@@ -1,0 +1,857 @@
+import { Router } from 'express';
+import { PrismaClient, FlightStatus } from '@prisma/client';
+import { asyncHandler, AppError } from '../middleware/errorHandler.js';
+import { authenticate, requireRole, AuthRequest } from '../middleware/auth.js';
+import { cache } from '../services/cache.js';
+import fs from 'fs/promises';
+import path from 'path';
+
+const router = Router();
+const prisma = new PrismaClient();
+
+// Helper: Create media folder for completed flight
+async function createMediaFolder(flight: any, customer: any, pilot: any): Promise<string | null> {
+  try {
+    const today = new Date();
+    const dateStr = today.toISOString().split('T')[0]; // YYYY-MM-DD
+    const mediaBasePath = process.env.MEDIA_STORAGE_PATH || './media';
+
+    const folderPath = path.join(
+      mediaBasePath,
+      dateStr,
+      `pilot_${pilot.id}`,
+      `customer_${customer.displayId}`
+    );
+
+    // Create directory recursively
+    await fs.mkdir(folderPath, { recursive: true });
+
+    // Create thumbnail subdirectory
+    await fs.mkdir(path.join(folderPath, 'thumbnail'), { recursive: true });
+
+    // Create .gitkeep file
+    await fs.writeFile(path.join(folderPath, '.gitkeep'), '');
+
+    // Create or update MediaFolder record
+    await prisma.mediaFolder.upsert({
+      where: { flightId: flight.id },
+      create: {
+        flightId: flight.id,
+        customerId: customer.id,
+        pilotId: pilot.id,
+        folderPath: folderPath,
+        fileCount: 0,
+        totalSizeBytes: 0,
+      },
+      update: {
+        folderPath: folderPath,
+      },
+    });
+
+    return folderPath;
+  } catch (error) {
+    console.error('Failed to create media folder:', error);
+    return null;
+  }
+}
+
+// GET /api/flights - List all flights with pagination, filtering, search
+router.get('/', authenticate, asyncHandler(async (req: AuthRequest, res: any) => {
+  const {
+    status,
+    pilotId,
+    date,
+    search,
+    cursor,
+    limit = '50'
+  } = req.query;
+
+  const take = Math.min(parseInt(limit as string) || 50, 100);
+  const where: any = {};
+
+  // Status filter
+  if (status && status !== 'all') {
+    where.status = status;
+  }
+
+  // Pilot filter
+  if (pilotId) {
+    where.pilotId = pilotId;
+  }
+
+  // Date filter (default to today)
+  if (date !== 'all') {
+    const filterDate = date ? new Date(date as string) : new Date();
+    const startOfDay = new Date(filterDate);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(filterDate);
+    endOfDay.setHours(23, 59, 59, 999);
+    where.createdAt = { gte: startOfDay, lte: endOfDay };
+  }
+
+  // Search by customer name or displayId
+  if (search) {
+    where.OR = [
+      { customer: { displayId: { contains: search as string, mode: 'insensitive' } } },
+      { customer: { firstName: { contains: search as string, mode: 'insensitive' } } },
+      { customer: { lastName: { contains: search as string, mode: 'insensitive' } } },
+    ];
+  }
+
+  // If user is a pilot, only show their flights
+  if (req.user!.role === 'PILOT' && req.user!.pilotId) {
+    where.pilotId = req.user!.pilotId;
+  }
+
+  // Cursor-based pagination
+  const cursorOption = cursor ? { id: cursor as string } : undefined;
+
+  const flights = await prisma.flight.findMany({
+    where,
+    take: take + 1, // Get one extra to check if there's more
+    skip: cursor ? 1 : 0,
+    cursor: cursorOption,
+    orderBy: { createdAt: 'desc' },
+    include: {
+      customer: {
+        select: {
+          id: true,
+          displayId: true,
+          firstName: true,
+          lastName: true,
+          phone: true,
+          weight: true,
+        },
+      },
+      pilot: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+    },
+  });
+
+  // Check if there are more results
+  const hasMore = flights.length > take;
+  const data = hasMore ? flights.slice(0, -1) : flights;
+  const nextCursor = hasMore ? data[data.length - 1]?.id : null;
+
+  res.json({
+    success: true,
+    data,
+    pagination: {
+      hasMore,
+      nextCursor,
+      count: data.length,
+    },
+  });
+}));
+
+// GET /api/flights/stats/today - Today's flight statistics
+router.get('/stats/today', authenticate, asyncHandler(async (req: AuthRequest, res: any) => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const flights = await prisma.flight.findMany({
+    where: { createdAt: { gte: today } },
+    select: {
+      status: true,
+      durationMinutes: true,
+      createdAt: true,
+      takeoffAt: true,
+    },
+  });
+
+  const completed = flights.filter(f => f.status === 'COMPLETED');
+  const avgDuration = completed.length > 0
+    ? Math.round(completed.reduce((sum, f) => sum + (f.durationMinutes || 0), 0) / completed.length)
+    : 0;
+
+  // Calculate average wait time (createdAt to takeoffAt)
+  const flightsWithTakeoff = flights.filter(f => f.takeoffAt);
+  const avgWaitTime = flightsWithTakeoff.length > 0
+    ? Math.round(
+        flightsWithTakeoff.reduce((sum, f) => {
+          const wait = f.takeoffAt!.getTime() - f.createdAt.getTime();
+          return sum + wait / 60000; // Convert to minutes
+        }, 0) / flightsWithTakeoff.length
+      )
+    : 0;
+
+  res.json({
+    success: true,
+    data: {
+      total: flights.length,
+      completed: completed.length,
+      inFlight: flights.filter(f => f.status === 'IN_FLIGHT').length,
+      waiting: flights.filter(f => ['ASSIGNED', 'PICKED_UP'].includes(f.status)).length,
+      cancelled: flights.filter(f => f.status === 'CANCELLED').length,
+      avgDuration,
+      avgWaitTime,
+    },
+  });
+}));
+
+// GET /api/flights/stats/hourly - Hourly flight distribution
+router.get('/stats/hourly', authenticate, asyncHandler(async (req: AuthRequest, res: any) => {
+  const { date } = req.query;
+
+  const filterDate = date ? new Date(date as string) : new Date();
+  const startOfDay = new Date(filterDate);
+  startOfDay.setHours(0, 0, 0, 0);
+  const endOfDay = new Date(filterDate);
+  endOfDay.setHours(23, 59, 59, 999);
+
+  const flights = await prisma.flight.findMany({
+    where: {
+      createdAt: { gte: startOfDay, lte: endOfDay },
+      status: { not: 'CANCELLED' },
+    },
+    select: {
+      createdAt: true,
+      status: true,
+    },
+  });
+
+  // Group by hour
+  const hourlyData: { hour: number; count: number; completed: number }[] = [];
+  for (let i = 6; i <= 20; i++) { // 06:00 to 20:00
+    const hourFlights = flights.filter(f => f.createdAt.getHours() === i);
+    hourlyData.push({
+      hour: i,
+      count: hourFlights.length,
+      completed: hourFlights.filter(f => f.status === 'COMPLETED').length,
+    });
+  }
+
+  res.json({
+    success: true,
+    data: hourlyData,
+  });
+}));
+
+// GET /api/flights/live - Live flight dashboard data (enhanced)
+router.get('/live', authenticate, asyncHandler(async (req: AuthRequest, res: any) => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  // Get all today's flights
+  const todayFlights = await prisma.flight.findMany({
+    where: {
+      createdAt: { gte: today },
+    },
+    include: {
+      customer: {
+        select: {
+          id: true,
+          displayId: true,
+          firstName: true,
+          lastName: true,
+          weight: true,
+          createdAt: true,
+        },
+      },
+      pilot: {
+        select: {
+          id: true,
+          name: true,
+          status: true,
+        },
+      },
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+
+  // Get all active pilots
+  const pilots = await prisma.pilot.findMany({
+    where: { isActive: true },
+    orderBy: [
+      { dailyFlightCount: 'asc' },
+      { queuePosition: 'asc' },
+    ],
+    select: {
+      id: true,
+      name: true,
+      status: true,
+      dailyFlightCount: true,
+      maxDailyFlights: true,
+    },
+  });
+
+  // Categorize flights (excluding cancelled for active lists)
+  const activeFlights = todayFlights.filter(f => f.status !== 'CANCELLED');
+  const inFlight = activeFlights.filter(f => f.status === 'IN_FLIGHT');
+  const waiting = activeFlights.filter(f => ['ASSIGNED', 'PICKED_UP'].includes(f.status));
+  const completed = activeFlights.filter(f => f.status === 'COMPLETED');
+  const cancelled = todayFlights.filter(f => f.status === 'CANCELLED');
+
+  // Calculate average duration
+  const avgDuration = completed.length > 0
+    ? Math.round(completed.reduce((sum, f) => sum + (f.durationMinutes || 0), 0) / completed.length)
+    : 0;
+
+  // Add elapsed time for in-flight
+  const now = new Date();
+  const inFlightWithElapsed = inFlight.map(f => ({
+    ...f,
+    elapsedMinutes: f.takeoffAt
+      ? Math.round((now.getTime() - f.takeoffAt.getTime()) / 60000)
+      : 0,
+  }));
+
+  // Add wait time for waiting customers
+  const waitingWithTime = waiting.map(f => ({
+    ...f,
+    waitMinutes: Math.round((now.getTime() - f.createdAt.getTime()) / 60000),
+  }));
+
+  res.json({
+    success: true,
+    data: {
+      inFlight: inFlightWithElapsed,
+      waiting: waitingWithTime,
+      completed,
+      cancelled,
+      pilots,
+      stats: {
+        totalToday: activeFlights.length,
+        inFlightCount: inFlight.length,
+        waitingCount: waiting.length,
+        completedCount: completed.length,
+        cancelledCount: cancelled.length,
+        availablePilots: pilots.filter(p => p.status === 'AVAILABLE' && p.dailyFlightCount < p.maxDailyFlights).length,
+        avgDuration,
+      },
+    },
+  });
+}));
+
+// GET /api/flights/:id - Get flight by ID with full details
+router.get('/:id', authenticate, asyncHandler(async (req: AuthRequest, res: any) => {
+  const { id } = req.params;
+
+  const flight = await prisma.flight.findUnique({
+    where: { id },
+    include: {
+      customer: true,
+      pilot: true,
+      mediaFolder: true,
+    },
+  });
+
+  if (!flight) {
+    throw new AppError('Uçuş bulunamadı', 404, 'FLIGHT_NOT_FOUND');
+  }
+
+  // Get sales for this customer on same day
+  const flightDate = new Date(flight.createdAt);
+  flightDate.setHours(0, 0, 0, 0);
+  const nextDay = new Date(flightDate);
+  nextDay.setDate(nextDay.getDate() + 1);
+
+  const sales = await prisma.sale.findMany({
+    where: {
+      customerId: flight.customerId,
+      createdAt: { gte: flightDate, lt: nextDay },
+    },
+    include: {
+      items: {
+        include: { product: true },
+      },
+    },
+  });
+
+  // Build timeline
+  const timeline = [
+    { event: 'Kayıt', time: flight.createdAt, status: 'completed' },
+  ];
+
+  if (flight.pickupAt) {
+    timeline.push({ event: 'Müşteri Alındı', time: flight.pickupAt, status: 'completed' });
+  }
+  if (flight.takeoffAt) {
+    timeline.push({ event: 'Kalkış', time: flight.takeoffAt, status: 'completed' });
+  }
+  if (flight.landingAt) {
+    timeline.push({ event: 'İniş', time: flight.landingAt, status: 'completed' });
+  }
+  if (flight.status === 'CANCELLED') {
+    timeline.push({ event: 'İptal Edildi', time: flight.updatedAt, status: 'cancelled' });
+  }
+
+  res.json({
+    success: true,
+    data: {
+      ...flight,
+      timeline,
+      sales,
+    },
+  });
+}));
+
+// POST /api/flights/:id/cancel - Cancel a flight
+router.post('/:id/cancel', authenticate, asyncHandler(async (req: AuthRequest, res: any) => {
+  const { id } = req.params;
+  const { reason } = req.body;
+
+  const flight = await prisma.flight.findUnique({
+    where: { id },
+    include: { pilot: true, customer: true },
+  });
+
+  if (!flight) {
+    throw new AppError('Uçuş bulunamadı', 404, 'FLIGHT_NOT_FOUND');
+  }
+
+  // Cannot cancel completed flights
+  if (flight.status === 'COMPLETED') {
+    throw new AppError('Tamamlanmış uçuş iptal edilemez', 400, 'CANNOT_CANCEL_COMPLETED');
+  }
+
+  if (flight.status === 'CANCELLED') {
+    throw new AppError('Uçuş zaten iptal edilmiş', 400, 'ALREADY_CANCELLED');
+  }
+
+  // Transaction to update flight, pilot, and customer
+  const updatedFlight = await prisma.$transaction(async (tx) => {
+    // Update flight
+    const updated = await tx.flight.update({
+      where: { id },
+      data: {
+        status: 'CANCELLED',
+        notes: reason ? `İptal nedeni: ${reason}` : flight.notes,
+      },
+      include: { customer: true, pilot: true },
+    });
+
+    // If pilot was in flight, set back to available
+    if (flight.status === 'IN_FLIGHT') {
+      await tx.pilot.update({
+        where: { id: flight.pilotId },
+        data: { status: 'AVAILABLE' },
+      });
+    }
+
+    // Update customer status
+    await tx.customer.update({
+      where: { id: flight.customerId },
+      data: { status: 'CANCELLED' },
+    });
+
+    return updated;
+  });
+
+  // Invalidate caches
+  await cache.pilotQueue.invalidate();
+  await cache.pilot.invalidate(flight.pilotId);
+  await cache.customer.invalidate(flight.customerId);
+  await cache.activeFlights.invalidate();
+
+  // Emit socket event
+  const io = req.app.get('io');
+  if (io) {
+    io.to('admin').emit('flight:cancelled', {
+      flight: { id: updatedFlight.id, status: 'CANCELLED' },
+      pilot: { id: updatedFlight.pilot.id, name: updatedFlight.pilot.name },
+      customer: {
+        id: updatedFlight.customer.id,
+        displayId: updatedFlight.customer.displayId,
+        name: `${updatedFlight.customer.firstName} ${updatedFlight.customer.lastName}`,
+      },
+      reason,
+    });
+  }
+
+  res.json({
+    success: true,
+    data: updatedFlight,
+    message: 'Uçuş iptal edildi',
+  });
+}));
+
+// POST /api/flights/bulk-cancel - Bulk cancel flights (admin only)
+router.post('/bulk-cancel', authenticate, requireRole('ADMIN'), asyncHandler(async (req: AuthRequest, res: any) => {
+  const { reason } = req.body;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  // Find all waiting flights (ASSIGNED or PICKED_UP)
+  const waitingFlights = await prisma.flight.findMany({
+    where: {
+      createdAt: { gte: today },
+      status: { in: ['ASSIGNED', 'PICKED_UP'] },
+    },
+    include: { pilot: true, customer: true },
+  });
+
+  if (waitingFlights.length === 0) {
+    return res.json({
+      success: true,
+      data: [],
+      message: 'İptal edilecek bekleyen uçuş yok',
+    });
+  }
+
+  // Cancel all waiting flights
+  const cancelledIds = waitingFlights.map(f => f.id);
+
+  await prisma.$transaction(async (tx) => {
+    // Update all flights
+    await tx.flight.updateMany({
+      where: { id: { in: cancelledIds } },
+      data: {
+        status: 'CANCELLED',
+        notes: reason ? `Toplu iptal: ${reason}` : 'Toplu iptal (hava muhalefeti)',
+      },
+    });
+
+    // Update all customers
+    const customerIds = waitingFlights.map(f => f.customerId);
+    await tx.customer.updateMany({
+      where: { id: { in: customerIds } },
+      data: { status: 'CANCELLED' },
+    });
+
+    // Set all affected pilots to available
+    const pilotIds = [...new Set(waitingFlights.map(f => f.pilotId))];
+    await tx.pilot.updateMany({
+      where: { id: { in: pilotIds } },
+      data: { status: 'AVAILABLE' },
+    });
+  });
+
+  // Invalidate caches
+  await cache.pilotQueue.invalidate();
+  await cache.activeFlights.invalidate();
+
+  // Emit socket event
+  const io = req.app.get('io');
+  if (io) {
+    io.to('admin').emit('flights:bulk-cancelled', {
+      count: cancelledIds.length,
+      reason,
+    });
+  }
+
+  res.json({
+    success: true,
+    data: { cancelledCount: cancelledIds.length },
+    message: `${cancelledIds.length} uçuş iptal edildi`,
+  });
+}));
+
+// POST /api/flights/:id/reassign - Reassign pilot to a flight
+router.post('/:id/reassign', authenticate, requireRole('ADMIN'), asyncHandler(async (req: AuthRequest, res: any) => {
+  const { id } = req.params;
+  const { pilotId } = req.body;
+
+  if (!pilotId) {
+    throw new AppError('Pilot ID gerekli', 400, 'PILOT_ID_REQUIRED');
+  }
+
+  const flight = await prisma.flight.findUnique({
+    where: { id },
+    include: { pilot: true, customer: true },
+  });
+
+  if (!flight) {
+    throw new AppError('Uçuş bulunamadı', 404, 'FLIGHT_NOT_FOUND');
+  }
+
+  // Can only reassign before takeoff
+  if (['IN_FLIGHT', 'COMPLETED', 'CANCELLED'].includes(flight.status)) {
+    throw new AppError('Bu aşamada pilot değiştirilemez', 400, 'CANNOT_REASSIGN');
+  }
+
+  const newPilot = await prisma.pilot.findUnique({
+    where: { id: pilotId },
+  });
+
+  if (!newPilot) {
+    throw new AppError('Pilot bulunamadı', 404, 'PILOT_NOT_FOUND');
+  }
+
+  if (!newPilot.isActive) {
+    throw new AppError('Pilot aktif değil', 400, 'PILOT_INACTIVE');
+  }
+
+  if (newPilot.dailyFlightCount >= newPilot.maxDailyFlights) {
+    throw new AppError('Pilot günlük limitine ulaşmış', 400, 'PILOT_AT_LIMIT');
+  }
+
+  const oldPilotId = flight.pilotId;
+
+  // Update flight with new pilot
+  const updatedFlight = await prisma.flight.update({
+    where: { id },
+    data: { pilotId },
+    include: { customer: true, pilot: true },
+  });
+
+  // Invalidate caches
+  await cache.pilotQueue.invalidate();
+  await cache.pilot.invalidate(oldPilotId);
+  await cache.pilot.invalidate(pilotId);
+  await cache.activeFlights.invalidate();
+
+  // Emit socket events
+  const io = req.app.get('io');
+  if (io) {
+    // Notify old pilot
+    io.to(`pilot:${oldPilotId}`).emit('flight:reassigned', {
+      message: 'Müşteri başka pilota aktarıldı',
+      flightId: id,
+    });
+
+    // Notify new pilot
+    io.to(`pilot:${pilotId}`).emit('customer:assigned', {
+      flight: { id: updatedFlight.id, status: updatedFlight.status },
+      customer: {
+        id: updatedFlight.customer.id,
+        displayId: updatedFlight.customer.displayId,
+        firstName: updatedFlight.customer.firstName,
+        lastName: updatedFlight.customer.lastName,
+        phone: updatedFlight.customer.phone,
+        weight: updatedFlight.customer.weight,
+      },
+      pilot: { id: newPilot.id, name: newPilot.name },
+    });
+
+    // Notify admin
+    io.to('admin').emit('flight:reassigned', {
+      flightId: id,
+      oldPilotId,
+      newPilotId: pilotId,
+      newPilotName: newPilot.name,
+    });
+  }
+
+  res.json({
+    success: true,
+    data: updatedFlight,
+    message: `Uçuş ${newPilot.name} pilotuna aktarıldı`,
+  });
+}));
+
+// PATCH /api/flights/:id/status - Update flight status (pilot action buttons)
+router.patch('/:id/status', authenticate, asyncHandler(async (req: AuthRequest, res: any) => {
+  const { id } = req.params;
+  const { status, notes } = req.body;
+
+  const validStatuses: FlightStatus[] = ['ASSIGNED', 'PICKED_UP', 'IN_FLIGHT', 'COMPLETED', 'CANCELLED'];
+
+  if (!status || !validStatuses.includes(status)) {
+    throw new AppError('Geçersiz durum', 400, 'INVALID_STATUS');
+  }
+
+  const flight = await prisma.flight.findUnique({
+    where: { id },
+    include: { pilot: true, customer: true },
+  });
+
+  if (!flight) {
+    throw new AppError('Uçuş bulunamadı', 404, 'FLIGHT_NOT_FOUND');
+  }
+
+  // Check if pilot is authorized
+  if (req.user!.role === 'PILOT' && req.user!.pilotId !== flight.pilotId) {
+    throw new AppError('Bu uçuşu güncelleme yetkiniz yok', 403, 'FORBIDDEN');
+  }
+
+  // Validate status transitions (no going back)
+  const validTransitions: Record<string, string[]> = {
+    ASSIGNED: ['PICKED_UP', 'CANCELLED'],
+    PICKED_UP: ['IN_FLIGHT', 'CANCELLED'],
+    IN_FLIGHT: ['COMPLETED', 'CANCELLED'],
+    COMPLETED: [],
+    CANCELLED: [],
+  };
+
+  if (!validTransitions[flight.status]?.includes(status)) {
+    throw new AppError(`${flight.status} durumundan ${status} durumuna geçilemez`, 400, 'INVALID_TRANSITION');
+  }
+
+  // Prepare update data based on status
+  const updateData: any = { status };
+  const now = new Date();
+
+  if (notes) {
+    updateData.notes = notes;
+  }
+
+  switch (status) {
+    case 'PICKED_UP':
+      updateData.pickupAt = now;
+      break;
+    case 'IN_FLIGHT':
+      updateData.takeoffAt = now;
+      break;
+    case 'COMPLETED':
+      updateData.landingAt = now;
+      if (flight.takeoffAt) {
+        updateData.durationMinutes = Math.round(
+          (now.getTime() - flight.takeoffAt.getTime()) / 60000
+        );
+      }
+      break;
+  }
+
+  // Transaction to update flight, pilot, and customer
+  const updatedFlight = await prisma.$transaction(async (tx) => {
+    // Update flight
+    const updated = await tx.flight.update({
+      where: { id },
+      data: updateData,
+      include: {
+        customer: true,
+        pilot: true,
+      },
+    });
+
+    // Update pilot status and counters based on flight status
+    if (status === 'IN_FLIGHT') {
+      await tx.pilot.update({
+        where: { id: flight.pilotId },
+        data: { status: 'IN_FLIGHT' },
+      });
+
+      await tx.customer.update({
+        where: { id: flight.customerId },
+        data: { status: 'IN_FLIGHT' },
+      });
+    } else if (status === 'COMPLETED') {
+      // Increment daily flight count
+      await tx.pilot.update({
+        where: { id: flight.pilotId },
+        data: {
+          status: 'AVAILABLE',
+          dailyFlightCount: { increment: 1 },
+        },
+      });
+
+      await tx.customer.update({
+        where: { id: flight.customerId },
+        data: { status: 'COMPLETED' },
+      });
+    } else if (status === 'PICKED_UP') {
+      await tx.customer.update({
+        where: { id: flight.customerId },
+        data: { status: 'ASSIGNED' },
+      });
+    }
+
+    return updated;
+  });
+
+  // Create media folder on completion
+  if (status === 'COMPLETED') {
+    await createMediaFolder(updatedFlight, updatedFlight.customer, updatedFlight.pilot);
+  }
+
+  // Invalidate caches
+  await cache.pilotQueue.invalidate();
+  await cache.pilot.invalidate(flight.pilotId);
+  await cache.customer.invalidate(flight.customerId);
+  await cache.activeFlights.invalidate();
+
+  // Emit socket events
+  const io = req.app.get('io');
+  if (io) {
+    const eventMap: Record<string, string> = {
+      PICKED_UP: 'flight:pickup',
+      IN_FLIGHT: 'flight:takeoff',
+      COMPLETED: 'flight:landed',
+      CANCELLED: 'flight:cancelled',
+    };
+
+    const event = eventMap[status];
+    if (event) {
+      const eventData = {
+        flight: {
+          id: updatedFlight.id,
+          status: updatedFlight.status,
+          durationMinutes: updatedFlight.durationMinutes,
+        },
+        pilot: {
+          id: updatedFlight.pilot.id,
+          name: updatedFlight.pilot.name,
+        },
+        customer: {
+          id: updatedFlight.customer.id,
+          displayId: updatedFlight.customer.displayId,
+          name: `${updatedFlight.customer.firstName} ${updatedFlight.customer.lastName}`,
+        },
+      };
+
+      // Notify admin
+      io.to('admin').emit(event, eventData);
+
+      // Notify pilot
+      io.to(`pilot:${flight.pilotId}`).emit(event, eventData);
+
+      // Check if pilot is approaching/reached limit
+      if (status === 'COMPLETED') {
+        const pilot = await prisma.pilot.findUnique({
+          where: { id: flight.pilotId },
+        });
+
+        if (pilot) {
+          if (pilot.dailyFlightCount === pilot.maxDailyFlights - 1) {
+            io.to(`pilot:${flight.pilotId}`).emit('pilot:limit-warning', {
+              message: `Günlük uçuş limitine yaklaştınız: ${pilot.dailyFlightCount + 1}/${pilot.maxDailyFlights}`,
+            });
+          } else if (pilot.dailyFlightCount >= pilot.maxDailyFlights) {
+            io.to(`pilot:${flight.pilotId}`).emit('pilot:limit-reached', {
+              message: `Günlük uçuş limitine ulaştınız: ${pilot.maxDailyFlights}/${pilot.maxDailyFlights} - Bugünlük sıra dışısınız`,
+            });
+
+            // Notify admin about pilot reaching limit
+            io.to('admin').emit('pilot:limit-reached', {
+              pilotId: pilot.id,
+              pilotName: pilot.name,
+              message: `${pilot.name} günlük uçuş limitine ulaştı`,
+            });
+          }
+        }
+      }
+    }
+  }
+
+  res.json({
+    success: true,
+    data: updatedFlight,
+  });
+}));
+
+// POST /api/flights/:id/notes - Add notes to flight
+router.post('/:id/notes', authenticate, asyncHandler(async (req: AuthRequest, res: any) => {
+  const { id } = req.params;
+  const { notes } = req.body;
+
+  const flight = await prisma.flight.findUnique({
+    where: { id },
+  });
+
+  if (!flight) {
+    throw new AppError('Uçuş bulunamadı', 404, 'FLIGHT_NOT_FOUND');
+  }
+
+  // Check if pilot is authorized
+  if (req.user!.role === 'PILOT' && req.user!.pilotId !== flight.pilotId) {
+    throw new AppError('Bu uçuşu güncelleme yetkiniz yok', 403, 'FORBIDDEN');
+  }
+
+  const updatedFlight = await prisma.flight.update({
+    where: { id },
+    data: { notes },
+  });
+
+  res.json({
+    success: true,
+    data: updatedFlight,
+  });
+}));
+
+export default router;

@@ -1,0 +1,30 @@
+{
+  "name": "skytrack",
+  "version": "1.0.0",
+  "private": true,
+  "description": "SkyTrack - Alanya Paragliding Cooperative Management System",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev:api\" \"npm run dev:web\"",
+    "dev:web": "npm run dev -w packages/web",
+    "dev:api": "npm run dev -w packages/api",
+    "build": "npm run build -w packages/api && npm run build -w packages/web",
+    "build:web": "npm run build -w packages/web",
+    "build:api": "npm run build -w packages/api",
+    "start": "concurrently \"npm run start:api\" \"npm run start:web\"",
+    "start:web": "npm run start -w packages/web",
+    "start:api": "npm run start -w packages/api",
+    "db:generate": "npm run db:generate -w packages/api",
+    "db:migrate": "npm run db:migrate -w packages/api",
+    "db:seed": "npm run db:seed -w packages/api",
+    "db:studio": "npm run db:studio -w packages/api"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

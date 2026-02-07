@@ -1,0 +1,213 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  OFFICE_STAFF
+  PILOT
+  MEDIA_SELLER
+}
+
+enum CustomerStatus {
+  REGISTERED
+  ASSIGNED
+  IN_FLIGHT
+  COMPLETED
+  CANCELLED
+}
+
+enum FlightStatus {
+  ASSIGNED
+  PICKED_UP
+  IN_FLIGHT
+  COMPLETED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PAID
+  UNPAID
+  PARTIAL
+}
+
+enum PaymentMethod {
+  CASH
+  CREDIT_CARD
+  TRANSFER
+}
+
+enum PilotStatus {
+  AVAILABLE
+  IN_FLIGHT
+  ON_BREAK
+  OFF_DUTY
+}
+
+enum MediaDeliveryStatus {
+  PENDING
+  PAID
+  DELIVERED
+}
+
+model User {
+  id           String   @id @default(uuid())
+  username     String   @unique
+  passwordHash String   @map("password_hash")
+  role         UserRole
+  pilotId      String?  @unique @map("pilot_id")
+  pilot        Pilot?   @relation(fields: [pilotId], references: [id])
+  sales        Sale[]
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@index([role])
+  @@map("users")
+}
+
+model Pilot {
+  id               String        @id @default(uuid())
+  name             String
+  phone            String
+  email            String?
+  dailyFlightCount Int           @default(0) @map("daily_flight_count")
+  maxDailyFlights  Int           @default(7) @map("max_daily_flights")
+  isActive         Boolean       @default(true) @map("is_active")
+  queuePosition    Int           @map("queue_position")
+  status           PilotStatus   @default(AVAILABLE)
+  user             User?
+  customers        Customer[]
+  flights          Flight[]
+  mediaFolders     MediaFolder[]
+  createdAt        DateTime      @default(now()) @map("created_at")
+  updatedAt        DateTime      @updatedAt @map("updated_at")
+
+  @@index([status])
+  @@index([dailyFlightCount])
+  @@index([isActive, status, dailyFlightCount])
+  @@map("pilots")
+}
+
+model Customer {
+  id               String         @id @default(uuid())
+  displayId        String         @unique @map("display_id")
+  firstName        String         @map("first_name")
+  lastName         String         @map("last_name")
+  email            String?
+  phone            String
+  emergencyContact String?        @map("emergency_contact")
+  weight           Float?
+  qrCode           String?        @map("qr_code")
+  waiverSigned     Boolean        @default(false) @map("waiver_signed")
+  waiverSignedAt   DateTime?      @map("waiver_signed_at")
+  assignedPilotId  String?        @map("assigned_pilot_id")
+  assignedPilot    Pilot?         @relation(fields: [assignedPilotId], references: [id])
+  status           CustomerStatus @default(REGISTERED)
+  flights          Flight[]
+  mediaFolders     MediaFolder[]
+  sales            Sale[]
+  createdAt        DateTime       @default(now()) @map("created_at")
+  updatedAt        DateTime       @updatedAt @map("updated_at")
+
+  @@index([displayId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([assignedPilotId])
+  @@map("customers")
+}
+
+model Flight {
+  id              String       @id @default(uuid())
+  customerId      String       @map("customer_id")
+  customer        Customer     @relation(fields: [customerId], references: [id])
+  pilotId         String       @map("pilot_id")
+  pilot           Pilot        @relation(fields: [pilotId], references: [id])
+  status          FlightStatus @default(ASSIGNED)
+  assignedAt      DateTime     @default(now()) @map("assigned_at")
+  pickupAt        DateTime?    @map("pickup_at")
+  takeoffAt       DateTime?    @map("takeoff_at")
+  landingAt       DateTime?    @map("landing_at")
+  durationMinutes Int?         @map("duration_minutes")
+  notes           String?
+  mediaFolder     MediaFolder?
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @updatedAt @map("updated_at")
+
+  @@index([status])
+  @@index([pilotId])
+  @@index([customerId])
+  @@index([pilotId, status])
+  @@index([createdAt])
+  @@map("flights")
+}
+
+model MediaFolder {
+  id              String              @id @default(uuid())
+  flightId        String              @unique @map("flight_id")
+  flight          Flight              @relation(fields: [flightId], references: [id])
+  customerId      String              @map("customer_id")
+  customer        Customer            @relation(fields: [customerId], references: [id])
+  pilotId         String              @map("pilot_id")
+  pilot           Pilot               @relation(fields: [pilotId], references: [id])
+  folderPath      String              @map("folder_path")
+  fileCount       Int                 @default(0) @map("file_count")
+  totalSizeBytes  BigInt              @default(0) @map("total_size_bytes")
+  paymentStatus   String              @default("PENDING") @map("payment_status")
+  deliveryStatus  String              @default("PENDING") @map("delivery_status")
+  paymentAmount   Float?              @map("payment_amount")
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime            @updatedAt @map("updated_at")
+
+  @@index([customerId])
+  @@index([pilotId])
+  @@index([paymentStatus])
+  @@index([deliveryStatus])
+  @@map("media_folders")
+}
+
+model Sale {
+  id            String         @id @default(uuid())
+  customerId    String         @map("customer_id")
+  customer      Customer       @relation(fields: [customerId], references: [id])
+  itemType      String         @map("item_type")
+  itemName      String         @map("item_name")
+  quantity      Int            @default(1)
+  unitPrice     Float          @map("unit_price")
+  totalPrice    Float          @map("total_price")
+  paymentStatus PaymentStatus  @default(UNPAID)
+  paymentMethod PaymentMethod? @map("payment_method")
+  soldById      String         @map("sold_by_id")
+  soldBy        User           @relation(fields: [soldById], references: [id])
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+
+  @@index([customerId])
+  @@index([paymentStatus])
+  @@index([createdAt])
+  @@map("sales")
+}
+
+model Product {
+  id          String   @id @default(uuid())
+  name        String
+  category    String
+  price       Float
+  isActive    Boolean  @default(true) @map("is_active")
+  isFavorite  Boolean  @default(false) @map("is_favorite")
+  stock       Int?
+  lowStockAlert Int?   @map("low_stock_alert")
+  imageUrl    String?  @map("image_url")
+  sortOrder   Int      @default(0) @map("sort_order")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([category])
+  @@index([isActive])
+  @@index([isFavorite])
+  @@map("products")
+}
