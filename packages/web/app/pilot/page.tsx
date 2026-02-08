@@ -8,6 +8,8 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { pilotsApi, flightsApi, mediaApi } from '@/lib/api'
 import { useSocket } from '@/hooks/useSocket'
 import { SOCKET_EVENTS } from '@/lib/socket'
+import { PushNotificationManager } from '@/components/pwa/PushNotificationManager'
+import { PWAInstallPrompt } from '@/components/pwa/PWAInstallGuide'
 import {
   Plane,
   User,
@@ -297,6 +299,10 @@ export default function PilotPanel() {
           </Button>
         </div>
       </header>
+
+      {/* PWA Components */}
+      <PushNotificationManager showOnMount={true} />
+      <PWAInstallPrompt />
 
       {/* Notification Banner */}
       {notification && (

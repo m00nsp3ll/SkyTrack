@@ -1,8 +1,9 @@
 const withPWA = require('@ducanh2912/next-pwa').default({
   dest: 'public',
-  disable: process.env.NODE_ENV === 'development',
+  disable: false, // Enable PWA in development for push notifications
   register: true,
   skipWaiting: true,
+  customWorkerSrc: 'service-worker',
   runtimeCaching: [
     {
       urlPattern: /^https?:\/\/.*\/api\/.*$/,
@@ -35,6 +36,17 @@ const withPWA = require('@ducanh2912/next-pwa').default({
         expiration: {
           maxEntries: 100,
           maxAgeSeconds: 60 * 60 * 24 * 7, // 7 days
+        },
+      },
+    },
+    {
+      urlPattern: /\.(?:woff|woff2|ttf|otf|eot)$/,
+      handler: 'CacheFirst',
+      options: {
+        cacheName: 'font-cache',
+        expiration: {
+          maxEntries: 20,
+          maxAgeSeconds: 60 * 60 * 24 * 365, // 1 year
         },
       },
     },

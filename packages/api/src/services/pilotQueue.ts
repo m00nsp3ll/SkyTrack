@@ -1,5 +1,6 @@
 import { PrismaClient, Pilot, PilotStatus } from '@prisma/client';
 import { cache } from './cache.js';
+import { sendPushToPilot, notifications } from './pushNotification.js';
 import fs from 'fs';
 import path from 'path';
 
@@ -205,7 +206,7 @@ export const pilotQueueService = {
     if (io) {
       const customer = await prisma.customer.findUnique({
         where: { id: customerId },
-        select: { firstName: true, lastName: true, displayId: true },
+        select: { firstName: true, lastName: true, displayId: true, weight: true },
       });
 
       io.to(`pilot:${pilot.id}`).emit('customer:assigned', {
@@ -227,6 +228,15 @@ export const pilotQueueService = {
           name: `${customer?.firstName} ${customer?.lastName}`,
         },
       });
+
+      // Send push notification to pilot (works even when app is closed)
+      if (customer) {
+        const customerName = `${customer.firstName} ${customer.lastName}`;
+        sendPushToPilot(
+          pilot.id,
+          notifications.customerAssigned(customerName, customer.displayId, customer.weight || 0)
+        ).catch(err => console.error('Push notification error:', err));
+      }
     }
 
     return {
@@ -328,6 +338,13 @@ export const pilotQueueService = {
             name: `${customer.firstName} ${customer.lastName}`,
           },
         });
+
+        // Send push notification to new pilot
+        const customerName = `${customer.firstName} ${customer.lastName}`;
+        sendPushToPilot(
+          pilot.id,
+          notifications.customerAssigned(customerName, customer.displayId, customer.weight || 0)
+        ).catch(err => console.error('Push notification error:', err));
       }
     }
 

@@ -51,6 +51,18 @@
 - [x] Personel CRUD işlemleri
 - [x] Pilot-kullanıcı eşleştirme
 
+### PWA ve Push Bildirimler
+- [x] Web Push Notification altyapısı (web-push + VAPID)
+- [x] PushSubscription veritabanı modeli
+- [x] Push notification servisi (sendPushToUser, sendPushToPilot, sendPushBroadcast)
+- [x] Push API endpoint'leri (subscribe, unsubscribe, test, broadcast)
+- [x] Service Worker push handler
+- [x] PWA manifest ve next-pwa yapılandırması
+- [x] Bildirim izin modal'ı (PushNotificationManager)
+- [x] PWA kurulum rehberi (iOS talimatları dahil)
+- [x] Müşteri atamalarında push bildirimi
+- [x] Admin bildirim yönetim sayfası
+
 ### UI/UX
 - [x] Responsive sidebar (collapse özelliği)
 - [x] Mobil menü (hamburger)

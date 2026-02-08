@@ -56,15 +56,16 @@ enum MediaDeliveryStatus {
 }
 
 model User {
-  id           String   @id @default(uuid())
-  username     String   @unique
-  passwordHash String   @map("password_hash")
-  role         UserRole
-  pilotId      String?  @unique @map("pilot_id")
-  pilot        Pilot?   @relation(fields: [pilotId], references: [id])
-  sales        Sale[]
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  id                String             @id @default(uuid())
+  username          String             @unique
+  passwordHash      String             @map("password_hash")
+  role              UserRole
+  pilotId           String?            @unique @map("pilot_id")
+  pilot             Pilot?             @relation(fields: [pilotId], references: [id])
+  sales             Sale[]
+  pushSubscriptions PushSubscription[]
+  createdAt         DateTime           @default(now()) @map("created_at")
+  updatedAt         DateTime           @updatedAt @map("updated_at")
 
   @@index([role])
   @@map("users")
@@ -212,4 +213,21 @@ model Product {
   @@index([isActive])
   @@index([isFavorite])
   @@map("products")
+}
+
+model PushSubscription {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint  String
+  p256dh    String
+  auth      String
+  device    String?
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([userId, endpoint])
+  @@index([userId])
+  @@index([isActive])
+  @@map("push_subscriptions")
 }
