@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
@@ -17,29 +18,96 @@ import {
   UserPlus,
   Package,
   Receipt,
+  TrendingUp,
+  UserCog,
+  Calendar,
+  GitCompare,
+  Server,
+  ListOrdered,
+  Eye,
+  CreditCard,
+  ChevronLeft,
+  ChevronRight,
+  Menu,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
-const menuItems = [
-  { href: '/admin', label: 'Panel', icon: LayoutDashboard },
-  { href: '/admin/customers/new', label: 'Yeni Kayıt', icon: UserPlus },
-  { href: '/admin/scan', label: 'QR Tara', icon: QrCode },
-  { href: '/admin/customers', label: 'Müşteriler', icon: Users },
-  { href: '/admin/pilots', label: 'Pilotlar', icon: UserCheck },
-  { href: '/admin/flights', label: 'Canlı Takip', icon: Plane },
-  { href: '/admin/flights/list', label: 'Uçuş Geçmişi', icon: Plane },
-  { href: '/pos', label: 'POS Satış', icon: ShoppingCart },
-  { href: '/admin/products', label: 'Ürün Kataloğu', icon: Package },
-  { href: '/admin/sales/daily', label: 'Kasa Raporu', icon: Receipt },
-  { href: '/admin/sales/unpaid', label: 'Ödenmemişler', icon: Receipt },
-  { href: '/admin/media', label: 'Medya Yönetimi', icon: Camera },
-  { href: '/admin/media/seller', label: 'Medya Satış', icon: Camera },
-  { href: '/admin/reports', label: 'Raporlar', icon: BarChart3 },
-  { href: '/admin/settings', label: 'Ayarlar', icon: Settings },
+interface MenuItem {
+  href: string
+  label: string
+  icon: any
+}
+
+interface MenuGroup {
+  title: string
+  items: MenuItem[]
+}
+
+const menuGroups: MenuGroup[] = [
+  {
+    title: 'GENEL',
+    items: [
+      { href: '/admin', label: 'Ana Panel', icon: LayoutDashboard },
+    ],
+  },
+  {
+    title: 'OPERASYON',
+    items: [
+      { href: '/admin/customers/new', label: 'Müşteri Kayıt', icon: UserPlus },
+      { href: '/admin/scan', label: 'QR Tara', icon: QrCode },
+      { href: '/admin/customers', label: 'Müşteri Listesi', icon: Users },
+      { href: '/admin/flights', label: 'Uçuş Takibi', icon: Plane },
+    ],
+  },
+  {
+    title: 'PİLOT YÖNETİMİ',
+    items: [
+      { href: '/admin/pilots', label: 'Pilotlar', icon: UserCheck },
+      { href: '/admin/pilots/queue', label: 'Pilot Sırası', icon: ListOrdered },
+    ],
+  },
+  {
+    title: 'MEDYA',
+    items: [
+      { href: '/admin/media', label: 'Medya Yönetimi', icon: Camera },
+      { href: '/admin/media/seller', label: 'Önizleme İstasyonu', icon: Eye },
+    ],
+  },
+  {
+    title: 'SATIŞ',
+    items: [
+      { href: '/pos', label: 'POS Satış Ekranı', icon: ShoppingCart },
+      { href: '/admin/products', label: 'Ürün Yönetimi', icon: Package },
+      { href: '/admin/sales/unpaid', label: 'Ödenmemiş Satışlar', icon: CreditCard },
+    ],
+  },
+  {
+    title: 'RAPORLAR',
+    items: [
+      { href: '/admin/sales/daily', label: 'Günlük Rapor', icon: Calendar },
+      { href: '/admin/reports/pilots', label: 'Pilot Raporu', icon: UserCog },
+      { href: '/admin/reports/revenue', label: 'Gelir Raporu', icon: TrendingUp },
+      { href: '/admin/reports/customers', label: 'Müşteri Akışı', icon: BarChart3 },
+      { href: '/admin/reports/compare', label: 'Dönem Karşılaştırma', icon: GitCompare },
+    ],
+  },
+  {
+    title: 'SİSTEM',
+    items: [
+      { href: '/admin/staff', label: 'Personel Yönetimi', icon: UserCog },
+      { href: '/admin/reports/system', label: 'Sistem İzleme', icon: Server },
+      { href: '/admin/settings', label: 'Ayarlar', icon: Settings },
+    ],
+  },
 ]
 
-export function Sidebar() {
+interface SidebarProps {
+  onNavigate?: () => void
+}
+
+export function Sidebar({ onNavigate }: SidebarProps) {
   const pathname = usePathname()
+  const [isCollapsed, setIsCollapsed] = useState(false)
 
   const handleLogout = () => {
     localStorage.removeItem('token')
@@ -47,47 +115,107 @@ export function Sidebar() {
     window.location.href = '/login'
   }
 
+  const isActive = (href: string) => {
+    if (href === '/admin') {
+      return pathname === '/admin'
+    }
+    return pathname === href || pathname.startsWith(href + '/')
+  }
+
   return (
-    <aside className="w-64 bg-white border-r border-gray-200 min-h-screen flex flex-col">
-      <div className="p-6 border-b border-gray-200">
-        <h1 className="text-xl font-bold text-primary">SkyTrack</h1>
-        <p className="text-sm text-muted-foreground">Yönetim Paneli</p>
-      </div>
-
-      <nav className="flex-1 p-4">
-        <ul className="space-y-1">
-          {menuItems.map((item) => {
-            const Icon = item.icon
-            const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
-
-            return (
-              <li key={item.href}>
-                <Link
-                  href={item.href}
-                  className={cn(
-                    'flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors',
-                    isActive
-                      ? 'bg-primary text-primary-foreground'
-                      : 'text-gray-700 hover:bg-gray-100'
-                  )}
-                >
-                  <Icon className="h-5 w-5" />
-                  {item.label}
-                </Link>
-              </li>
-            )
-          })}
-        </ul>
-      </nav>
-
-      <div className="p-4 border-t border-gray-200">
+    <aside
+      className={cn(
+        'bg-white border-r border-gray-200 h-screen flex flex-col transition-all duration-300',
+        isCollapsed ? 'w-16' : 'w-64'
+      )}
+    >
+      {/* Header */}
+      <div className={cn(
+        'border-b border-gray-200 flex items-center',
+        isCollapsed ? 'p-3 justify-center' : 'p-4 justify-between'
+      )}>
+        {!isCollapsed && (
+          <div>
+            <h1 className="text-xl font-bold text-primary">SkyTrack</h1>
+            <p className="text-xs text-muted-foreground">Yönetim Paneli</p>
+          </div>
+        )}
         <Button
           variant="ghost"
-          className="w-full justify-start text-gray-700 hover:text-destructive hover:bg-destructive/10"
-          onClick={handleLogout}
+          size="icon"
+          onClick={() => setIsCollapsed(!isCollapsed)}
+          className="h-8 w-8"
         >
-          <LogOut className="h-5 w-5 mr-3" />
-          Çıkış Yap
+          {isCollapsed ? (
+            <ChevronRight className="h-4 w-4" />
+          ) : (
+            <ChevronLeft className="h-4 w-4" />
+          )}
+        </Button>
+      </div>
+
+      {/* Navigation */}
+      <nav className="flex-1 overflow-y-auto py-2">
+        {menuGroups.map((group, groupIndex) => (
+          <div key={group.title} className="mb-1">
+            {/* Group Title */}
+            {!isCollapsed && (
+              <div className="px-4 py-2">
+                <span className="text-[10px] font-semibold text-gray-400 tracking-wider">
+                  {group.title}
+                </span>
+              </div>
+            )}
+
+            {/* Group Items */}
+            <ul className="px-2 space-y-0.5">
+              {group.items.map((item) => {
+                const Icon = item.icon
+                const active = isActive(item.href)
+
+                return (
+                  <li key={item.href}>
+                    <Link
+                      href={item.href}
+                      onClick={onNavigate}
+                      title={isCollapsed ? item.label : undefined}
+                      className={cn(
+                        'flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors',
+                        active
+                          ? 'bg-primary text-primary-foreground'
+                          : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900',
+                        isCollapsed && 'justify-center px-2'
+                      )}
+                    >
+                      <Icon className={cn('h-5 w-5 flex-shrink-0', active && 'text-primary-foreground')} />
+                      {!isCollapsed && <span className="truncate">{item.label}</span>}
+                    </Link>
+                  </li>
+                )
+              })}
+            </ul>
+
+            {/* Divider between groups */}
+            {groupIndex < menuGroups.length - 1 && (
+              <div className="mx-4 my-2 border-b border-gray-100" />
+            )}
+          </div>
+        ))}
+      </nav>
+
+      {/* Logout */}
+      <div className="p-2 border-t border-gray-200">
+        <Button
+          variant="ghost"
+          className={cn(
+            'w-full text-gray-600 hover:text-destructive hover:bg-destructive/10',
+            isCollapsed ? 'justify-center px-2' : 'justify-start'
+          )}
+          onClick={handleLogout}
+          title={isCollapsed ? 'Çıkış Yap' : undefined}
+        >
+          <LogOut className="h-5 w-5 flex-shrink-0" />
+          {!isCollapsed && <span className="ml-3">Çıkış Yap</span>}
         </Button>
       </div>
     </aside>

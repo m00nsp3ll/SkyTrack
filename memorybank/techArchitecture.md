@@ -148,7 +148,9 @@
 ## Key Technical Decisions
 
 ### 1. QR Code Strategy
-- QR encodes a URL: `http://192.168.1.100/c/{customer_display_id}`
+- QR encodes a URL: `http://192.168.1.100/c/{display_id}`
+- Display ID format: 1 letter + 4 digits (e.g., A0001, A0002, ... A9999, B0001)
+- Total capacity: 26 x 9999 = 259,974 customers
 - This URL works for ALL operations: flight check, media download, POS
 - Scannable by any phone camera — no app needed
 - The landing page detects context (is media ready? is there a tab?)

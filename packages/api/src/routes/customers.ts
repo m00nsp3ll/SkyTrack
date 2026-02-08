@@ -1,39 +1,29 @@
 import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
 import QRCode from 'qrcode';
+import path from 'path';
 import { asyncHandler, AppError } from '../middleware/errorHandler.js';
 import { authenticate, requireRole, AuthRequest } from '../middleware/auth.js';
 import { pilotQueueService } from '../services/pilotQueue.js';
 import { cache } from '../services/cache.js';
+import { displayIdService } from '../services/displayId.js';
+import { generateWaiverPdf, getWaiverPdfPath, waiverPdfExists } from '../services/waiverPdf.js';
+import { getLocalIP } from '../utils/networkUtils.js';
 
 const router = Router();
 const prisma = new PrismaClient();
 
-const SERVER_IP = process.env.SERVER_IP || 'localhost';
+const WEB_PORT = process.env.WEB_PORT || '3000';
 
-// Helper: Generate display ID (ST-YYYYMMDD-NNN)
-const generateDisplayId = async (): Promise<string> => {
-  const today = new Date();
-  const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '');
-  const prefix = `ST-${dateStr}-`;
-
-  const lastCustomer = await prisma.customer.findFirst({
-    where: { displayId: { startsWith: prefix } },
-    orderBy: { displayId: 'desc' },
-  });
-
-  let nextNum = 1;
-  if (lastCustomer) {
-    const lastNum = parseInt(lastCustomer.displayId.split('-')[2], 10);
-    nextNum = lastNum + 1;
-  }
-
-  return `${prefix}${nextNum.toString().padStart(3, '0')}`;
+// Helper: Get current server URL (HTTPS)
+const getServerBaseUrl = (): string => {
+  const ip = getLocalIP();
+  return `https://${ip}:${WEB_PORT}`;
 };
 
 // Helper: Generate QR code as data URL
 const generateQRCodeDataURL = async (displayId: string): Promise<string> => {
-  const url = `http://${SERVER_IP}/c/${displayId}`;
+  const url = `${getServerBaseUrl()}/c/${displayId}`;
   return QRCode.toDataURL(url, {
     width: 300,
     margin: 2,
@@ -43,7 +33,7 @@ const generateQRCodeDataURL = async (displayId: string): Promise<string> => {
 
 // Helper: Generate QR code as buffer (for image endpoint)
 const generateQRCodeBuffer = async (displayId: string): Promise<Buffer> => {
-  const url = `http://${SERVER_IP}/c/${displayId}`;
+  const url = `${getServerBaseUrl()}/c/${displayId}`;
   return QRCode.toBuffer(url, {
     width: 400,
     margin: 2,
@@ -71,13 +61,18 @@ router.get('/', authenticate, asyncHandler(async (req: AuthRequest, res: any) =>
     where.status = status;
   }
 
-  // Filter by date (default: today)
-  const filterDate = date ? new Date(date as string) : new Date();
-  const startOfDay = new Date(filterDate);
-  startOfDay.setHours(0, 0, 0, 0);
-  const endOfDay = new Date(filterDate);
-  endOfDay.setHours(23, 59, 59, 999);
-  where.createdAt = { gte: startOfDay, lte: endOfDay };
+  // Filter by date (only if explicitly provided)
+  let startOfDay: Date | null = null;
+  let endOfDay: Date | null = null;
+
+  if (date) {
+    const filterDate = new Date(date as string);
+    startOfDay = new Date(filterDate);
+    startOfDay.setHours(0, 0, 0, 0);
+    endOfDay = new Date(filterDate);
+    endOfDay.setHours(23, 59, 59, 999);
+    where.createdAt = { gte: startOfDay, lte: endOfDay };
+  }
 
   // Filter by pilot
   if (pilotId) {
@@ -120,12 +115,8 @@ router.get('/', authenticate, asyncHandler(async (req: AuthRequest, res: any) =>
   const data = hasMore ? customers.slice(0, take) : customers;
   const nextCursor = hasMore ? data[data.length - 1].id : null;
 
-  // Get total count for the day
-  const totalCount = await prisma.customer.count({
-    where: {
-      createdAt: { gte: startOfDay, lte: endOfDay },
-    },
-  });
+  // Get total count
+  const totalCount = await prisma.customer.count({ where });
 
   res.json({
     success: true,
@@ -142,42 +133,41 @@ router.get('/', authenticate, asyncHandler(async (req: AuthRequest, res: any) =>
 router.get('/:id', authenticate, asyncHandler(async (req: AuthRequest, res: any) => {
   const { id } = req.params;
 
-  // Try cache first
-  let customer = await cache.customer.get(id);
-
-  if (!customer) {
-    customer = await prisma.customer.findFirst({
-      where: {
-        OR: [{ id }, { displayId: id }],
-      },
-      include: {
-        assignedPilot: true,
-        flights: {
-          include: {
-            pilot: { select: { id: true, name: true } },
-            mediaFolder: true,
-          },
-          orderBy: { createdAt: 'desc' },
+  // Don't use cache for now due to BigInt serialization issues
+  const customer = await prisma.customer.findFirst({
+    where: {
+      OR: [{ id }, { displayId: id }],
+    },
+    include: {
+      assignedPilot: true,
+      flights: {
+        include: {
+          pilot: { select: { id: true, name: true } },
+          mediaFolder: true,
         },
-        sales: {
-          orderBy: { createdAt: 'desc' },
-        },
-        mediaFolders: true,
+        orderBy: { createdAt: 'desc' },
       },
-    });
-
-    if (customer) {
-      await cache.customer.set(id, customer);
-    }
-  }
+      sales: {
+        orderBy: { createdAt: 'desc' },
+      },
+      mediaFolders: true,
+    },
+  });
 
   if (!customer) {
     throw new AppError('Müşteri bulunamadı', 404, 'CUSTOMER_NOT_FOUND');
   }
 
+  // Convert BigInt to Number for JSON serialization
+  const serializedCustomer = JSON.parse(
+    JSON.stringify(customer, (key, value) =>
+      typeof value === 'bigint' ? Number(value) : value
+    )
+  );
+
   res.json({
     success: true,
-    data: customer,
+    data: serializedCustomer,
   });
 }));
 
@@ -190,7 +180,8 @@ router.post('/', authenticate, requireRole('ADMIN', 'OFFICE_STAFF'), asyncHandle
     phone,
     emergencyContact,
     weight,
-    waiverSigned
+    waiverSigned,
+    signatureData
   } = req.body;
 
   // Validation
@@ -217,25 +208,64 @@ router.post('/', authenticate, requireRole('ADMIN', 'OFFICE_STAFF'), asyncHandle
   }
 
   // Generate display ID and QR code
-  const displayId = await generateDisplayId();
+  const displayId = await displayIdService.generateNext();
   const qrCode = await generateQRCodeDataURL(displayId);
 
-  // Create customer
-  const customer = await prisma.customer.create({
-    data: {
-      displayId,
-      firstName: firstName.trim(),
-      lastName: lastName.trim(),
-      email: email?.trim() || null,
-      phone: phone.replace(/\s/g, ''),
-      emergencyContact: emergencyContact?.trim() || null,
-      weight: weight ? parseFloat(weight) : null,
-      qrCode,
-      waiverSigned: true,
-      waiverSignedAt: new Date(),
-      status: 'REGISTERED',
-    },
-  });
+  // Create customer - signatureData will be saved after migration
+  const customerData: any = {
+    displayId,
+    firstName: firstName.trim(),
+    lastName: lastName.trim(),
+    email: email?.trim() || null,
+    phone: phone.replace(/\s/g, ''),
+    emergencyContact: emergencyContact?.trim() || null,
+    weight: weight ? parseFloat(weight) : null,
+    qrCode,
+    waiverSigned: true,
+    waiverSignedAt: new Date(),
+    status: 'REGISTERED',
+  };
+
+  // Only add signatureData if the field exists in schema (after migration)
+  if (signatureData) {
+    customerData.signatureData = signatureData;
+  }
+
+  let customer;
+  try {
+    customer = await prisma.customer.create({ data: customerData });
+  } catch (dbError: any) {
+    // If signatureData field doesn't exist yet, retry without it
+    if (dbError.code === 'P2009' || dbError.message?.includes('signatureData')) {
+      delete customerData.signatureData;
+      customer = await prisma.customer.create({ data: customerData });
+    } else {
+      throw dbError;
+    }
+  }
+
+  // Generate waiver PDF if signature data is provided
+  let waiverPdfPath: string | null = null;
+  if (signatureData) {
+    try {
+      waiverPdfPath = await generateWaiverPdf({
+        displayId: customer.displayId,
+        firstName: customer.firstName,
+        lastName: customer.lastName,
+        phone: customer.phone,
+        signatureData,
+        waiverSignedAt: customer.waiverSignedAt!,
+      });
+
+      // Update customer with PDF path
+      await prisma.customer.update({
+        where: { id: customer.id },
+        data: { waiverPdfPath },
+      });
+    } catch (pdfError) {
+      console.error('Error generating waiver PDF:', pdfError);
+    }
+  }
 
   // Try to assign a pilot
   const io = req.app.get('io');
@@ -258,7 +288,7 @@ router.post('/', authenticate, requireRole('ADMIN', 'OFFICE_STAFF'), asyncHandle
     data: {
       customer: updatedCustomer,
       qrCode,
-      qrUrl: `http://${SERVER_IP}/c/${displayId}`,
+      qrUrl: `${getServerBaseUrl()}/c/${displayId}`,
       pilotAssigned: assignment !== null,
       pilot: assignment?.pilot ? {
         id: assignment.pilot.id,
@@ -303,6 +333,52 @@ router.put('/:id', authenticate, asyncHandler(async (req: AuthRequest, res: any)
   });
 }));
 
+// GET /api/customers/:id/waiver-pdf - Download waiver PDF (public - no auth required)
+router.get('/:id/waiver-pdf', asyncHandler(async (req: AuthRequest, res: any) => {
+  const { id } = req.params;
+
+  const customer = await prisma.customer.findFirst({
+    where: {
+      OR: [{ id }, { displayId: id }],
+    },
+  });
+
+  if (!customer) {
+    throw new AppError('Müşteri bulunamadı', 404, 'CUSTOMER_NOT_FOUND');
+  }
+
+  // Check if PDF exists
+  const pdfPath = getWaiverPdfPath(customer.displayId);
+  if (!waiverPdfExists(customer.displayId)) {
+    // Try to generate PDF if signature data exists
+    if (customer.signatureData && customer.waiverSignedAt) {
+      try {
+        await generateWaiverPdf({
+          displayId: customer.displayId,
+          firstName: customer.firstName,
+          lastName: customer.lastName,
+          phone: customer.phone,
+          signatureData: customer.signatureData,
+          waiverSignedAt: customer.waiverSignedAt,
+        });
+      } catch (error) {
+        throw new AppError('PDF oluşturulamadı', 500, 'PDF_GENERATION_ERROR');
+      }
+    } else {
+      throw new AppError('Risk formu PDF bulunamadı', 404, 'WAIVER_PDF_NOT_FOUND');
+    }
+  }
+
+  // Format filename: MusteriAdi_Soyadi_YYYY-MM-DD.pdf
+  const date = customer.waiverSignedAt
+    ? customer.waiverSignedAt.toISOString().split('T')[0]
+    : new Date().toISOString().split('T')[0];
+  const safeName = `${customer.firstName}_${customer.lastName}`.replace(/[^a-zA-ZğüşıöçĞÜŞİÖÇ0-9_]/g, '');
+  const fileName = `${safeName}_${date}.pdf`;
+
+  res.download(pdfPath, fileName);
+}));
+
 // GET /api/customers/:id/qr - Get QR code as image
 router.get('/:id/qr', authenticate, asyncHandler(async (req: AuthRequest, res: any) => {
   const { id } = req.params;
@@ -326,7 +402,7 @@ router.get('/:id/qr', authenticate, asyncHandler(async (req: AuthRequest, res: a
       data: {
         displayId: customer.displayId,
         qrCode,
-        url: `http://${SERVER_IP}/c/${customer.displayId}`,
+        url: `${getServerBaseUrl()}/c/${customer.displayId}`,
       },
     });
   }
@@ -393,6 +469,7 @@ router.get('/public/:displayId', asyncHandler(async (req: AuthRequest, res: any)
               id: true,
               fileCount: true,
               deliveryStatus: true,
+              paymentStatus: true,
             },
           },
         },
@@ -422,7 +499,7 @@ router.get('/public/:displayId', asyncHandler(async (req: AuthRequest, res: any)
       media: mediaFolder ? {
         fileCount: mediaFolder.fileCount,
         deliveryStatus: mediaFolder.deliveryStatus,
-        canDownload: mediaFolder.deliveryStatus === 'PAID' || mediaFolder.deliveryStatus === 'DELIVERED',
+        canDownload: mediaFolder.paymentStatus === 'PAID' || mediaFolder.deliveryStatus === 'DELIVERED',
       } : null,
     },
   });

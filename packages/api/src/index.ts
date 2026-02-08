@@ -16,10 +16,13 @@ import flightsRoutes from './routes/flights.js';
 import mediaRoutes from './routes/media.js';
 import productsRoutes from './routes/products.js';
 import salesRoutes from './routes/sales.js';
+import reportsRoutes from './routes/reports.js';
+import usersRoutes from './routes/users.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { setupSocket } from './socket/index.js';
 import { setupCronJobs } from './cron/dailyReset.js';
 import { cache } from './services/cache.js';
+import { getLocalIP } from './utils/networkUtils.js';
 
 dotenv.config({ path: '../../.env' });
 
@@ -27,12 +30,18 @@ const app = express();
 const httpServer = createServer(app);
 
 const SERVER_PORT = process.env.SERVER_PORT || 3001;
-const SERVER_IP = process.env.SERVER_IP || 'localhost';
+const WEB_PORT = process.env.WEB_PORT || 3000;
 
-// Socket.IO setup
+// Get current IP dynamically
+const getCurrentIP = () => getLocalIP();
+
+// Socket.IO setup - allow all origins for LAN access
 const io = new Server(httpServer, {
   cors: {
-    origin: [`http://${SERVER_IP}:3000`, 'http://localhost:3000'],
+    origin: (origin, callback) => {
+      // Allow all origins on local network
+      callback(null, true);
+    },
     credentials: true,
   },
 });
@@ -46,9 +55,13 @@ app.use(helmet({
   crossOriginEmbedderPolicy: false,
 }));
 
-// CORS
+// CORS - allow all origins for LAN access
 app.use(cors({
-  origin: [`http://${SERVER_IP}:3000`, 'http://localhost:3000'],
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile apps, curl, etc)
+    // and all local network origins
+    callback(null, true);
+  },
   credentials: true,
 }));
 
@@ -82,13 +95,19 @@ app.use(cookieParser());
 // Static files for media
 app.use('/media', express.static('media'));
 
-// Health check
+// Health check with dynamic IP info
 app.get('/api/health', (req, res) => {
+  const currentIP = getCurrentIP();
   res.json({
     success: true,
     message: 'SkyTrack API is running',
     timestamp: new Date().toISOString(),
     cache: cache.isAvailable() ? 'connected' : 'disabled',
+    network: {
+      ip: currentIP,
+      apiUrl: `http://${currentIP}:${SERVER_PORT}`,
+      webUrl: `http://${currentIP}:${WEB_PORT}`,
+    },
   });
 });
 
@@ -100,6 +119,8 @@ app.use('/api/flights', flightsRoutes);
 app.use('/api/media', mediaRoutes);
 app.use('/api/products', productsRoutes);
 app.use('/api/sales', salesRoutes);
+app.use('/api/reports', reportsRoutes);
+app.use('/api/users', usersRoutes);
 
 // Error handler
 app.use(errorHandler);
@@ -110,9 +131,11 @@ setupSocket(io);
 // Setup Cron Jobs
 setupCronJobs();
 
-// Start server
-httpServer.listen(SERVER_PORT, () => {
-  console.log(`🚀 SkyTrack API running at http://${SERVER_IP}:${SERVER_PORT}`);
+// Start server on all interfaces (0.0.0.0) for LAN access
+httpServer.listen(SERVER_PORT, '0.0.0.0', () => {
+  const currentIP = getCurrentIP();
+  console.log(`🚀 SkyTrack API running at http://${currentIP}:${SERVER_PORT}`);
+  console.log(`🌐 Web App: http://${currentIP}:${WEB_PORT}`);
   console.log(`📡 Socket.IO ready`);
   console.log(`🗜️ Compression enabled`);
   console.log(`🛡️ Rate limiting: ${process.env.RATE_LIMIT_MAX_REQUESTS || 100} req/min`);

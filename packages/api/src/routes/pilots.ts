@@ -99,31 +99,19 @@ router.post('/queue/reorder', authenticate, requireRole('ADMIN'), asyncHandler(a
   });
 }));
 
-// GET /api/pilots/:id - Get pilot by ID
+// GET /api/pilots/:id - Get pilot by ID with optional date filter
 router.get('/:id', authenticate, asyncHandler(async (req: AuthRequest, res: any) => {
   const { id } = req.params;
+  const { from, to } = req.query;
 
   const pilot = await prisma.pilot.findUnique({
     where: { id },
     include: {
-      flights: {
-        orderBy: { createdAt: 'desc' },
-        take: 20,
-        include: {
-          customer: {
-            select: {
-              id: true,
-              displayId: true,
-              firstName: true,
-              lastName: true,
-              phone: true,
-              weight: true,
-            },
-          },
-        },
-      },
       user: {
         select: { id: true, username: true },
+      },
+      _count: {
+        select: { flights: true },
       },
     },
   });
@@ -132,7 +120,59 @@ router.get('/:id', authenticate, asyncHandler(async (req: AuthRequest, res: any)
     throw new AppError('Pilot bulunamadı', 404, 'PILOT_NOT_FOUND');
   }
 
-  // Get today's stats
+  // Date filter for flights
+  let dateFilter: any = {};
+
+  if (from && to) {
+    const fromDate = new Date(from as string);
+    fromDate.setHours(0, 0, 0, 0);
+    const toDate = new Date(to as string);
+    toDate.setHours(23, 59, 59, 999);
+    dateFilter = { createdAt: { gte: fromDate, lte: toDate } };
+  } else if (from) {
+    const fromDate = new Date(from as string);
+    fromDate.setHours(0, 0, 0, 0);
+    const toDate = new Date(from as string);
+    toDate.setHours(23, 59, 59, 999);
+    dateFilter = { createdAt: { gte: fromDate, lte: toDate } };
+  } else {
+    // Default: today
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    dateFilter = { createdAt: { gte: today } };
+  }
+
+  // Get filtered flights
+  const filteredFlights = await prisma.flight.findMany({
+    where: {
+      pilotId: id,
+      ...dateFilter,
+    },
+    include: {
+      customer: {
+        select: {
+          id: true,
+          displayId: true,
+          firstName: true,
+          lastName: true,
+          weight: true,
+        },
+      },
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+
+  // Get all-time stats
+  const allTimeStats = await prisma.flight.groupBy({
+    by: ['status'],
+    where: { pilotId: id },
+    _count: true,
+  });
+
+  const totalFlights = allTimeStats.reduce((sum, s) => sum + s._count, 0);
+  const completedAllTime = allTimeStats.find(s => s.status === 'COMPLETED')?._count || 0;
+
+  // Get today's flights for daily counter
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
@@ -159,11 +199,20 @@ router.get('/:id', authenticate, asyncHandler(async (req: AuthRequest, res: any)
     success: true,
     data: {
       ...pilot,
+      totalFlights,
+      completedAllTime,
       todayFlights,
+      filteredFlights,
       todayStats: {
         total: todayFlights.length,
         completed: todayFlights.filter(f => f.status === 'COMPLETED').length,
         inProgress: todayFlights.filter(f => ['ASSIGNED', 'PICKED_UP', 'IN_FLIGHT'].includes(f.status)).length,
+      },
+      filteredStats: {
+        total: filteredFlights.length,
+        completed: filteredFlights.filter(f => f.status === 'COMPLETED').length,
+        inProgress: filteredFlights.filter(f => ['ASSIGNED', 'PICKED_UP', 'IN_FLIGHT'].includes(f.status)).length,
+        cancelled: filteredFlights.filter(f => f.status === 'CANCELLED').length,
       },
     },
   });

@@ -3,6 +3,7 @@ import { PrismaClient } from '@prisma/client';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs/promises';
+import { exec } from 'child_process';
 import archiver from 'archiver';
 import { asyncHandler, AppError } from '../middleware/errorHandler.js';
 import { authenticate, requireRole, AuthRequest } from '../middleware/auth.js';
@@ -103,6 +104,121 @@ const upload = multer({
     }
   },
 });
+
+// ==========================================
+// STATIC ROUTES (must come before :customerId)
+// ==========================================
+
+// GET /api/media/stats/today - Today's media stats
+router.get(
+  '/stats/today',
+  authenticate,
+  asyncHandler(async (req: AuthRequest, res: any) => {
+    const stats = await getTodayMediaStats();
+
+    res.json({
+      success: true,
+      data: stats,
+    });
+  })
+);
+
+// GET /api/media/storage - Disk storage stats
+router.get(
+  '/storage',
+  authenticate,
+  requireRole('ADMIN'),
+  asyncHandler(async (req: AuthRequest, res: any) => {
+    const stats = await getDiskStats();
+
+    res.json({
+      success: true,
+      data: stats,
+    });
+  })
+);
+
+// GET /api/media/folders - List all media folders with pagination
+router.get(
+  '/folders',
+  authenticate,
+  asyncHandler(async (req: AuthRequest, res: any) => {
+    const { date, paymentStatus, deliveryStatus, cursor, limit = '50' } = req.query;
+
+    const take = Math.min(parseInt(limit as string) || 50, 100);
+    const where: any = {};
+
+    // Date filter
+    if (date) {
+      const filterDate = new Date(date as string);
+      const startOfDay = new Date(filterDate);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(filterDate);
+      endOfDay.setHours(23, 59, 59, 999);
+      where.createdAt = { gte: startOfDay, lte: endOfDay };
+    }
+
+    // Payment status filter
+    if (paymentStatus && paymentStatus !== 'all') {
+      where.paymentStatus = paymentStatus;
+    }
+
+    // Delivery status filter
+    if (deliveryStatus && deliveryStatus !== 'all') {
+      where.deliveryStatus = deliveryStatus;
+    }
+
+    const cursorOption = cursor ? { id: cursor as string } : undefined;
+
+    const folders = await prisma.mediaFolder.findMany({
+      where,
+      take: take + 1,
+      skip: cursor ? 1 : 0,
+      cursor: cursorOption,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        customer: {
+          select: {
+            id: true,
+            displayId: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+        pilot: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        flight: {
+          select: {
+            id: true,
+            status: true,
+          },
+        },
+      },
+    });
+
+    const hasMore = folders.length > take;
+    const data = hasMore ? folders.slice(0, -1) : folders;
+    const nextCursor = hasMore ? data[data.length - 1]?.id : null;
+
+    res.json({
+      success: true,
+      data,
+      pagination: {
+        hasMore,
+        nextCursor,
+        count: data.length,
+      },
+    });
+  })
+);
+
+// ==========================================
+// DYNAMIC ROUTES (with :customerId parameter)
+// ==========================================
 
 // POST /api/media/upload/:customerId - Upload files for a customer
 router.post(
@@ -255,8 +371,11 @@ router.get(
   asyncHandler(async (req: AuthRequest, res: any) => {
     const { customerId } = req.params;
 
-    const customer = await prisma.customer.findUnique({
-      where: { id: customerId },
+    // Search by id or displayId
+    const customer = await prisma.customer.findFirst({
+      where: {
+        OR: [{ id: customerId }, { displayId: customerId }],
+      },
       include: {
         flights: {
           orderBy: { createdAt: 'desc' },
@@ -293,7 +412,7 @@ router.get(
           id: mediaFolder.id,
           folderPath: mediaFolder.folderPath,
           fileCount: mediaFolder.fileCount,
-          totalSizeBytes: mediaFolder.totalSizeBytes,
+          totalSizeBytes: Number(mediaFolder.totalSizeBytes),
           paymentStatus: mediaFolder.paymentStatus,
           deliveryStatus: mediaFolder.deliveryStatus,
         } : null,
@@ -309,8 +428,10 @@ router.get(
   asyncHandler(async (req: AuthRequest, res: any) => {
     const { customerId } = req.params;
 
-    const customer = await prisma.customer.findUnique({
-      where: { id: customerId },
+    const customer = await prisma.customer.findFirst({
+      where: {
+        OR: [{ id: customerId }, { displayId: customerId }],
+      },
       include: {
         flights: {
           orderBy: { createdAt: 'desc' },
@@ -355,6 +476,58 @@ router.get(
         paymentStatus: mediaFolder.paymentStatus,
         deliveryStatus: mediaFolder.deliveryStatus,
       },
+    });
+  })
+);
+
+// GET /api/media/:customerId/public-files - Public file list for customer download page
+router.get(
+  '/:customerId/public-files',
+  asyncHandler(async (req: any, res: any) => {
+    const { customerId } = req.params;
+
+    const customer = await prisma.customer.findFirst({
+      where: {
+        OR: [{ id: customerId }, { displayId: customerId }],
+      },
+      include: {
+        flights: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          include: { mediaFolder: true },
+        },
+      },
+    });
+
+    if (!customer) {
+      throw new AppError('Müşteri bulunamadı', 404, 'CUSTOMER_NOT_FOUND');
+    }
+
+    const mediaFolder = customer.flights[0]?.mediaFolder;
+    if (!mediaFolder) {
+      return res.json({
+        success: true,
+        data: { files: [] },
+      });
+    }
+
+    // Check payment status - only return files if paid
+    if (mediaFolder.paymentStatus !== 'PAID') {
+      throw new AppError('Ödeme yapılmadan dosyalar görüntülenemez', 403, 'PAYMENT_REQUIRED');
+    }
+
+    const files = await listMediaFiles(mediaFolder.folderPath);
+
+    // Return only filename, type, and size (no full paths for security)
+    const fileList = files.map((file) => ({
+      filename: file.filename,
+      type: file.type,
+      size: file.size,
+    }));
+
+    res.json({
+      success: true,
+      data: { files: fileList },
     });
   })
 );
@@ -413,8 +586,8 @@ router.get(
     // Pipe archive to response
     archive.pipe(res);
 
-    // Add originals folder to archive
-    archive.directory(originalsPath, 'medya');
+    // Add originals folder to archive with "Alanya Paragliding" folder name
+    archive.directory(originalsPath, 'Alanya Paragliding');
 
     // Finalize archive
     await archive.finalize();
@@ -487,8 +660,10 @@ router.patch(
       throw new AppError('Geçersiz ödeme durumu', 400, 'INVALID_STATUS');
     }
 
-    const customer = await prisma.customer.findUnique({
-      where: { id: customerId },
+    const customer = await prisma.customer.findFirst({
+      where: {
+        OR: [{ id: customerId }, { displayId: customerId }],
+      },
       include: {
         flights: {
           orderBy: { createdAt: 'desc' },
@@ -527,7 +702,10 @@ router.patch(
 
     res.json({
       success: true,
-      data: updatedFolder,
+      data: {
+        ...updatedFolder,
+        totalSizeBytes: Number(updatedFolder.totalSizeBytes),
+      },
       message: status === 'PAID' ? 'Ödeme alındı' : 'Ödeme durumu güncellendi',
     });
   })
@@ -762,109 +940,79 @@ router.delete(
   })
 );
 
-// GET /api/media/stats/today - Today's media stats
-router.get(
-  '/stats/today',
+// POST /api/media/:customerId/open-folder - Open media folder in Finder (macOS)
+router.post(
+  '/:customerId/open-folder',
   authenticate,
   asyncHandler(async (req: AuthRequest, res: any) => {
-    const stats = await getTodayMediaStats();
+    const { customerId } = req.params;
 
-    res.json({
-      success: true,
-      data: stats,
-    });
-  })
-);
-
-// GET /api/media/storage - Disk storage stats
-router.get(
-  '/storage',
-  authenticate,
-  requireRole('ADMIN'),
-  asyncHandler(async (req: AuthRequest, res: any) => {
-    const stats = await getDiskStats();
-
-    res.json({
-      success: true,
-      data: stats,
-    });
-  })
-);
-
-// GET /api/media/folders - List all media folders with pagination
-router.get(
-  '/folders',
-  authenticate,
-  asyncHandler(async (req: AuthRequest, res: any) => {
-    const { date, paymentStatus, deliveryStatus, cursor, limit = '50' } = req.query;
-
-    const take = Math.min(parseInt(limit as string) || 50, 100);
-    const where: any = {};
-
-    // Date filter
-    if (date) {
-      const filterDate = new Date(date as string);
-      const startOfDay = new Date(filterDate);
-      startOfDay.setHours(0, 0, 0, 0);
-      const endOfDay = new Date(filterDate);
-      endOfDay.setHours(23, 59, 59, 999);
-      where.createdAt = { gte: startOfDay, lte: endOfDay };
-    }
-
-    // Payment status filter
-    if (paymentStatus && paymentStatus !== 'all') {
-      where.paymentStatus = paymentStatus;
-    }
-
-    // Delivery status filter
-    if (deliveryStatus && deliveryStatus !== 'all') {
-      where.deliveryStatus = deliveryStatus;
-    }
-
-    const cursorOption = cursor ? { id: cursor as string } : undefined;
-
-    const folders = await prisma.mediaFolder.findMany({
-      where,
-      take: take + 1,
-      skip: cursor ? 1 : 0,
-      cursor: cursorOption,
-      orderBy: { createdAt: 'desc' },
+    // Get customer with media folder
+    const customer = await prisma.customer.findUnique({
+      where: { id: customerId },
       include: {
-        customer: {
-          select: {
-            id: true,
-            displayId: true,
-            firstName: true,
-            lastName: true,
-          },
+        mediaFolders: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
         },
-        pilot: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-        flight: {
-          select: {
-            id: true,
-            status: true,
+        flights: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          include: {
+            mediaFolder: true,
           },
         },
       },
     });
 
-    const hasMore = folders.length > take;
-    const data = hasMore ? folders.slice(0, -1) : folders;
-    const nextCursor = hasMore ? data[data.length - 1]?.id : null;
+    if (!customer) {
+      throw new AppError('Müşteri bulunamadı', 404, 'CUSTOMER_NOT_FOUND');
+    }
 
-    res.json({
-      success: true,
-      data,
-      pagination: {
-        hasMore,
-        nextCursor,
-        count: data.length,
-      },
+    // Get folder path from mediaFolders or flight's mediaFolder
+    let folderPath = customer.mediaFolders[0]?.folderPath ||
+                     customer.flights[0]?.mediaFolder?.folderPath;
+
+    if (!folderPath) {
+      throw new AppError('Medya klasörü bulunamadı', 404, 'FOLDER_NOT_FOUND');
+    }
+
+    // Make absolute path - use process.cwd() which is packages/api when running dev
+    const absolutePath = path.resolve(process.cwd(), folderPath);
+
+    // Check if folder exists
+    try {
+      await fs.access(absolutePath);
+    } catch {
+      throw new AppError('Klasör bulunamadı: ' + absolutePath, 404, 'FOLDER_NOT_EXISTS');
+    }
+
+    // Open in Finder (macOS) or file explorer (Windows/Linux)
+    const platform = process.platform;
+    let command: string;
+
+    if (platform === 'darwin') {
+      command = `open "${absolutePath}"`;
+    } else if (platform === 'win32') {
+      command = `explorer "${absolutePath}"`;
+    } else {
+      command = `xdg-open "${absolutePath}"`;
+    }
+
+    exec(command, (error) => {
+      if (error) {
+        console.error('Failed to open folder:', error);
+        return res.status(500).json({
+          success: false,
+          error: { message: 'Klasör açılamadı' },
+        });
+      }
+
+      res.json({
+        success: true,
+        message: 'Klasör açıldı',
+        data: { path: absolutePath },
+      });
     });
   })
 );

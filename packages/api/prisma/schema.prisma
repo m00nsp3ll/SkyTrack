@@ -105,6 +105,8 @@ model Customer {
   qrCode           String?        @map("qr_code")
   waiverSigned     Boolean        @default(false) @map("waiver_signed")
   waiverSignedAt   DateTime?      @map("waiver_signed_at")
+  signatureData    String?        @map("signature_data")
+  waiverPdfPath    String?        @map("waiver_pdf_path")
   assignedPilotId  String?        @map("assigned_pilot_id")
   assignedPilot    Pilot?         @relation(fields: [assignedPilotId], references: [id])
   status           CustomerStatus @default(REGISTERED)
@@ -172,8 +174,8 @@ model MediaFolder {
 
 model Sale {
   id            String         @id @default(uuid())
-  customerId    String         @map("customer_id")
-  customer      Customer       @relation(fields: [customerId], references: [id])
+  customerId    String?        @map("customer_id")
+  customer      Customer?      @relation(fields: [customerId], references: [id])
   itemType      String         @map("item_type")
   itemName      String         @map("item_name")
   quantity      Int            @default(1)

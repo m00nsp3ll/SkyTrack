@@ -165,11 +165,32 @@ export const pilotQueueService = {
         },
       });
 
-      // Update pilot flight count
+      // Get the max queue position
+      const maxQueuePilot = await tx.pilot.findFirst({
+        where: { isActive: true },
+        orderBy: { queuePosition: 'desc' },
+        select: { queuePosition: true },
+      });
+      const maxQueuePosition = maxQueuePilot?.queuePosition || 0;
+
+      // Update pilot: increment flight count and move to end of queue
       await tx.pilot.update({
         where: { id: pilot.id },
         data: {
           dailyFlightCount: { increment: 1 },
+          queuePosition: maxQueuePosition + 1,
+        },
+      });
+
+      // Reorder remaining pilots to fill the gap
+      await tx.pilot.updateMany({
+        where: {
+          isActive: true,
+          id: { not: pilot.id },
+          queuePosition: { gt: pilot.queuePosition },
+        },
+        data: {
+          queuePosition: { decrement: 1 },
         },
       });
 

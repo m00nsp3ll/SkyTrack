@@ -21,7 +21,15 @@ import {
   X,
   Star,
   Receipt,
+  Camera,
 } from 'lucide-react'
+import dynamic from 'next/dynamic'
+
+// Dynamically import QR scanner to avoid SSR issues
+const Html5QrcodePlugin = dynamic(
+  () => import('@/components/QrScanner').then((mod) => mod.default),
+  { ssr: false }
+)
 
 interface Product {
   id: string
@@ -62,6 +70,7 @@ export default function POSPage() {
   const [loading, setLoading] = useState(true)
   const [processing, setProcessing] = useState(false)
   const [productSearch, setProductSearch] = useState('')
+  const [showQrScanner, setShowQrScanner] = useState(false)
   const searchInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -100,6 +109,34 @@ export default function POSPage() {
       setSearchId('')
     } catch (error) {
       alert('Müşteri bulunamadı')
+    } finally {
+      setSearchingCustomer(false)
+    }
+  }
+
+  const handleQrScan = async (decodedText: string) => {
+    setShowQrScanner(false)
+    // Extract displayId from URL like http://192.168.1.100:3000/c/ST-20260207-001
+    let displayId = decodedText
+    if (decodedText.includes('/c/')) {
+      displayId = decodedText.split('/c/').pop() || decodedText
+    }
+
+    setSearchId(displayId)
+    setSearchingCustomer(true)
+    try {
+      const response = await customersApi.getById(displayId)
+      const data = response.data.data
+      setCustomer({
+        id: data.id,
+        displayId: data.displayId,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        pilotName: data.assignedPilot?.name,
+      })
+      setSearchId('')
+    } catch (error) {
+      alert('Müşteri bulunamadı: ' + displayId)
     } finally {
       setSearchingCustomer(false)
     }
@@ -243,6 +280,13 @@ export default function POSPage() {
                 ) : (
                   <Search className="h-4 w-4" />
                 )}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setShowQrScanner(true)}
+              >
+                <Camera className="h-4 w-4" />
               </Button>
             </div>
 
@@ -467,6 +511,31 @@ export default function POSPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* QR Scanner Modal */}
+      {showQrScanner && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white p-4 rounded-lg max-w-md w-full mx-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold">QR Kod Tara</h3>
+              <Button variant="ghost" size="icon" onClick={() => setShowQrScanner(false)}>
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
+            <div className="aspect-square bg-black rounded-lg overflow-hidden">
+              <Html5QrcodePlugin
+                fps={10}
+                qrbox={250}
+                disableFlip={false}
+                qrCodeSuccessCallback={handleQrScan}
+              />
+            </div>
+            <p className="text-sm text-muted-foreground text-center mt-3">
+              Müşteri QR kodunu kameraya gösterin
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

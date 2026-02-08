@@ -1,9 +1,16 @@
 import axios from 'axios'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api'
+// Dynamic API URL based on current hostname (works on mobile and PC)
+function getApiUrl() {
+  if (typeof window === 'undefined') {
+    return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api'
+  }
+  const hostname = window.location.hostname
+  return `http://${hostname}:3001/api`
+}
 
 export const api = axios.create({
-  baseURL: API_URL,
+  baseURL: getApiUrl(),
   withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
@@ -142,14 +149,14 @@ export const mediaApi = {
 
   // Get download URL (for public access)
   getDownloadUrl: (displayId: string) => {
-    const serverIp = process.env.NEXT_PUBLIC_SERVER_IP || 'localhost'
-    return `http://${serverIp}:3001/api/media/${displayId}/download`
+    const hostname = typeof window !== 'undefined' ? window.location.hostname : 'localhost'
+    return `http://${hostname}:3001/api/media/${displayId}/download`
   },
 
   // Get single file download URL
   getFileDownloadUrl: (displayId: string, filename: string) => {
-    const serverIp = process.env.NEXT_PUBLIC_SERVER_IP || 'localhost'
-    return `http://${serverIp}:3001/api/media/${displayId}/download/${filename}`
+    const hostname = typeof window !== 'undefined' ? window.location.hostname : 'localhost'
+    return `http://${hostname}:3001/api/media/${displayId}/download/${filename}`
   },
 }
 
@@ -186,4 +193,21 @@ export const salesApi = {
   bulkPay: (customerId: string, paymentMethod?: string) =>
     api.post(`/sales/bulk-pay/${customerId}`, { paymentMethod }),
   delete: (id: string) => api.delete(`/sales/${id}`),
+}
+
+// Reports API
+export const reportsApi = {
+  getDashboard: () => api.get('/reports/dashboard'),
+  getDashboardCharts: () => api.get('/reports/dashboard/charts'),
+  getDashboardRecent: () => api.get('/reports/dashboard/recent'),
+  getPilots: (from?: string, to?: string) =>
+    api.get('/reports/pilots', { params: { from, to } }),
+  getRevenue: (from?: string, to?: string) =>
+    api.get('/reports/revenue', { params: { from, to } }),
+  getCustomers: (from?: string, to?: string) =>
+    api.get('/reports/customers', { params: { from, to } }),
+  getDaily: (date: string) => api.get(`/reports/daily/${date}`),
+  getCompare: (period1_from: string, period1_to: string, period2_from: string, period2_to: string) =>
+    api.get('/reports/compare', { params: { period1_from, period1_to, period2_from, period2_to } }),
+  getSystem: () => api.get('/reports/system'),
 }
