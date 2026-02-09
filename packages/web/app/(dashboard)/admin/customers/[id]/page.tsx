@@ -128,10 +128,30 @@ const flightSteps = [
   { key: 'COMPLETED', label: 'Tamamlandı', field: 'landingAt' },
 ]
 
-// Get hostname dynamically for links
-function getHostname() {
-  if (typeof window === 'undefined') return 'localhost'
-  return window.location.hostname
+// Get customer page URL dynamically
+function getCustomerPageUrl(displayId: string) {
+  if (typeof window === 'undefined') return `https://skytrackyp.com/c/${displayId}`
+  const hostname = window.location.hostname
+  if (hostname === 'skytrackyp.com' || hostname === 'www.skytrackyp.com') {
+    return `https://skytrackyp.com/c/${displayId}`
+  }
+  if (hostname.includes('trycloudflare.com')) {
+    return `https://${hostname}/c/${displayId}`
+  }
+  return `https://${hostname}:${window.location.port || '3000'}/c/${displayId}`
+}
+
+// Get API URL dynamically
+function getApiBaseUrl() {
+  if (typeof window === 'undefined') return 'https://api.skytrackyp.com/api'
+  const hostname = window.location.hostname
+  if (hostname === 'skytrackyp.com' || hostname === 'www.skytrackyp.com') {
+    return 'https://api.skytrackyp.com/api'
+  }
+  if (hostname.includes('trycloudflare.com')) {
+    return `https://${hostname.replace(/^[^.]+/, 'api')}/api`
+  }
+  return `https://${hostname}:3001/api`
 }
 
 export default function CustomerDetailPage() {
@@ -142,7 +162,6 @@ export default function CustomerDetailPage() {
   const [showQrModal, setShowQrModal] = useState(false)
   const [copied, setCopied] = useState(false)
   const [personalInfoOpen, setPersonalInfoOpen] = useState(false)
-  const [hostname, setHostname] = useState('localhost')
 
   // Action states
   const [reassigning, setReassigning] = useState(false)
@@ -206,7 +225,6 @@ export default function CustomerDetailPage() {
   // Initial load
   useEffect(() => {
     fetchCustomer()
-    setHostname(getHostname())
   }, [fetchCustomer])
 
   // Load QR and media when customer loads
@@ -228,7 +246,12 @@ export default function CustomerDetailPage() {
 
   // Socket.IO connection
   useEffect(() => {
-    const newSocket = io(`http://${hostname}:3001`)
+    const socketUrl = typeof window !== 'undefined'
+      ? (window.location.hostname === 'skytrackyp.com' || window.location.hostname === 'www.skytrackyp.com'
+          ? 'https://api.skytrackyp.com'
+          : `https://${window.location.hostname}:3001`)
+      : 'https://localhost:3001'
+    const newSocket = io(socketUrl)
     setSocket(newSocket)
 
     newSocket.on('customer:updated', (data: { customerId: string }) => {
@@ -447,11 +470,12 @@ Bu belgeyi imzalayarak asagidaki hususlari kabul ve beyan ederim:
 
   const handleDownloadWaiverPdf = () => {
     if (!customer) return
-    window.open(`http://${hostname}:3001/api/customers/${customer.id}/waiver-pdf`)
+    const apiUrl = getApiBaseUrl()
+    window.open(`${apiUrl}/customers/${customer.id}/waiver-pdf`)
   }
 
   const handleCopyLink = async () => {
-    const link = `http://${hostname}:3000/c/${customer?.displayId}`
+    const link = getCustomerPageUrl(customer?.displayId || '')
     await navigator.clipboard.writeText(link)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
@@ -509,11 +533,27 @@ Bu belgeyi imzalayarak asagidaki hususlari kabul ve beyan ederim:
     if (!customer || !paymentMethod) return
     setProcessingPayment(true)
     try {
+      // 1. Update media folder payment status
       await api.patch(`/media/${customer.id}/payment`, {
         status: 'PAID',
         amount: parseFloat(mediaPrice),
         paymentMethod
       })
+
+      // 2. Create a sale record for media payment
+      await salesApi.create({
+        customerId: customer.id,
+        items: [{
+          productId: null,
+          itemType: 'MEDIA',
+          itemName: 'Fotoğraf/Video Paketi',
+          quantity: 1,
+          unitPrice: parseFloat(mediaPrice),
+        }],
+        paymentStatus: 'PAID',
+        paymentMethod: paymentMethod === 'CARD' ? 'CREDIT_CARD' : paymentMethod,
+      })
+
       await fetchCustomer()
     } catch (error: any) {
       alert(error.response?.data?.error?.message || 'Ödeme başarısız')
@@ -593,6 +633,15 @@ Bu belgeyi imzalayarak asagidaki hususlari kabul ve beyan ederim:
       alert(error.response?.data?.error?.message || 'Tahsilat başarısız')
     } finally {
       setCollectingDebt(false)
+    }
+  }
+
+  const handlePaySingleSale = async (saleId: string, paymentMethod: 'CASH' | 'CREDIT_CARD') => {
+    try {
+      await salesApi.updatePayment(saleId, 'PAID', paymentMethod)
+      await fetchCustomer()
+    } catch (error: any) {
+      alert(error.response?.data?.error?.message || 'Ödeme başarısız')
     }
   }
 
@@ -720,6 +769,13 @@ Bu belgeyi imzalayarak asagidaki hususlari kabul ve beyan ederim:
   const hasMedia = mediaFolder && mediaFolder.fileCount > 0
   const isPaid = mediaFolder?.paymentStatus === 'PAID'
   const isDelivered = mediaFolder?.deliveryStatus === 'DELIVERED'
+
+  // Sort sales: unpaid first
+  const sortedSales = customer?.sales ? [...customer.sales].sort((a, b) => {
+    if (a.paymentStatus !== 'PAID' && b.paymentStatus === 'PAID') return -1
+    if (a.paymentStatus === 'PAID' && b.paymentStatus !== 'PAID') return 1
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  }) : []
 
   const unpaidSales = customer?.sales.filter(s => s.paymentStatus !== 'PAID') || []
   const totalSpent = customer?.sales.reduce((sum, s) => sum + s.totalPrice, 0) || 0
@@ -1205,7 +1261,7 @@ Bu belgeyi imzalayarak asagidaki hususlari kabul ve beyan ederim:
                 <p className="font-semibold mb-2">Müşteri İndirme Linki</p>
                 <div className="flex items-center gap-3">
                   <code className="bg-white px-3 py-2 rounded flex-1 text-sm">
-                    http://{hostname}:3000/c/{customer.displayId}
+                    {typeof window !== 'undefined' ? getCustomerPageUrl(customer.displayId) : `https://skytrackyp.com/c/${customer.displayId}`}
                   </code>
                   <Button variant="outline" size="sm" onClick={handleCopyLink}>
                     {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
@@ -1260,7 +1316,7 @@ Bu belgeyi imzalayarak asagidaki hususlari kabul ve beyan ederim:
           {customer.sales.length > 0 ? (
             <>
               <div className="divide-y">
-                {customer.sales.map((sale) => (
+                {sortedSales.map((sale) => (
                   <div
                     key={sale.id}
                     className={`flex items-center justify-between py-3 ${
@@ -1275,11 +1331,24 @@ Bu belgeyi imzalayarak asagidaki hususlari kabul ve beyan ederim:
                     </div>
                     <div className="text-right">
                       <p className="font-medium">₺{sale.totalPrice.toLocaleString('tr-TR')}</p>
-                      <span className={`text-xs ${
-                        sale.paymentStatus === 'PAID' ? 'text-green-600' : 'text-red-600 font-semibold'
-                      }`}>
-                        {sale.paymentStatus === 'PAID' ? 'Ödendi' : 'Ödenmedi'}
-                      </span>
+                      {sale.paymentStatus === 'PAID' ? (
+                        <span className="text-xs text-green-600">Ödendi</span>
+                      ) : (
+                        <div className="flex gap-1 mt-1">
+                          <button
+                            onClick={() => handlePaySingleSale(sale.id, 'CASH')}
+                            className="px-2 py-1 bg-green-500 text-white rounded text-xs hover:bg-green-600"
+                          >
+                            Nakit
+                          </button>
+                          <button
+                            onClick={() => handlePaySingleSale(sale.id, 'CREDIT_CARD')}
+                            className="px-2 py-1 bg-blue-500 text-white rounded text-xs hover:bg-blue-600"
+                          >
+                            Kart
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}

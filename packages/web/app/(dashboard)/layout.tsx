@@ -15,6 +15,12 @@ export default function DashboardLayout({
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   useEffect(() => {
+    // Redirect www to non-www to keep localStorage consistent
+    if (typeof window !== 'undefined' && window.location.hostname === 'www.skytrackyp.com') {
+      window.location.href = window.location.href.replace('www.skytrackyp.com', 'skytrackyp.com')
+      return
+    }
+
     const token = localStorage.getItem('token')
     const user = localStorage.getItem('user')
 

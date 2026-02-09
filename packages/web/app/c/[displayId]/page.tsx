@@ -29,6 +29,7 @@ interface CustomerData {
   media: {
     fileCount: number
     deliveryStatus: string
+    paymentStatus: string
     canDownload: boolean
   } | null
 }
@@ -55,7 +56,7 @@ const statusMessages: Record<string, { icon: any; title: string; description: st
   COMPLETED: {
     icon: CheckCircle,
     title: 'Uçuş Tamamlandı',
-    description: 'Fotoğraf ve videolarınız hazırlanıyor...',
+    description: 'Teşekkürler!',
     color: 'text-green-600',
   },
   CANCELLED: {
@@ -68,9 +69,21 @@ const statusMessages: Record<string, { icon: any; title: string; description: st
 
 // Get API URL dynamically based on current hostname
 function getApiUrl() {
-  if (typeof window === 'undefined') return 'http://localhost:3001/api'
+  if (typeof window === 'undefined') return 'https://api.skytrackyp.com/api'
   const hostname = window.location.hostname
-  return `http://${hostname}:3001/api`
+
+  // Custom domain
+  if (hostname === 'skytrackyp.com' || hostname === 'www.skytrackyp.com') {
+    return 'https://api.skytrackyp.com/api'
+  }
+
+  // Cloudflare tunnel
+  if (hostname.includes('trycloudflare.com')) {
+    return `https://${hostname.replace(/^[^.]+/, 'api')}/api`
+  }
+
+  // Local network
+  return `https://${hostname}:3001/api`
 }
 
 export default function CustomerDownloadPage() {
@@ -115,12 +128,23 @@ export default function CustomerDownloadPage() {
   }, [displayId, apiUrl])
 
   const handleDownload = () => {
-    const hostname = typeof window !== 'undefined' ? window.location.hostname : 'localhost'
+    if (typeof window === 'undefined') return
+    const hostname = window.location.hostname
     setDownloading(true)
+
+    // Build download URL based on hostname
+    let downloadUrl: string
+    if (hostname === 'skytrackyp.com' || hostname === 'www.skytrackyp.com') {
+      downloadUrl = `https://api.skytrackyp.com/api/media/${displayId}/download`
+    } else if (hostname.includes('trycloudflare.com')) {
+      downloadUrl = `https://${hostname.replace(/^[^.]+/, 'api')}/api/media/${displayId}/download`
+    } else {
+      downloadUrl = `https://${hostname}:3001/api/media/${displayId}/download`
+    }
 
     // Create download link
     const link = document.createElement('a')
-    link.href = `http://${hostname}:3001/api/media/${displayId}/download`
+    link.href = downloadUrl
     link.download = `Alanya_Paragliding_${displayId}.zip`
     document.body.appendChild(link)
     link.click()
@@ -195,31 +219,6 @@ export default function CustomerDownloadPage() {
                 <p className="font-semibold text-lg">{data.pilot.name}</p>
               </div>
             )}
-
-            {data.flight?.takeoffAt && (
-              <div className="mt-4 pt-4 border-t grid grid-cols-2 gap-4 text-center">
-                <div>
-                  <p className="text-sm text-gray-500">Kalkış</p>
-                  <p className="font-semibold">
-                    {new Date(data.flight.takeoffAt).toLocaleTimeString('tr-TR', {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
-                  </p>
-                </div>
-                {data.flight.landingAt && (
-                  <div>
-                    <p className="text-sm text-gray-500">İniş</p>
-                    <p className="font-semibold">
-                      {new Date(data.flight.landingAt).toLocaleTimeString('tr-TR', {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </p>
-                  </div>
-                )}
-              </div>
-            )}
           </CardContent>
         </Card>
 
@@ -233,7 +232,7 @@ export default function CustomerDownloadPage() {
                       <Camera className="w-10 h-10 text-green-600" />
                     </div>
                     <h2 className="text-xl font-bold text-green-700 mb-2">
-                      Fotoğraflarınız Hazır!
+                      İndirmeye Hazır!
                     </h2>
                     <p className="text-gray-600 mb-4">
                       {data.media?.fileCount} dosya indirmeye hazır
@@ -262,29 +261,31 @@ export default function CustomerDownloadPage() {
                       ZIP dosyası indirilecek. Telefonunuz otomatik olarak açacaktır.
                     </p>
                   </>
-                ) : data.media ? (
+                ) : data.media && data.media.fileCount > 0 ? (
                   <>
-                    <div className="inline-block bg-yellow-100 rounded-full p-4 mb-4">
-                      <Clock className="w-10 h-10 text-yellow-600" />
+                    <div className="inline-block bg-orange-100 rounded-full p-4 mb-4">
+                      <Clock className="w-10 h-10 text-orange-600" />
                     </div>
-                    <h2 className="text-xl font-bold text-yellow-700 mb-2">
-                      Fotoğraflarınız Hazırlanıyor
+                    <h2 className="text-xl font-bold text-orange-700 mb-2">
+                      Hazırlandı - Ödeme Bekliyor
                     </h2>
                     <p className="text-gray-600">
-                      {data.media.fileCount} dosya yüklendi.
+                      {data.media.fileCount} dosya hazır.
+                      <br />
                       Ödeme sonrası indirilebilir olacak.
                     </p>
                   </>
                 ) : (
                   <>
-                    <div className="inline-block bg-gray-100 rounded-full p-4 mb-4">
-                      <Image className="w-10 h-10 text-gray-400" />
+                    <div className="inline-block bg-blue-100 rounded-full p-4 mb-4">
+                      <Camera className="w-10 h-10 text-blue-600" />
                     </div>
-                    <h2 className="text-xl font-bold text-gray-700 mb-2">
-                      Fotoğraflar Bekleniyor
+                    <h2 className="text-xl font-bold text-blue-700 mb-2">
+                      Fotoğraflar Hazırlanıyor
                     </h2>
                     <p className="text-gray-600">
                       Fotoğraf ve videolarınız yakında yüklenecek.
+                      <br />
                       Bu sayfa otomatik olarak güncellenecektir.
                     </p>
                   </>

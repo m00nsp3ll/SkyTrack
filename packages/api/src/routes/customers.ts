@@ -14,9 +14,15 @@ const router = Router();
 const prisma = new PrismaClient();
 
 const WEB_PORT = process.env.WEB_PORT || '3000';
+const CUSTOM_DOMAIN = process.env.CUSTOM_DOMAIN || 'skytrackyp.com';
 
-// Helper: Get current server URL (HTTPS)
+// Helper: Get current server URL (prefer custom domain if set)
 const getServerBaseUrl = (): string => {
+  // Use custom domain in production
+  if (CUSTOM_DOMAIN && CUSTOM_DOMAIN !== 'localhost') {
+    return `https://${CUSTOM_DOMAIN}`;
+  }
+  // Fallback to local IP for development
   const ip = getLocalIP();
   return `https://${ip}:${WEB_PORT}`;
 };

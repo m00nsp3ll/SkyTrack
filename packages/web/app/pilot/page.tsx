@@ -26,6 +26,10 @@ import {
   WifiOff,
   Camera,
   FolderSync,
+  QrCode,
+  X,
+  ChevronRight,
+  ListOrdered,
 } from 'lucide-react'
 
 interface UserData {
@@ -90,6 +94,9 @@ export default function PilotPanel() {
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date())
   const [notification, setNotification] = useState<string | null>(null)
   const [scanningMedia, setScanningMedia] = useState<string | null>(null)
+  const [showProfileSidebar, setShowProfileSidebar] = useState(false)
+  const [selectedQRCustomer, setSelectedQRCustomer] = useState<Customer | null>(null)
+  const [selectedQRType, setSelectedQRType] = useState<'admin' | 'media'>('admin')
 
   // Socket.IO hook
   const { on, socket } = useSocket({
@@ -113,6 +120,12 @@ export default function PilotPanel() {
 
   // Initial load and auth check
   useEffect(() => {
+    // Redirect www to non-www to keep localStorage consistent
+    if (typeof window !== 'undefined' && window.location.hostname === 'www.skytrackyp.com') {
+      window.location.href = window.location.href.replace('www.skytrackyp.com', 'skytrackyp.com')
+      return
+    }
+
     const token = localStorage.getItem('token')
     const userData = localStorage.getItem('user')
 
@@ -265,13 +278,16 @@ export default function PilotPanel() {
       {/* Header */}
       <header className="bg-primary text-primary-foreground p-4 sticky top-0 z-10">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
+          <div
+            className="flex items-center gap-3 flex-1 cursor-pointer hover:bg-white/10 rounded-lg p-2 -m-2 transition-colors"
+            onClick={() => setShowProfileSidebar(true)}
+          >
             <Avatar className="h-12 w-12">
               <AvatarFallback className="bg-white text-primary text-lg">
                 {user?.pilotName?.slice(0, 2).toUpperCase() || 'P'}
               </AvatarFallback>
             </Avatar>
-            <div>
+            <div className="flex-1">
               <h1 className="font-semibold text-lg">{user?.pilotName || user?.username}</h1>
               <div className="flex items-center gap-2 text-sm opacity-90">
                 {currentStatus && (
@@ -288,12 +304,13 @@ export default function PilotPanel() {
                 )}
               </div>
             </div>
+            <ChevronRight className="h-5 w-5 opacity-60" />
           </div>
           <Button
             variant="ghost"
             size="icon"
             onClick={handleLogout}
-            className="text-white hover:bg-white/20"
+            className="text-white hover:bg-white/20 ml-2"
           >
             <LogOut className="h-5 w-5" />
           </Button>
@@ -330,54 +347,37 @@ export default function PilotPanel() {
       )}
 
       {/* Stats */}
-      <div className="p-4 grid grid-cols-3 gap-3">
+      <div className="p-4 grid grid-cols-4 gap-2">
+        <Card className={pilot?.queuePosition && pilot.queuePosition > 0 ? 'ring-2 ring-yellow-500' : ''}>
+          <CardContent className="p-3 text-center">
+            <p className="text-2xl font-bold text-yellow-600">
+              {pilot?.queuePosition && pilot.queuePosition > 0 ? pilot.queuePosition : '-'}
+            </p>
+            <p className="text-xs text-muted-foreground">Sıra</p>
+          </CardContent>
+        </Card>
         <Card>
-          <CardContent className="p-4 text-center">
-            <p className={`text-3xl font-bold ${isAtLimit ? 'text-red-600' : 'text-primary'}`}>
+          <CardContent className="p-3 text-center">
+            <p className={`text-2xl font-bold ${isAtLimit ? 'text-red-600' : 'text-primary'}`}>
               {pilot?.dailyFlightCount || 0}
             </p>
             <p className="text-xs text-muted-foreground">Bugün</p>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-4 text-center">
-            <p className="text-3xl font-bold text-green-600">{stats?.remaining || 0}</p>
+          <CardContent className="p-3 text-center">
+            <p className="text-2xl font-bold text-green-600">{stats?.remaining || 0}</p>
             <p className="text-xs text-muted-foreground">Kalan</p>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-4 text-center">
-            <p className="text-3xl font-bold text-blue-600">{stats?.inQueue || 0}</p>
+          <CardContent className="p-3 text-center">
+            <p className="text-2xl font-bold text-blue-600">{stats?.inQueue || 0}</p>
             <p className="text-xs text-muted-foreground">Bekleyen</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Status Buttons (when not in flight) */}
-      {pilot?.status !== 'IN_FLIGHT' && (
-        <div className="px-4 mb-4">
-          <p className="text-sm text-muted-foreground mb-2">Durumunuz:</p>
-          <div className="grid grid-cols-3 gap-2">
-            {(['AVAILABLE', 'ON_BREAK', 'OFF_DUTY'] as const).map((status) => {
-              const cfg = statusConfig[status]
-              const Icon = cfg.icon
-              const isActive = pilot?.status === status
-              return (
-                <Button
-                  key={status}
-                  variant={isActive ? 'default' : 'outline'}
-                  className={`flex-col h-auto py-3 ${isActive ? cfg.color : ''}`}
-                  onClick={() => handleStatusChange(status)}
-                  disabled={updating === 'status' || isActive}
-                >
-                  <Icon className="h-5 w-5 mb-1" />
-                  <span className="text-xs">{cfg.label}</span>
-                </Button>
-              )
-            })}
-          </div>
-        </div>
-      )}
 
       {/* Active Customers */}
       <div className="px-4">
@@ -539,15 +539,13 @@ export default function PilotPanel() {
                     variant="outline"
                     size="sm"
                     className="w-full"
-                    onClick={() => handleScanMedia(flight.customer.id)}
-                    disabled={scanningMedia === flight.customer.id}
+                    onClick={() => {
+                      setSelectedQRCustomer(flight.customer)
+                      setSelectedQRType('media')
+                    }}
                   >
-                    {scanningMedia === flight.customer.id ? (
-                      <RefreshCw className="h-4 w-4 animate-spin mr-2" />
-                    ) : (
-                      <FolderSync className="h-4 w-4 mr-2" />
-                    )}
-                    Medya Klasörünü Tara
+                    <QrCode className="h-4 w-4 mr-2" />
+                    Müşteri QR Kodu
                   </Button>
                 </CardContent>
               </Card>
@@ -558,6 +556,227 @@ export default function PilotPanel() {
 
       {/* Bottom Safe Area */}
       <div className="h-8" />
+
+      {/* Profile Sidebar */}
+      {showProfileSidebar && (
+        <>
+          {/* Overlay */}
+          <div
+            className="fixed inset-0 bg-black/50 z-40"
+            onClick={() => setShowProfileSidebar(false)}
+          />
+
+          {/* Sidebar */}
+          <div className="fixed top-0 left-0 bottom-0 w-80 bg-white shadow-xl z-50 flex flex-col animate-slide-in-left">
+            {/* Header */}
+            <div className="bg-primary text-white p-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Avatar className="h-12 w-12">
+                  <AvatarFallback className="bg-white text-primary text-lg">
+                    {user?.pilotName?.slice(0, 2).toUpperCase() || 'P'}
+                  </AvatarFallback>
+                </Avatar>
+                <div>
+                  <h2 className="font-semibold">{user?.pilotName || user?.username}</h2>
+                  <p className="text-sm opacity-90">Pilot Panel</p>
+                </div>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setShowProfileSidebar(false)}
+                className="text-white hover:bg-white/20"
+              >
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto p-4">
+              {/* Status Section */}
+              <div className="mb-6">
+                <h3 className="text-sm font-medium text-muted-foreground mb-3">Durumunuz</h3>
+                <div className="space-y-2">
+                  {(['AVAILABLE', 'ON_BREAK', 'OFF_DUTY'] as const).map((status) => {
+                    const cfg = statusConfig[status]
+                    const Icon = cfg.icon
+                    const isActive = pilot?.status === status
+                    return (
+                      <Button
+                        key={status}
+                        variant={isActive ? 'default' : 'outline'}
+                        className={`w-full justify-start h-12 ${isActive ? cfg.color : ''}`}
+                        onClick={() => {
+                          handleStatusChange(status)
+                          setShowProfileSidebar(false)
+                        }}
+                        disabled={updating === 'status' || isActive || pilot?.status === 'IN_FLIGHT'}
+                      >
+                        <Icon className="h-5 w-5 mr-3" />
+                        <span>{cfg.label}</span>
+                        {isActive && <CheckCircle className="h-4 w-4 ml-auto" />}
+                      </Button>
+                    )
+                  })}
+                </div>
+                {pilot?.status === 'IN_FLIGHT' && (
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Uçuştayken durum değiştiremezsiniz
+                  </p>
+                )}
+              </div>
+
+              {/* Stats Summary */}
+              <div className="mb-6">
+                <h3 className="text-sm font-medium text-muted-foreground mb-3">Günlük Özet</h3>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between py-2 border-b">
+                    <span className="text-muted-foreground">Tamamlanan Uçuş</span>
+                    <span className="font-semibold">{pilot?.dailyFlightCount || 0}</span>
+                  </div>
+                  <div className="flex justify-between py-2 border-b">
+                    <span className="text-muted-foreground">Kalan Limit</span>
+                    <span className="font-semibold">{stats?.remaining || 0}</span>
+                  </div>
+                  {pilot?.queuePosition && pilot.queuePosition > 0 && (
+                    <div className="flex justify-between py-2 border-b">
+                      <span className="text-muted-foreground">Sıra Durumu</span>
+                      <span className="font-semibold text-yellow-600">{pilot.queuePosition}. sırada</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Connection Status */}
+              <div className="mb-6">
+                <h3 className="text-sm font-medium text-muted-foreground mb-3">Bağlantı</h3>
+                <div className="flex items-center gap-2 text-sm">
+                  {isConnected ? (
+                    <>
+                      <Wifi className="h-4 w-4 text-green-600" />
+                      <span className="text-green-600 font-medium">Bağlı</span>
+                    </>
+                  ) : (
+                    <>
+                      <WifiOff className="h-4 w-4 text-red-600" />
+                      <span className="text-red-600 font-medium">Bağlantı Yok</span>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 border-t">
+              <Button
+                variant="destructive"
+                className="w-full"
+                onClick={handleLogout}
+              >
+                <LogOut className="h-4 w-4 mr-2" />
+                Çıkış Yap
+              </Button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* QR Code Modal */}
+      {selectedQRCustomer && (
+        <>
+          {/* Overlay */}
+          <div
+            className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4"
+            onClick={() => setSelectedQRCustomer(null)}
+          >
+            {/* Modal */}
+            <div
+              className="bg-white rounded-lg p-6 max-w-sm w-full relative"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Close Button */}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute top-2 right-2"
+                onClick={() => setSelectedQRCustomer(null)}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+
+              {/* Customer Info */}
+              <div className="text-center mb-4">
+                <p className="text-sm text-muted-foreground mb-1">
+                  {selectedQRCustomer.displayId}
+                </p>
+                <h3 className="text-xl font-bold">
+                  {selectedQRCustomer.firstName} {selectedQRCustomer.lastName}
+                </h3>
+                <p className="text-sm mt-1 font-medium text-primary">
+                  Müşteri QR Kodu
+                </p>
+              </div>
+
+              {/* QR Code */}
+              <div className="bg-white p-4 rounded-lg border-2 border-gray-200 mb-4">
+                <img
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(
+                    `${window.location.protocol}//${
+                      window.location.hostname === 'skytrackyp.com' || window.location.hostname === 'www.skytrackyp.com'
+                        ? 'skytrackyp.com'
+                        : window.location.hostname.includes('trycloudflare.com')
+                        ? window.location.hostname
+                        : `${window.location.hostname}:${window.location.port}`
+                    }/c/${selectedQRCustomer.displayId}`
+                  )}`}
+                  alt="QR Code"
+                  className="w-full h-auto"
+                />
+              </div>
+
+              {/* Instructions */}
+              <p className="text-sm text-center text-muted-foreground mb-4">
+                Müşteri / Foto Video QR
+              </p>
+
+              {/* Actions */}
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    const url = `${window.location.protocol}//${
+                      window.location.hostname === 'skytrackyp.com' || window.location.hostname === 'www.skytrackyp.com'
+                        ? 'skytrackyp.com'
+                        : window.location.hostname.includes('trycloudflare.com')
+                        ? window.location.hostname
+                        : `${window.location.hostname}:${window.location.port}`
+                    }/c/${selectedQRCustomer.displayId}`
+                    navigator.clipboard.writeText(url)
+                    setNotification('Link kopyalandı!')
+                    setTimeout(() => setNotification(null), 2000)
+                  }}
+                >
+                  Link Kopyala
+                </Button>
+                <Button
+                  onClick={() => {
+                    const url = `${window.location.protocol}//${
+                      window.location.hostname === 'skytrackyp.com' || window.location.hostname === 'www.skytrackyp.com'
+                        ? 'skytrackyp.com'
+                        : window.location.hostname.includes('trycloudflare.com')
+                        ? window.location.hostname
+                        : `${window.location.hostname}:${window.location.port}`
+                    }/c/${selectedQRCustomer.displayId}`
+                    window.open(url, '_blank')
+                  }}
+                >
+                  Sayfayı Aç
+                </Button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   )
 }

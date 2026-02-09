@@ -58,8 +58,10 @@ enum MediaDeliveryStatus {
 model User {
   id                String             @id @default(uuid())
   username          String             @unique
+  name              String?
   passwordHash      String             @map("password_hash")
   role              UserRole
+  isActive          Boolean            @default(true) @map("is_active")
   pilotId           String?            @unique @map("pilot_id")
   pilot             Pilot?             @relation(fields: [pilotId], references: [id])
   sales             Sale[]

@@ -1,3 +1,7 @@
+import dotenv from 'dotenv';
+// Load .env FIRST before any other imports that might need env vars
+dotenv.config({ path: '../../.env' });
+
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -6,8 +10,10 @@ import cookieParser from 'cookie-parser';
 import compression from 'compression';
 import rateLimit from 'express-rate-limit';
 import { createServer } from 'http';
+import { createServer as createHttpsServer } from 'https';
 import { Server } from 'socket.io';
-import dotenv from 'dotenv';
+import fs from 'fs';
+import path from 'path';
 
 import authRoutes from './routes/auth.js';
 import pilotsRoutes from './routes/pilots.js';
@@ -25,10 +31,26 @@ import { setupCronJobs } from './cron/dailyReset.js';
 import { cache } from './services/cache.js';
 import { getLocalIP } from './utils/networkUtils.js';
 
-dotenv.config({ path: '../../.env' });
-
 const app = express();
-const httpServer = createServer(app);
+
+// SSL certificates for HTTPS
+const certsPath = path.join(process.cwd(), '..', '..', 'certs');
+let httpsServer;
+let httpServer;
+
+try {
+  const sslOptions = {
+    key: fs.readFileSync(path.join(certsPath, 'localhost.key')),
+    cert: fs.readFileSync(path.join(certsPath, 'localhost.crt')),
+  };
+  httpsServer = createHttpsServer(sslOptions, app);
+  console.log('🔒 HTTPS enabled');
+} catch (err) {
+  console.log('⚠️ SSL certificates not found, falling back to HTTP');
+  httpServer = createServer(app);
+}
+
+const server = httpsServer || httpServer;
 
 const SERVER_PORT = process.env.SERVER_PORT || 3001;
 const WEB_PORT = process.env.WEB_PORT || 3000;
@@ -37,7 +59,7 @@ const WEB_PORT = process.env.WEB_PORT || 3000;
 const getCurrentIP = () => getLocalIP();
 
 // Socket.IO setup - allow all origins for LAN access
-const io = new Server(httpServer, {
+const io = new Server(server, {
   cors: {
     origin: (origin, callback) => {
       // Allow all origins on local network
@@ -134,10 +156,11 @@ setupSocket(io);
 setupCronJobs();
 
 // Start server on all interfaces (0.0.0.0) for LAN access
-httpServer.listen(SERVER_PORT, '0.0.0.0', () => {
+const protocol = httpsServer ? 'https' : 'http';
+server.listen(SERVER_PORT, '0.0.0.0', () => {
   const currentIP = getCurrentIP();
-  console.log(`🚀 SkyTrack API running at http://${currentIP}:${SERVER_PORT}`);
-  console.log(`🌐 Web App: http://${currentIP}:${WEB_PORT}`);
+  console.log(`🚀 SkyTrack API running at ${protocol}://${currentIP}:${SERVER_PORT}`);
+  console.log(`🌐 Web App: https://${currentIP}:${WEB_PORT}`);
   console.log(`📡 Socket.IO ready`);
   console.log(`🗜️ Compression enabled`);
   console.log(`🛡️ Rate limiting: ${process.env.RATE_LIMIT_MAX_REQUESTS || 100} req/min`);

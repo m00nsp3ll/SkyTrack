@@ -1,5 +1,9 @@
 import webpush from 'web-push';
 import { PrismaClient } from '@prisma/client';
+import dotenv from 'dotenv';
+
+// Load .env file explicitly
+dotenv.config({ path: '../../.env' });
 
 const prisma = new PrismaClient();
 
@@ -8,8 +12,17 @@ const vapidPublicKey = process.env.VAPID_PUBLIC_KEY;
 const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY;
 const vapidSubject = process.env.VAPID_SUBJECT || 'mailto:admin@skytrack.com';
 
+console.log('[Push] VAPID Config:', {
+  publicKey: vapidPublicKey ? vapidPublicKey.substring(0, 20) + '...' : 'NOT SET',
+  privateKey: vapidPrivateKey ? 'SET' : 'NOT SET',
+  subject: vapidSubject,
+});
+
 if (vapidPublicKey && vapidPrivateKey) {
   webpush.setVapidDetails(vapidSubject, vapidPublicKey, vapidPrivateKey);
+  console.log('[Push] VAPID configured successfully');
+} else {
+  console.error('[Push] ERROR: VAPID keys not configured!');
 }
 
 export interface PushNotificationPayload {
@@ -65,6 +78,7 @@ export async function sendPushToUser(
 
     for (const subscription of subscriptions) {
       try {
+        console.log('[Push] Sending to endpoint:', subscription.endpoint.substring(0, 50) + '...');
         await webpush.sendNotification(
           {
             endpoint: subscription.endpoint,
@@ -75,8 +89,10 @@ export async function sendPushToUser(
           },
           notificationPayload
         );
+        console.log('[Push] Sent successfully');
         result.sent++;
       } catch (error: any) {
+        console.error('[Push] Send error:', error.statusCode, error.message, error.body);
         result.failed++;
 
         // If subscription is expired or invalid, deactivate it

@@ -39,20 +39,32 @@ export function PushNotificationManager({ onSubscribed, showOnMount = true }: Pu
   }, [checkSubscription])
 
   useEffect(() => {
-    // Show modal if permission is default and showOnMount is true
-    if (showOnMount && permission === 'default' && !isSubscribed) {
-      const timer = setTimeout(() => setShowModal(true), 2000)
-      return () => clearTimeout(timer)
+    // Always show modal if permission is default and not subscribed
+    if (permission === 'default' && !isSubscribed) {
+      setShowModal(true)
     }
-  }, [permission, isSubscribed, showOnMount])
+  }, [permission, isSubscribed])
 
   const subscribe = async () => {
     setLoading(true)
     setError('')
 
     try {
+      console.log('[Push] Starting subscription...')
+
+      // Check if service worker is supported
+      if (!('serviceWorker' in navigator)) {
+        throw new Error('Service Worker desteklenmiyor')
+      }
+
+      if (!('PushManager' in window)) {
+        throw new Error('Push bildirimleri desteklenmiyor')
+      }
+
       // Request notification permission
+      console.log('[Push] Requesting permission...')
       const perm = await Notification.requestPermission()
+      console.log('[Push] Permission result:', perm)
       setPermission(perm)
 
       if (perm !== 'granted') {
@@ -61,24 +73,65 @@ export function PushNotificationManager({ onSubscribed, showOnMount = true }: Pu
         return
       }
 
+      // Get API base URL dynamically
+      const protocol = window.location.protocol
+      const hostname = window.location.hostname
+      let apiUrl: string
+
+      // If using custom domain, use api subdomain
+      if (hostname === 'skytrackyp.com' || hostname === 'www.skytrackyp.com') {
+        apiUrl = 'https://api.skytrackyp.com/api'
+      }
+      // If using Cloudflare tunnel, use api subdomain dynamically
+      else if (hostname.includes('trycloudflare.com')) {
+        apiUrl = `https://${hostname.replace(/^[^.]+/, 'api')}/api`
+      }
+      // Local network
+      else {
+        apiUrl = `${protocol}//${hostname}:3001/api`
+      }
+      console.log('[Push] API URL:', apiUrl)
+
       // Get VAPID public key from API
-      const vapidResponse = await fetch('/api/push/vapid-public-key')
+      console.log('[Push] Fetching VAPID key...')
+      const vapidResponse = await fetch(`${apiUrl}/push/vapid-public-key`)
       const vapidData = await vapidResponse.json()
+      console.log('[Push] VAPID response:', vapidData)
 
       if (!vapidData.success) {
         throw new Error('VAPID key alınamadı')
       }
 
+      // Wait for service worker to be ready with timeout
+      console.log('[Push] Waiting for Service Worker...')
+      let registration: ServiceWorkerRegistration
+      try {
+        registration = await Promise.race([
+          navigator.serviceWorker.ready,
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('Service Worker zaman aşımı')), 10000)
+          )
+        ])
+        console.log('[Push] Service Worker ready:', registration)
+      } catch (swError) {
+        console.log('[Push] SW timeout, trying manual register...')
+        // Try to register service worker manually
+        registration = await navigator.serviceWorker.register('/sw.js')
+        await new Promise(resolve => setTimeout(resolve, 1000))
+        console.log('[Push] Manual registration done:', registration)
+      }
+
       // Subscribe to push notifications
-      const registration = await navigator.serviceWorker.ready
+      console.log('[Push] Subscribing to push manager...')
       const subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(vapidData.data.publicKey),
       })
+      console.log('[Push] Subscription created:', subscription)
 
       // Send subscription to backend
       const token = localStorage.getItem('token')
-      const response = await fetch('/api/push/subscribe', {
+      const response = await fetch(`${apiUrl}/push/subscribe`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

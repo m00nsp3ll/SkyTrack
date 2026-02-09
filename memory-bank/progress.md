@@ -4,10 +4,19 @@
 
 ### Çekirdek Sistem
 - [x] Next.js 14 + Express.js + PostgreSQL + Prisma kurulumu
-- [x] JWT tabanlı kimlik doğrulama sistemi
+- [x] JWT tabanlı kimlik doğrulama sistemi (7 gün geçerli token)
 - [x] Socket.IO gerçek zamanlı iletişim
 - [x] HTTPS desteği (self-signed certificate)
 - [x] Dinamik IP algılama (LAN için)
+- [x] Cloudflare Tunnel ile custom domain desteği (skytrackyp.com)
+
+### Custom Domain & Deployment
+- [x] Cloudflare Tunnel yapılandırması
+- [x] skytrackyp.com ana domain
+- [x] api.skytrackyp.com API subdomain
+- [x] www.skytrackyp.com desteği
+- [x] www → non-www otomatik yönlendirme (localStorage tutarlılığı için)
+- [x] Dinamik URL hesaplama (tüm bileşenlerde)
 
 ### Müşteri Yönetimi
 - [x] Müşteri kayıt formu (ad, soyad, telefon, kilo, acil iletişim)
@@ -16,6 +25,7 @@
 - [x] QR kod oluşturma ve yazdırma
 - [x] Müşteri detay sayfası
 - [x] Müşteri listesi (arama, filtreleme, pagination)
+- [x] Müşteri indirme sayfası (/c/[displayId])
 
 ### Pilot Yönetimi
 - [x] Pilot CRUD işlemleri
@@ -25,6 +35,8 @@
 - [x] Pilot sırası yönetimi (drag & drop)
 - [x] Pilot detay sayfası (toplam uçuş, tarih filtresi)
 - [x] Pilot panel (mobil için)
+- [x] Pilot panelinde sıra gösterimi (dinamik hesaplama)
+- [x] Pilot profil sidebar (soldan açılan, animasyonlu)
 
 ### Uçuş Takibi
 - [x] Canlı uçuş takip paneli
@@ -38,7 +50,8 @@
 - [x] QR kod oluşturma (müşteri kayıt sonrası)
 - [x] QR kod tarama (html5-qrcode)
 - [x] HTTPS ile mobil kamera desteği
-- [x] Dinamik IP ile QR URL oluşturma
+- [x] Custom domain ile QR URL oluşturma (skytrackyp.com/c/xxx)
+- [x] Mevcut müşteri QR kodları güncelleme scripti
 
 ### Risk Formu
 - [x] Dijital imza alma
@@ -62,27 +75,30 @@
 - [x] PWA kurulum rehberi (iOS talimatları dahil)
 - [x] Müşteri atamalarında push bildirimi
 - [x] Admin bildirim yönetim sayfası
+- [x] Custom domain desteği (api.skytrackyp.com)
+
+### Medya Yönetimi
+- [x] Medya yükleme sistemi
+- [x] Medya klasör tarama
+- [x] Ödeme durumu takibi
+- [x] Müşteri indirme sayfası
+- [x] ZIP indirme özelliği
+
+### POS / Satış
+- [x] Ürün yönetimi
+- [x] Satış işlemleri
+- [x] Ödeme yöntemleri (Nakit, Kart, Havale, Veresiye)
+- [x] Müşteri bazlı satış geçmişi
+- [x] Borç tahsilat sistemi
 
 ### UI/UX
 - [x] Responsive sidebar (collapse özelliği)
 - [x] Mobil menü (hamburger)
 - [x] Mobil scroll düzeltmesi
 - [x] Menü tıklandığında kapanma
+- [x] Slide-in animasyonları (Tailwind keyframes)
 
 ## Devam Eden / Eksik Özellikler
-
-### Medya Yönetimi
-- [ ] Medya yükleme sistemi (GoPro'dan)
-- [ ] Thumbnail oluşturma
-- [ ] Medya satış paneli
-- [ ] Müşteri indirme sayfası
-- [ ] Ödeme durumu takibi
-
-### POS / Satış
-- [ ] Ürün yönetimi
-- [ ] Satış işlemleri
-- [ ] Ödeme yöntemleri
-- [ ] Günlük rapor
 
 ### Raporlar
 - [ ] Pilot performans raporu
@@ -92,11 +108,12 @@
 
 ## Bilinen Sorunlar
 
-1. **Medya Yönetimi boş** - MediaFolder kaydı yok çünkü henüz medya yüklenmedi
-2. **PDF Türkçe font** - pdfkit varsayılan fontları Türkçe desteklemiyor, ASCII'ye dönüştürülüyor
+1. **PDF Türkçe font** - pdfkit varsayılan fontları Türkçe desteklemiyor, ASCII'ye dönüştürülüyor
 
 ## Deployment Notları
 
-- Proje yerel ağ (LAN) için tasarlandı
-- Uzak sunucuya deploy edilirse medya transfer sistemi çalışmaz
-- Önerilen: Yerel mini PC/NAS + bulut yedekleme
+- Proje Cloudflare Tunnel ile internete açıldı
+- Custom domain: skytrackyp.com
+- API subdomain: api.skytrackyp.com
+- Tunnel config: ~/.cloudflared/config.yml
+- Tunnel başlatma: `cloudflared tunnel run skytrack`

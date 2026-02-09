@@ -3,10 +3,22 @@ import axios from 'axios'
 // Dynamic API URL based on current hostname (works on mobile and PC)
 function getApiUrl() {
   if (typeof window === 'undefined') {
-    return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api'
+    return process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001/api'
   }
   const hostname = window.location.hostname
-  return `http://${hostname}:3001/api`
+
+  // If using custom domain, use api subdomain
+  if (hostname === 'skytrackyp.com' || hostname === 'www.skytrackyp.com') {
+    return 'https://api.skytrackyp.com/api'
+  }
+
+  // If using temporary Cloudflare tunnel, use api subdomain dynamically
+  if (hostname.includes('trycloudflare.com')) {
+    return `https://${hostname.replace(/^[^.]+/, 'api')}/api`
+  }
+
+  // Local network - use HTTPS
+  return `https://${hostname}:3001/api`
 }
 
 export const api = axios.create({
@@ -149,14 +161,30 @@ export const mediaApi = {
 
   // Get download URL (for public access)
   getDownloadUrl: (displayId: string) => {
-    const hostname = typeof window !== 'undefined' ? window.location.hostname : 'localhost'
-    return `http://${hostname}:3001/api/media/${displayId}/download`
+    if (typeof window === 'undefined') return `https://api.skytrackyp.com/api/media/${displayId}/download`
+    const hostname = window.location.hostname
+
+    if (hostname === 'skytrackyp.com' || hostname === 'www.skytrackyp.com') {
+      return `https://api.skytrackyp.com/api/media/${displayId}/download`
+    }
+    if (hostname.includes('trycloudflare.com')) {
+      return `https://${hostname.replace(/^[^.]+/, 'api')}/api/media/${displayId}/download`
+    }
+    return `https://${hostname}:3001/api/media/${displayId}/download`
   },
 
   // Get single file download URL
   getFileDownloadUrl: (displayId: string, filename: string) => {
-    const hostname = typeof window !== 'undefined' ? window.location.hostname : 'localhost'
-    return `http://${hostname}:3001/api/media/${displayId}/download/${filename}`
+    if (typeof window === 'undefined') return `https://api.skytrackyp.com/api/media/${displayId}/download/${filename}`
+    const hostname = window.location.hostname
+
+    if (hostname === 'skytrackyp.com' || hostname === 'www.skytrackyp.com') {
+      return `https://api.skytrackyp.com/api/media/${displayId}/download/${filename}`
+    }
+    if (hostname.includes('trycloudflare.com')) {
+      return `https://${hostname.replace(/^[^.]+/, 'api')}/api/media/${displayId}/download/${filename}`
+    }
+    return `https://${hostname}:3001/api/media/${displayId}/download/${filename}`
   },
 }
 

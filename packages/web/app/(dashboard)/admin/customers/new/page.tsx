@@ -27,6 +27,32 @@ Bu belgeyi imzalayarak aşağıdaki hususları kabul ve beyan ederim:
 
 6. 18 yaşından büyük olduğumu veya yasal veli/vasi onayı aldığımı beyan ederim.`
 
+// Dynamic base URL for customer pages
+function getBaseUrl() {
+  if (typeof window === 'undefined') return 'https://skytrackyp.com'
+  const hostname = window.location.hostname
+  if (hostname === 'skytrackyp.com' || hostname === 'www.skytrackyp.com') {
+    return 'https://skytrackyp.com'
+  }
+  if (hostname.includes('trycloudflare.com')) {
+    return `https://${hostname}`
+  }
+  return `https://${hostname}:${window.location.port || '3000'}`
+}
+
+// Dynamic API URL
+function getApiUrl() {
+  if (typeof window === 'undefined') return 'https://api.skytrackyp.com/api'
+  const hostname = window.location.hostname
+  if (hostname === 'skytrackyp.com' || hostname === 'www.skytrackyp.com') {
+    return 'https://api.skytrackyp.com/api'
+  }
+  if (hostname.includes('trycloudflare.com')) {
+    return `https://${hostname.replace(/^[^.]+/, 'api')}/api`
+  }
+  return `https://${hostname}:3001/api`
+}
+
 interface RegistrationResult {
   customer: {
     id: string
@@ -40,8 +66,6 @@ interface RegistrationResult {
   pilot: { id: string; name: string } | null
   message: string
 }
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api'
 
 export default function NewCustomerPage() {
   const router = useRouter()

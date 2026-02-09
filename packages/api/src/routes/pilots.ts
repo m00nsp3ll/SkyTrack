@@ -273,15 +273,57 @@ router.get('/:id/panel', authenticate, asyncHandler(async (req: AuthRequest, res
   const activeFlights = todayFlights.filter(f => ['ASSIGNED', 'PICKED_UP', 'IN_FLIGHT'].includes(f.status));
   const completedFlights = todayFlights.filter(f => f.status === 'COMPLETED');
 
+  // Calculate ACTUAL completed flight count for today
+  const actualDailyFlightCount = completedFlights.length;
+
+  // Calculate DYNAMIC queue position among available pilots
+  const allActivePilots = await prisma.pilot.findMany({
+    where: {
+      isActive: true,
+      status: { in: ['AVAILABLE', 'ON_BREAK'] },
+    },
+    orderBy: [
+      { dailyFlightCount: 'asc' },
+      { queuePosition: 'asc' },
+    ],
+    select: {
+      id: true,
+      dailyFlightCount: true,
+      maxDailyFlights: true,
+    },
+  });
+
+  // Find this pilot's position in the queue (1-indexed)
+  let dynamicQueuePosition = 0;
+  const eligiblePilots = allActivePilots.filter(p => p.dailyFlightCount < p.maxDailyFlights);
+  const positionIndex = eligiblePilots.findIndex(p => p.id === id);
+  if (positionIndex !== -1) {
+    dynamicQueuePosition = positionIndex + 1;
+  }
+
+  // If dailyFlightCount is out of sync, update it
+  if (pilot.dailyFlightCount !== actualDailyFlightCount) {
+    await prisma.pilot.update({
+      where: { id },
+      data: { dailyFlightCount: actualDailyFlightCount },
+    });
+    // Invalidate cache
+    await cache.pilotQueue.invalidate();
+  }
+
   res.json({
     success: true,
     data: {
-      pilot,
+      pilot: {
+        ...pilot,
+        dailyFlightCount: actualDailyFlightCount,
+        queuePosition: dynamicQueuePosition,
+      },
       activeFlights,
       completedFlights,
       stats: {
         completed: completedFlights.length,
-        remaining: pilot.maxDailyFlights - pilot.dailyFlightCount,
+        remaining: pilot.maxDailyFlights - actualDailyFlightCount,
         inQueue: activeFlights.length,
       },
     },

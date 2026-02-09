@@ -19,9 +19,9 @@ import {
   ShoppingCart,
   RefreshCw,
   X,
-  Star,
   Receipt,
   Camera,
+  AlertCircle,
 } from 'lucide-react'
 import dynamic from 'next/dynamic'
 
@@ -37,7 +37,6 @@ interface Product {
   category: string
   price: number
   isActive: boolean
-  isFavorite: boolean
   stock: number | null
 }
 
@@ -49,6 +48,12 @@ interface CartItem {
   quantity: number
 }
 
+interface PendingPayment {
+  saleId: string
+  itemName: string
+  totalPrice: number
+}
+
 interface Customer {
   id: string
   displayId: string
@@ -57,16 +62,27 @@ interface Customer {
   pilotName?: string
 }
 
-const CATEGORIES = ['Favori', 'İçecek', 'Yiyecek', 'Hediyelik', 'Diğer']
+interface CustomerSale {
+  id: string
+  itemName: string
+  quantity: number
+  totalPrice: number
+  paymentStatus: string
+  createdAt: string
+}
+
+const CATEGORIES = ['Tüm Ürünler', 'İçecek', 'Yiyecek', 'Hediyelik', 'Fotoğraf/Video', 'Diğer']
 
 export default function POSPage() {
   const [products, setProducts] = useState<Product[]>([])
-  const [favorites, setFavorites] = useState<Product[]>([])
   const [cart, setCart] = useState<CartItem[]>([])
+  const [pendingPayments, setPendingPayments] = useState<PendingPayment[]>([])
   const [customer, setCustomer] = useState<Customer | null>(null)
+  const [customerSales, setCustomerSales] = useState<CustomerSale[]>([])
+  const [customerBalance, setCustomerBalance] = useState(0)
   const [searchId, setSearchId] = useState('')
   const [searchingCustomer, setSearchingCustomer] = useState(false)
-  const [activeCategory, setActiveCategory] = useState('Favori')
+  const [activeCategory, setActiveCategory] = useState('Tüm Ürünler')
   const [loading, setLoading] = useState(true)
   const [processing, setProcessing] = useState(false)
   const [productSearch, setProductSearch] = useState('')
@@ -80,17 +96,55 @@ export default function POSPage() {
   const fetchProducts = async () => {
     setLoading(true)
     try {
-      const [productsRes, favoritesRes] = await Promise.all([
-        productsApi.getAll({ activeOnly: 'true' }),
-        productsApi.getFavorites(),
-      ])
+      const productsRes = await productsApi.getAll({ activeOnly: 'true' })
       setProducts(productsRes.data.data.products)
-      setFavorites(favoritesRes.data.data)
     } catch (error) {
       console.error('Failed to fetch products:', error)
     } finally {
       setLoading(false)
     }
+  }
+
+  const fetchCustomerSales = async (customerId: string) => {
+    try {
+      const response = await salesApi.getByCustomer(customerId)
+      const data = response.data.data
+      const sales = data.sales || []
+      // Sort: unpaid first, then by date desc
+      const sortedSales = [...sales].sort((a: CustomerSale, b: CustomerSale) => {
+        if (a.paymentStatus === 'UNPAID' && b.paymentStatus !== 'UNPAID') return -1
+        if (a.paymentStatus !== 'UNPAID' && b.paymentStatus === 'UNPAID') return 1
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      })
+      setCustomerSales(sortedSales)
+
+      // Use summary from API
+      setCustomerBalance(data.summary?.totalUnpaid || 0)
+    } catch (error) {
+      console.error('Failed to fetch customer sales:', error)
+      setCustomerSales([])
+      setCustomerBalance(0)
+    }
+  }
+
+  const handlePayUnpaidSale = (sale: CustomerSale) => {
+    // Add to pending payments (not cart)
+    const exists = pendingPayments.find(p => p.saleId === sale.id)
+    if (!exists) {
+      setPendingPayments(prev => [...prev, {
+        saleId: sale.id,
+        itemName: sale.itemName,
+        totalPrice: sale.totalPrice,
+      }])
+    }
+  }
+
+  const removePendingPayment = (saleId: string) => {
+    setPendingPayments(prev => prev.filter(p => p.saleId !== saleId))
+  }
+
+  const clearPendingPayments = () => {
+    setPendingPayments([])
   }
 
   const searchCustomer = async () => {
@@ -99,14 +153,17 @@ export default function POSPage() {
     try {
       const response = await customersApi.getById(searchId.trim())
       const data = response.data.data
-      setCustomer({
+      const customerData = {
         id: data.id,
         displayId: data.displayId,
         firstName: data.firstName,
         lastName: data.lastName,
         pilotName: data.assignedPilot?.name,
-      })
+      }
+      setCustomer(customerData)
       setSearchId('')
+      // Fetch customer's previous sales
+      await fetchCustomerSales(data.id)
     } catch (error) {
       alert('Müşteri bulunamadı')
     } finally {
@@ -127,14 +184,17 @@ export default function POSPage() {
     try {
       const response = await customersApi.getById(displayId)
       const data = response.data.data
-      setCustomer({
+      const customerData = {
         id: data.id,
         displayId: data.displayId,
         firstName: data.firstName,
         lastName: data.lastName,
         pilotName: data.assignedPilot?.name,
-      })
+      }
+      setCustomer(customerData)
       setSearchId('')
+      // Fetch customer's previous sales
+      await fetchCustomerSales(data.id)
     } catch (error) {
       alert('Müşteri bulunamadı: ' + displayId)
     } finally {
@@ -192,39 +252,57 @@ export default function POSPage() {
 
   const clearCustomer = () => {
     setCustomer(null)
+    setCustomerSales([])
+    setCustomerBalance(0)
+    setPendingPayments([])
   }
 
   const cartTotal = cart.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0)
+  const pendingTotal = pendingPayments.reduce((sum, p) => sum + p.totalPrice, 0)
+  const grandTotal = cartTotal + pendingTotal
 
   const handlePayment = async (paymentMethod: 'CASH' | 'CREDIT_CARD' | 'TRANSFER', paymentStatus: 'PAID' | 'UNPAID' = 'PAID') => {
-    if (cart.length === 0) {
+    if (cart.length === 0 && pendingPayments.length === 0) {
       alert('Sepet boş')
       return
     }
 
     setProcessing(true)
     try {
-      const items = cart.map((item) => ({
-        productId: item.productId,
-        itemType: item.category,
-        itemName: item.name,
-        quantity: item.quantity,
-        unitPrice: item.unitPrice,
-      }))
+      // 1. Process pending payments (update existing sales)
+      for (const pending of pendingPayments) {
+        await salesApi.updatePayment(pending.saleId, 'PAID', paymentMethod)
+      }
 
-      await salesApi.create({
-        customerId: customer?.id,
-        items,
-        paymentStatus,
-        paymentMethod: paymentStatus === 'PAID' ? paymentMethod : undefined,
-      })
+      // 2. Create new sales if cart has items
+      if (cart.length > 0) {
+        const items = cart.map((item) => ({
+          productId: item.productId,
+          itemType: item.category,
+          itemName: item.name,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+        }))
 
-      alert(`Satış tamamlandı: ${cartTotal.toFixed(2)} TL`)
+        await salesApi.create({
+          customerId: customer?.id,
+          items,
+          paymentStatus,
+          paymentMethod: paymentStatus === 'PAID' ? paymentMethod : undefined,
+        })
+      }
+
+      alert(`Ödeme tamamlandı: ${grandTotal.toFixed(2)} TL`)
       setCart([])
-      setCustomer(null)
+      setPendingPayments([])
       fetchProducts() // Refresh stock
+
+      // Refresh customer sales if customer is selected
+      if (customer) {
+        await fetchCustomerSales(customer.id)
+      }
     } catch (error: any) {
-      alert(error.response?.data?.message || 'Satış kaydedilemedi')
+      alert(error.response?.data?.message || 'İşlem başarısız')
     } finally {
       setProcessing(false)
     }
@@ -233,8 +311,11 @@ export default function POSPage() {
   const getDisplayProducts = () => {
     let list: Product[] = []
 
-    if (activeCategory === 'Favori') {
-      list = favorites
+    if (activeCategory === 'Tüm Ürünler') {
+      list = products
+    } else if (activeCategory === 'Fotoğraf/Video') {
+      // Include VIDEO, PHOTO, PACKAGE categories
+      list = products.filter((p) => ['VIDEO', 'PHOTO', 'PACKAGE', 'Fotoğraf/Video'].includes(p.category))
     } else {
       list = products.filter((p) => p.category === activeCategory)
     }
@@ -252,7 +333,7 @@ export default function POSPage() {
   return (
     <div className="h-[calc(100vh-80px)] flex gap-4">
       {/* LEFT: Customer Section */}
-      <div className="w-72 flex-shrink-0 flex flex-col gap-4">
+      <div className="w-72 flex-shrink-0 flex flex-col gap-4 overflow-hidden">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-2">
@@ -304,6 +385,15 @@ export default function POSPage() {
                     <X className="h-4 w-4" />
                   </button>
                 </div>
+                {/* Customer Balance */}
+                {customerBalance > 0 && (
+                  <div className="mt-2 p-2 bg-yellow-100 rounded border border-yellow-300">
+                    <div className="flex items-center gap-1 text-yellow-800">
+                      <AlertCircle className="h-3 w-3" />
+                      <span className="text-xs font-medium">Bakiye: {customerBalance.toFixed(2)} ₺</span>
+                    </div>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="p-3 bg-gray-50 rounded-lg text-center text-sm text-muted-foreground">
@@ -316,12 +406,73 @@ export default function POSPage() {
               variant="outline"
               size="sm"
               className="w-full text-xs"
-              onClick={() => setCustomer(null)}
+              onClick={() => clearCustomer()}
             >
               Müşterisiz Satış
             </Button>
           </CardContent>
         </Card>
+
+        {/* Customer Sales History */}
+        {customer && (
+          <Card className="flex-1 flex flex-col overflow-hidden">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Receipt className="h-4 w-4" />
+                Satış Geçmişi ({customerSales.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="flex-1 overflow-y-auto p-3">
+              {customerSales.length === 0 ? (
+                <p className="text-xs text-muted-foreground text-center py-4">
+                  Henüz satış yok
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {customerSales.map((sale) => {
+                    const isInPending = pendingPayments.some(p => p.saleId === sale.id)
+                    return (
+                      <div
+                        key={sale.id}
+                        className={`p-2 rounded text-xs ${
+                          sale.paymentStatus === 'PAID'
+                            ? 'bg-green-50 border border-green-200'
+                            : isInPending
+                            ? 'bg-blue-50 border border-blue-300'
+                            : 'bg-red-50 border border-red-200'
+                        }`}
+                      >
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium truncate">{sale.itemName}</p>
+                            <p className="text-muted-foreground">
+                              {sale.quantity}x • {new Date(sale.createdAt).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-medium">{sale.totalPrice.toFixed(2)} ₺</p>
+                            {sale.paymentStatus === 'PAID' ? (
+                              <p className="text-green-600">Ödendi</p>
+                            ) : isInPending ? (
+                              <p className="text-blue-600">Sepette</p>
+                            ) : (
+                              <button
+                                onClick={() => handlePayUnpaidSale(sale)}
+                                className="mt-1 px-2 py-1 bg-red-500 text-white rounded text-[10px] hover:bg-red-600"
+                              >
+                                Ödeme Al
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {/* CENTER: Products */}
@@ -336,7 +487,6 @@ export default function POSPage() {
               onClick={() => setActiveCategory(cat)}
               className="flex-shrink-0"
             >
-              {cat === 'Favori' && <Star className="h-3 w-3 mr-1" />}
               {cat}
             </Button>
           ))}
@@ -412,6 +562,40 @@ export default function POSPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="flex-1 flex flex-col overflow-hidden">
+            {/* Pending Payments */}
+            {pendingPayments.length > 0 && (
+              <div className="mb-3 pb-3 border-b border-red-200">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-medium text-red-600">Bekleyen Ödemeler</span>
+                  <button onClick={clearPendingPayments} className="text-red-500 text-xs hover:underline">
+                    Temizle
+                  </button>
+                </div>
+                <div className="space-y-1">
+                  {pendingPayments.map((pending) => (
+                    <div
+                      key={pending.saleId}
+                      className="flex items-center justify-between p-2 bg-red-50 rounded-lg border border-red-200"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{pending.itemName}</p>
+                        <p className="text-xs text-red-600">Ödeme bekliyor</p>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <span className="text-sm font-medium">{pending.totalPrice.toFixed(2)} ₺</span>
+                        <button
+                          onClick={() => removePendingPayment(pending.saleId)}
+                          className="p-1 rounded text-red-500 hover:bg-red-100"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Cart Items */}
             <div className="flex-1 overflow-y-auto space-y-2 mb-4">
               {cart.length === 0 ? (
@@ -459,9 +643,21 @@ export default function POSPage() {
 
             {/* Total */}
             <div className="border-t pt-3 mb-3">
+              {pendingPayments.length > 0 && cart.length > 0 && (
+                <div className="text-xs text-muted-foreground mb-2 space-y-1">
+                  <div className="flex justify-between">
+                    <span>Bekleyen ödemeler:</span>
+                    <span>{pendingTotal.toFixed(2)} ₺</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Yeni satışlar:</span>
+                    <span>{cartTotal.toFixed(2)} ₺</span>
+                  </div>
+                </div>
+              )}
               <div className="flex items-center justify-between mb-2">
                 <span className="text-muted-foreground">Toplam</span>
-                <span className="text-2xl font-bold">{cartTotal.toFixed(2)} ₺</span>
+                <span className="text-2xl font-bold">{grandTotal.toFixed(2)} ₺</span>
               </div>
             </div>
 
@@ -469,7 +665,7 @@ export default function POSPage() {
             <div className="grid grid-cols-2 gap-2">
               <Button
                 onClick={() => handlePayment('CASH')}
-                disabled={processing || cart.length === 0}
+                disabled={processing || (cart.length === 0 && pendingPayments.length === 0)}
                 className="h-14 bg-green-600 hover:bg-green-700"
               >
                 {processing ? (
@@ -483,7 +679,7 @@ export default function POSPage() {
               </Button>
               <Button
                 onClick={() => handlePayment('CREDIT_CARD')}
-                disabled={processing || cart.length === 0}
+                disabled={processing || (cart.length === 0 && pendingPayments.length === 0)}
                 className="h-14 bg-blue-600 hover:bg-blue-700"
               >
                 <CreditCard className="h-5 w-5 mr-2" />
@@ -491,7 +687,7 @@ export default function POSPage() {
               </Button>
               <Button
                 onClick={() => handlePayment('TRANSFER')}
-                disabled={processing || cart.length === 0}
+                disabled={processing || (cart.length === 0 && pendingPayments.length === 0)}
                 variant="outline"
                 className="h-12"
               >

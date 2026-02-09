@@ -29,6 +29,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Menu,
+  Bell,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
@@ -94,6 +95,7 @@ const menuGroups: MenuGroup[] = [
   {
     title: 'SİSTEM',
     items: [
+      { href: '/admin/notifications', label: 'Bildirimler', icon: Bell },
       { href: '/admin/staff', label: 'Personel Yönetimi', icon: UserCog },
       { href: '/admin/reports/system', label: 'Sistem İzleme', icon: Server },
       { href: '/admin/settings', label: 'Ayarlar', icon: Settings },

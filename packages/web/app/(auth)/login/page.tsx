@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -14,6 +14,13 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+
+  // Redirect www to non-www to keep localStorage consistent
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.location.hostname === 'www.skytrackyp.com') {
+      window.location.href = window.location.href.replace('www.skytrackyp.com', 'skytrackyp.com')
+    }
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
