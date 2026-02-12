@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import Link from 'next/link'
 import {
   TrendingUp,
   TrendingDown,
@@ -13,6 +14,7 @@ import {
   CreditCard,
   Banknote,
   ArrowRightLeft,
+  Users,
 } from 'lucide-react'
 import { reportsApi } from '@/lib/api'
 import {
@@ -45,6 +47,7 @@ interface RevenueData {
   categories: Record<string, number>
   dailyTrend: { date: string; pos: number; media: number }[]
   topProducts: { name: string; total: number }[]
+  topStaff: { id: string; name: string; total: number; count: number }[]
   dateRange: { from: string; to: string }
 }
 
@@ -331,35 +334,86 @@ export default function RevenueReport() {
         </Card>
       </div>
 
-      {/* Top Products */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">En Çok Satan Ürünler</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {data?.topProducts && data.topProducts.length > 0 ? (
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={data.topProducts} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis type="number" fontSize={12} />
-                <YAxis
-                  dataKey="name"
-                  type="category"
-                  fontSize={11}
-                  width={150}
-                  tick={{ textAnchor: 'end' }}
-                />
-                <Tooltip formatter={(value: number) => formatCurrency(value)} />
-                <Bar dataKey="total" fill="#3b82f6" radius={[0, 4, 4, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="flex items-center justify-center h-[300px] text-muted-foreground">
-              Veri yok
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      {/* Charts Row 2 */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Top Products */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">En Çok Satan Ürünler</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {data?.topProducts && data.topProducts.length > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={data.topProducts} layout="vertical">
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis type="number" fontSize={12} />
+                  <YAxis
+                    dataKey="name"
+                    type="category"
+                    fontSize={11}
+                    width={150}
+                    tick={{ textAnchor: 'end' }}
+                  />
+                  <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                  <Bar dataKey="total" fill="#3b82f6" radius={[0, 4, 4, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex items-center justify-center h-[300px] text-muted-foreground">
+                Veri yok
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Staff Performance */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Users className="w-5 h-5" />
+              Personel Satış Performansı
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {data?.topStaff && data.topStaff.length > 0 ? (
+              <div className="space-y-3">
+                {data.topStaff.map((staff, index) => {
+                  const maxTotal = data.topStaff[0]?.total || 1
+                  const percentage = (staff.total / maxTotal) * 100
+                  return (
+                    <Link
+                      key={staff.id}
+                      href={`/admin/reports/staff-sales?staffId=${staff.id}&staffName=${encodeURIComponent(staff.name)}`}
+                      className="block space-y-1 hover:bg-gray-50 p-2 -mx-2 rounded-lg transition-colors cursor-pointer"
+                    >
+                      <div className="flex items-center justify-between text-sm">
+                        <div className="flex items-center gap-2">
+                          <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold">
+                            {index + 1}
+                          </div>
+                          <span className="font-medium hover:text-primary transition-colors">{staff.name}</span>
+                          <span className="text-xs text-muted-foreground">({staff.count} satış)</span>
+                        </div>
+                        <span className="font-bold text-primary">{formatCurrency(staff.total)}</span>
+                      </div>
+                      <div className="w-full bg-gray-100 rounded-full h-2">
+                        <div
+                          className="bg-primary h-2 rounded-full transition-all"
+                          style={{ width: `${percentage}%` }}
+                        />
+                      </div>
+                    </Link>
+                  )
+                })}
+              </div>
+            ) : (
+              <div className="flex items-center justify-center h-[300px] text-muted-foreground">
+                Veri yok
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Revenue Split Visual */}
       <Card>

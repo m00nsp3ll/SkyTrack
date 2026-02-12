@@ -86,7 +86,8 @@ const menuGroups: MenuGroup[] = [
   {
     title: 'RAPORLAR',
     items: [
-      { href: '/admin/sales/daily', label: 'Günlük Rapor', icon: Calendar },
+      { href: '/admin/sales/daily', label: 'Kasa Raporu', icon: Calendar },
+      { href: '/admin/reports/cashier', label: 'Vezne Raporu', icon: Receipt },
       { href: '/admin/reports/pilots', label: 'Pilot Raporu', icon: UserCog },
       { href: '/admin/reports/revenue', label: 'Gelir Raporu', icon: TrendingUp },
       { href: '/admin/reports/customers', label: 'Müşteri Akışı', icon: BarChart3 },

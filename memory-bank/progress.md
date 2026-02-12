@@ -123,6 +123,19 @@
 - [x] Ödeme yöntemleri (Nakit, Kart, Havale, Veresiye)
 - [x] Müşteri bazlı satış geçmişi
 - [x] Borç tahsilat sistemi
+- [x] Personel satış takip sistemi (soldBy kaydı)
+
+### Raporlama (2026-02-12)
+- [x] Dashboard - Ana panel özet kartları
+- [x] Kasa Raporu (/admin/sales/daily) - Günlük satış detayları + personel/saat
+- [x] Vezne Raporu (/admin/reports/cashier) - Tüm personel performansı
+- [x] Personel Detay Raporu (/admin/reports/staff-sales) - Bireysel satış analizi
+- [x] Gelir Raporu (/admin/reports/revenue) - Kategori, trend, personel performansı
+- [x] Pilot Raporu (/admin/reports/pilots) - Pilot performans istatistikleri
+- [x] Müşteri Akışı Raporu (/admin/reports/customers) - Müşteri analizi
+- [x] Dönem Karşılaştırma (/admin/reports/compare) - İki dönem karşılaştırması
+- [x] Sistem İzleme (/admin/reports/system) - Disk, DB, memory kullanımı
+- [x] Bekleyen Ödemeler Modal - Personel detayında pop-up panel
 
 ### UI/UX
 - [x] Responsive sidebar (collapse özelliği)
@@ -130,14 +143,18 @@
 - [x] Mobil scroll düzeltmesi
 - [x] Menü tıklandığında kapanma
 - [x] Slide-in animasyonları (Tailwind keyframes)
+- [x] Kategori accordion pattern (genişletilebilir satış listesi)
+- [x] Modal sistemleri (bekleyen ödemeler, POS, vb.)
+- [x] Progress bar gösterimleri (personel katkı, ödeme dağılımı)
+- [x] Tıklanabilir linkler arası navigasyon (personel ↔ detay, müşteri ↔ portfolyo)
 
 ## Devam Eden / Eksik Özellikler
 
 ### Raporlar
-- [ ] Pilot performans raporu
-- [ ] Gelir raporu
-- [ ] Müşteri akışı raporu
-- [ ] Dönem karşılaştırma
+- [ ] Pilot performans raporu detaylandırma
+- [ ] Müşteri akışı raporu geliştirme
+- [ ] Excel export özelliği
+- [ ] Tarih aralığı preset'leri (bugün, bu hafta, bu ay, vb.)
 
 ## Bilinen Sorunlar
 

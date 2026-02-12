@@ -252,9 +252,10 @@ export default function DailyReportPage() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b text-left">
-                    <th className="pb-3 font-medium">Saat</th>
                     <th className="pb-3 font-medium">Müşteri</th>
                     <th className="pb-3 font-medium">Ürün</th>
+                    <th className="pb-3 font-medium">Satışı Yapan</th>
+                    <th className="pb-3 font-medium">Saat</th>
                     <th className="pb-3 font-medium text-center">Adet</th>
                     <th className="pb-3 font-medium text-right">Tutar</th>
                     <th className="pb-3 font-medium text-center">Ödeme</th>
@@ -262,24 +263,35 @@ export default function DailyReportPage() {
                 </thead>
                 <tbody>
                   {report.sales.slice(0, 50).map((sale) => (
-                    <tr key={sale.id} className="border-b">
-                      <td className="py-2 text-sm">
+                    <tr key={sale.id} className="border-b hover:bg-gray-50">
+                      <td className="py-3">
+                        {sale.customer ? (
+                          <span className="text-sm font-medium">{sale.customer.displayId}</span>
+                        ) : (
+                          <span className="text-sm text-muted-foreground">-</span>
+                        )}
+                      </td>
+                      <td className="py-3">
+                        <span className="text-sm">{sale.itemName}</span>
+                        <span className="text-xs text-muted-foreground ml-2">({sale.itemType})</span>
+                      </td>
+                      <td className="py-3">
+                        <Link
+                          href={`/admin/reports/staff-sales?staffId=${sale.soldBy?.id}&staffName=${encodeURIComponent(sale.soldBy?.username || '')}`}
+                          className="text-sm font-medium text-primary hover:underline cursor-pointer"
+                        >
+                          {sale.soldBy?.username || '-'}
+                        </Link>
+                      </td>
+                      <td className="py-3 text-sm text-muted-foreground">
                         {new Date(sale.createdAt).toLocaleTimeString('tr-TR', {
                           hour: '2-digit',
                           minute: '2-digit',
                         })}
                       </td>
-                      <td className="py-2">
-                        {sale.customer ? (
-                          <span className="text-sm">{sale.customer.displayId}</span>
-                        ) : (
-                          <span className="text-sm text-muted-foreground">-</span>
-                        )}
-                      </td>
-                      <td className="py-2 font-medium">{sale.itemName}</td>
-                      <td className="py-2 text-center">{sale.quantity}</td>
-                      <td className="py-2 text-right font-medium">{formatCurrency(sale.totalPrice)}</td>
-                      <td className="py-2 text-center">
+                      <td className="py-3 text-center text-sm">{sale.quantity}</td>
+                      <td className="py-3 text-right font-medium">{formatCurrency(sale.totalPrice)}</td>
+                      <td className="py-3 text-center">
                         <span
                           className={`px-2 py-1 rounded text-xs ${
                             sale.paymentStatus === 'PAID'

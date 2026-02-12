@@ -301,6 +301,9 @@ router.get('/revenue', authenticate, asyncHandler(async (req: AuthRequest, res: 
         paymentMethod: true,
         itemType: true,
         createdAt: true,
+        soldBy: {
+          select: { id: true, username: true, name: true },
+        },
       },
     }),
     prisma.mediaFolder.findMany({
@@ -361,6 +364,21 @@ router.get('/revenue', authenticate, asyncHandler(async (req: AuthRequest, res: 
     .slice(0, 10)
     .map(([name, total]) => ({ name, total }));
 
+  // Staff sales breakdown
+  const staffSales: Record<string, { id: string; name: string; total: number; count: number }> = {};
+  paidSales.forEach(s => {
+    const staffId = s.soldBy.id;
+    const staffName = s.soldBy.name || s.soldBy.username;
+    if (!staffSales[staffId]) {
+      staffSales[staffId] = { id: staffId, name: staffName, total: 0, count: 0 };
+    }
+    staffSales[staffId].total += s.totalPrice;
+    staffSales[staffId].count += 1;
+  });
+  const topStaff = Object.values(staffSales)
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 10);
+
   res.json({
     success: true,
     data: {
@@ -375,6 +393,7 @@ router.get('/revenue', authenticate, asyncHandler(async (req: AuthRequest, res: 
       categories,
       dailyTrend,
       topProducts,
+      topStaff,
       dateRange: { from: fromDate, to: toDate },
     },
   });
@@ -657,6 +676,154 @@ router.get('/compare', authenticate, asyncHandler(async (req: AuthRequest, res: 
       },
     },
   });
+}));
+
+// GET /api/reports/staff-sales - Staff sales performance report
+router.get('/staff-sales', authenticate, asyncHandler(async (req: AuthRequest, res: any) => {
+  const { staffId, from, to } = req.query;
+
+  const fromDate = from ? new Date(from as string) : new Date(new Date().setDate(new Date().getDate() - 30));
+  fromDate.setHours(0, 0, 0, 0);
+  const toDate = to ? new Date(to as string) : new Date();
+  toDate.setHours(23, 59, 59, 999);
+
+  // If specific staff requested
+  if (staffId) {
+    const [user, sales] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id: staffId as string },
+        select: { id: true, username: true, name: true, role: true },
+      }),
+      prisma.sale.findMany({
+        where: {
+          soldById: staffId as string,
+          createdAt: { gte: fromDate, lte: toDate },
+        },
+        include: {
+          customer: {
+            select: { id: true, displayId: true, firstName: true, lastName: true },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+    ]);
+
+    if (!user) {
+      throw new AppError('Personel bulunamadı', 404, 'STAFF_NOT_FOUND');
+    }
+
+    const paidSales = sales.filter(s => s.paymentStatus === 'PAID');
+    const totalRevenue = paidSales.reduce((sum, s) => sum + s.totalPrice, 0);
+    const totalUnpaid = sales.filter(s => s.paymentStatus === 'UNPAID').reduce((sum, s) => sum + s.totalPrice, 0);
+
+    // Category breakdown
+    const categories: Record<string, { count: number; total: number }> = {};
+    paidSales.forEach(s => {
+      if (!categories[s.itemType]) {
+        categories[s.itemType] = { count: 0, total: 0 };
+      }
+      categories[s.itemType].count += s.quantity;
+      categories[s.itemType].total += s.totalPrice;
+    });
+
+    // Daily trend
+    const dailySales: { date: string; amount: number; count: number }[] = [];
+    const dayMs = 24 * 60 * 60 * 1000;
+    for (let d = new Date(fromDate); d <= toDate; d = new Date(d.getTime() + dayMs)) {
+      const dateStr = d.toISOString().split('T')[0];
+      const dayStart = new Date(d);
+      const dayEnd = new Date(d.getTime() + dayMs);
+
+      const daySales = paidSales.filter(s => s.createdAt >= dayStart && s.createdAt < dayEnd);
+      dailySales.push({
+        date: dateStr,
+        amount: daySales.reduce((sum, s) => sum + s.totalPrice, 0),
+        count: daySales.length,
+      });
+    }
+
+    // Hourly distribution
+    const hourlySales: Record<number, number> = {};
+    for (let h = 8; h <= 19; h++) hourlySales[h] = 0;
+    paidSales.forEach(s => {
+      const hour = s.createdAt.getHours();
+      if (hourlySales[hour] !== undefined) {
+        hourlySales[hour] += s.totalPrice;
+      }
+    });
+
+    // Payment method breakdown
+    const paymentMethods = {
+      CASH: paidSales.filter(s => s.paymentMethod === 'CASH').reduce((sum, s) => sum + s.totalPrice, 0),
+      CREDIT_CARD: paidSales.filter(s => s.paymentMethod === 'CREDIT_CARD').reduce((sum, s) => sum + s.totalPrice, 0),
+      TRANSFER: paidSales.filter(s => s.paymentMethod === 'TRANSFER').reduce((sum, s) => sum + s.totalPrice, 0),
+    };
+
+    res.json({
+      success: true,
+      data: {
+        staff: user,
+        summary: {
+          totalSales: sales.length,
+          totalRevenue,
+          totalUnpaid,
+          avgSaleAmount: sales.length > 0 ? totalRevenue / paidSales.length : 0,
+          collectionRate: (totalRevenue + totalUnpaid) > 0
+            ? ((totalRevenue / (totalRevenue + totalUnpaid)) * 100).toFixed(1)
+            : '100',
+        },
+        categories,
+        dailySales,
+        hourlySales: Object.entries(hourlySales).map(([hour, amount]) => ({
+          hour: parseInt(hour),
+          amount,
+        })),
+        paymentMethods,
+        recentSales: sales.slice(0, 100),
+        dateRange: { from: fromDate, to: toDate },
+      },
+    });
+  } else {
+    // All staff summary
+    const sales = await prisma.sale.findMany({
+      where: { createdAt: { gte: fromDate, lte: toDate } },
+      select: {
+        totalPrice: true,
+        paymentStatus: true,
+        soldBy: {
+          select: { id: true, username: true, name: true },
+        },
+      },
+    });
+
+    const staffStats: Record<string, { name: string; total: number; count: number; paid: number }> = {};
+    sales.forEach(s => {
+      const staffId = s.soldBy.id;
+      const staffName = s.soldBy.name || s.soldBy.username;
+      if (!staffStats[staffId]) {
+        staffStats[staffId] = { name: staffName, total: 0, count: 0, paid: 0 };
+      }
+      staffStats[staffId].count += 1;
+      if (s.paymentStatus === 'PAID') {
+        staffStats[staffId].total += s.totalPrice;
+        staffStats[staffId].paid += 1;
+      }
+    });
+
+    const staffList = Object.entries(staffStats).map(([id, stats]) => ({
+      id,
+      ...stats,
+      avgSale: stats.paid > 0 ? stats.total / stats.paid : 0,
+    })).sort((a, b) => b.total - a.total);
+
+    res.json({
+      success: true,
+      data: {
+        staffList,
+        dateRange: { from: fromDate, to: toDate },
+      },
+    });
+  }
 }));
 
 // GET /api/reports/system - System status
