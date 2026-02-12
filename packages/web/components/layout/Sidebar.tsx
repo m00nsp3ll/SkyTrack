@@ -32,6 +32,7 @@ import {
   Bell,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { cleanupFcmToken } from '@/lib/nativePush'
 
 interface MenuItem {
   href: string
@@ -167,7 +168,8 @@ export function Sidebar({ onNavigate }: SidebarProps) {
     setFilteredGroups(getFilteredMenuGroups())
   }, [])
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await cleanupFcmToken()
     localStorage.removeItem('token')
     localStorage.removeItem('user')
     localStorage.removeItem('permissions')

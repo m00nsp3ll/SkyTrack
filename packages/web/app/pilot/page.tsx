@@ -10,7 +10,7 @@ import { useSocket } from '@/hooks/useSocket'
 import { SOCKET_EVENTS } from '@/lib/socket'
 import { PushNotificationManager } from '@/components/pwa/PushNotificationManager'
 import { PWAInstallPrompt } from '@/components/pwa/PWAInstallGuide'
-import { initNativePush } from '@/lib/nativePush'
+import { initNativePush, cleanupFcmToken } from '@/lib/nativePush'
 import {
   Plane,
   User,
@@ -215,9 +215,11 @@ export default function PilotPanel() {
     }
   }, [user?.pilotId, on, fetchPanelData])
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await cleanupFcmToken()
     localStorage.removeItem('token')
     localStorage.removeItem('user')
+    localStorage.removeItem('permissions')
     router.push('/login')
   }
 
@@ -280,7 +282,7 @@ export default function PilotPanel() {
   return (
     <div className="min-h-screen bg-gray-50 pb-32">
       {/* Header */}
-      <header className="bg-primary text-primary-foreground p-4 sticky top-0 z-10">
+      <header className="bg-primary text-primary-foreground p-4 sticky top-0 z-10 pt-[max(1rem,env(safe-area-inset-top))]">
         <div className="flex items-center justify-between">
           <div
             className="flex items-center gap-3 flex-1 cursor-pointer hover:bg-white/10 rounded-lg p-2 -m-2 transition-colors"

@@ -75,6 +75,6 @@ export const generateToken = (user: { id: string; role: UserRole; pilotId?: stri
   return jwt.sign(
     { userId: user.id, role: user.role, pilotId: user.pilotId },
     JWT_SECRET,
-    { expiresIn: '7d' }
+    { expiresIn: '30d' }
   );
 };

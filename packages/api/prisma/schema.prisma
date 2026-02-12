@@ -247,6 +247,14 @@ model RolePermission {
   @@map("role_permissions")
 }
 
+model NotificationSetting {
+  id        String   @id @default(uuid())
+  settings  Json     @default("{}")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("notification_settings")
+}
+
 model FcmToken {
   id        String   @id @default(uuid())
   userId    String   @map("user_id")

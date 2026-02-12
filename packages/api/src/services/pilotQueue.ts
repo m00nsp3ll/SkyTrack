@@ -1,6 +1,6 @@
 import { PrismaClient, Pilot, PilotStatus } from '@prisma/client';
 import { cache } from './cache.js';
-import { sendNativeToPilot } from './firebaseNotification.js';
+import { sendNativeToPilot, getNotificationConfig } from './firebaseNotification.js';
 import { sanitizePilotName } from './media.js';
 import fs from 'fs';
 import path from 'path';
@@ -242,13 +242,18 @@ export const pilotQueueService = {
       // Send notification to pilot
       if (customer) {
         const customerName = `${customer.firstName} ${customer.lastName}`;
+        const defaultBody = `${customerName} (${customer.displayId}) - ${customer.weight || 0}kg`;
 
         // Firebase Native Push (FCM) - Primary notification channel
-        sendNativeToPilot(pilot.id, {
-          title: '🪂 Yeni Müşteri Atandı',
-          body: `${customerName} (${customer.displayId}) - ${customer.weight || 0}kg`,
-          data: { type: 'customer_assigned', flightId: result.id },
-        }).catch(err => console.error('FCM notification error:', err));
+        getNotificationConfig('customer_assigned').then(config => {
+          if (config?.enabled) {
+            sendNativeToPilot(pilot.id, {
+              title: config.title || '🪂 Yeni Müşteri Atandı',
+              body: config.body ? config.body.replace('{customer}', customerName).replace('{displayId}', customer.displayId).replace('{weight}', String(customer.weight || 0)) : defaultBody,
+              data: { type: 'customer_assigned', flightId: result.id },
+            }).catch(err => console.error('FCM notification error:', err));
+          }
+        });
       }
     }
 
@@ -402,13 +407,18 @@ export const pilotQueueService = {
 
         // Send notification to new pilot
         const customerName = `${customer.firstName} ${customer.lastName}`;
+        const defaultBody = `${customerName} (${customer.displayId}) - ${customer.weight || 0}kg`;
 
         // Firebase Native Push (FCM) - Primary notification channel
-        sendNativeToPilot(pilot.id, {
-          title: '🪂 Yeni Müşteri Atandı',
-          body: `${customerName} (${customer.displayId}) - ${customer.weight || 0}kg`,
-          data: { type: 'customer_reassigned' },
-        }).catch(err => console.error('FCM notification error:', err));
+        getNotificationConfig('customer_reassigned').then(config => {
+          if (config?.enabled) {
+            sendNativeToPilot(pilot.id, {
+              title: config.title || '🪂 Yeni Müşteri Atandı',
+              body: config.body ? config.body.replace('{customer}', customerName).replace('{displayId}', customer.displayId).replace('{weight}', String(customer.weight || 0)) : defaultBody,
+              data: { type: 'customer_reassigned' },
+            }).catch(err => console.error('FCM notification error:', err));
+          }
+        });
       }
     }
 

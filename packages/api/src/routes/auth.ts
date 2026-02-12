@@ -32,6 +32,15 @@ router.post('/login', asyncHandler(async (req: AuthRequest, res: any) => {
 
   const token = generateToken(user);
 
+  // Set HTTP-only cookie as backup auth mechanism
+  res.cookie('token', token, {
+    httpOnly: false, // Allow JS access so Capacitor can read it
+    secure: true,
+    sameSite: 'none',
+    maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+    path: '/',
+  });
+
   // Get role permissions
   const rolePerm = await prisma.rolePermission.findUnique({ where: { role: user.role } });
 

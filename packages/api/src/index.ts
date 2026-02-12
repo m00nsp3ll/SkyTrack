@@ -29,6 +29,7 @@ import fcmRoutes from './routes/fcm.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { setupSocket } from './socket/index.js';
 import { setupCronJobs } from './cron/dailyReset.js';
+import { startCronJobs } from './services/cronJobs.js';
 import { cache } from './services/cache.js';
 import { getLocalIP } from './utils/networkUtils.js';
 
@@ -156,6 +157,7 @@ setupSocket(io);
 
 // Setup Cron Jobs
 setupCronJobs();
+startCronJobs();
 
 // Start server on all interfaces (0.0.0.0) for LAN access
 const protocol = httpsServer ? 'https' : 'http';

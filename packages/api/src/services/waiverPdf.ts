@@ -25,21 +25,9 @@ function sanitizeFilename(name: string): string {
     .trim();
 }
 
-const WAIVER_TEXT = toAscii(`YAMAÇ PARAŞÜTÜ UÇUŞU RİSK VE SORUMLULUK BEYANI
+const WAIVER_TEXT = toAscii(`RİSK KABUL FORMU
 
-Bu belgeyi imzalayarak aşağıdaki hususları kabul ve beyan ederim:
-
-1. Yamaç paraşütü sporu, doğası gereği tehlikeli bir aktivitedir ve ciddi yaralanma veya ölüm riski taşımaktadır.
-
-2. Uçuş sırasında hava koşulları, ekipman arızası veya diğer öngörülemeyen durumlar nedeniyle kaza meydana gelebileceğini biliyorum.
-
-3. Herhangi bir sağlık problemim (kalp hastalığı, epilepsi, hamilelik, vb.) bulunmamaktadır veya varsa pilot ve yetkilere bildirdim.
-
-4. Uçuş öncesi verilen tüm güvenlik talimatlarına uyacağımı taahhüt ederim.
-
-5. Meydana gelebilecek herhangi bir kaza, yaralanma veya maddi hasar durumunda kooperatif ve pilotu sorumlu tutmayacağımı kabul ederim.
-
-6. 18 yaşından büyük olduğumu veya yasal veli/vasi onayı aldığımı beyan ederim.`);
+Ben Yamaç Paraşütü ile tandem uçuşu yapmak için gerekli ön eğitimi pilotumdan gördüm. Bu konuda tüm bilgilere sahibim. Kendi isteğim ile uçuşa hazırım. Tandem uçuşu RAY SİGORTA A.Ş güvencesindedir. Ben uçuş esnasında meydana gelebilecek herhangi bir kazada ALANYA İlçe Sportif Turizm Kurulu Uçuş Kontrol Heyeti Bürosu Ve İşletmesini Yürüten şirketten/pilotundan ve diğer şahıslardan hiçbir hak talep etmeyeceğimi kabul ederim.`);
 
 interface CustomerData {
   displayId: string;
@@ -82,7 +70,7 @@ export async function generateWaiverPdf(customer: CustomerData): Promise<string>
 
       doc
         .fontSize(16)
-        .text(toAscii('RİSK VE SORUMLULUK BEYANI'), { align: 'center' });
+        .text(toAscii('RİSK KABUL FORMU'), { align: 'center' });
 
       doc.moveDown(1.5);
 

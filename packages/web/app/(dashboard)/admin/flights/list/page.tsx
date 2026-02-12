@@ -242,30 +242,46 @@ export default function FlightsListPage() {
                 <Card className="hover:shadow-md transition-shadow cursor-pointer">
                   <CardContent className="p-4">
                     <div className="flex items-center gap-4">
-                      {/* Customer Info */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
-                          <span className="text-xs text-muted-foreground">
-                            {flight.customer.displayId}
-                          </span>
                           <span className={`px-2 py-0.5 rounded text-xs ${status.color}`}>
                             {status.label}
                           </span>
+                          <span className="text-xs text-muted-foreground">
+                            {flight.customer.displayId}
+                          </span>
                         </div>
-                        <p className="font-medium truncate">
-                          {flight.customer.firstName} {flight.customer.lastName}
+                        <p className="font-bold text-base truncate">
+                          {flight.pilot.name}
                         </p>
-                        <div className="flex items-center gap-3 text-sm text-muted-foreground mt-1">
-                          <span className="flex items-center gap-1">
-                            <User className="h-3 w-3" />
-                            {flight.pilot.name}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <Clock className="h-3 w-3" />
-                            {formatTime(flight.createdAt)}
-                          </span>
+                        <p className="text-sm text-muted-foreground truncate">
+                          {flight.customer.firstName} {flight.customer.lastName}
+                          <span className="ml-2 text-xs">({flight.customer.weight} kg)</span>
+                        </p>
+                        <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1.5">
+                          {flight.takeoffAt && (
+                            <span className="flex items-center gap-1">
+                              <Plane className="h-3 w-3 text-blue-500" />
+                              Kalkış: {formatTime(flight.takeoffAt)}
+                            </span>
+                          )}
+                          {flight.landingAt && (
+                            <span className="flex items-center gap-1">
+                              <Plane className="h-3 w-3 text-green-500 rotate-90" />
+                              İniş: {formatTime(flight.landingAt)}
+                            </span>
+                          )}
                           {flight.durationMinutes && (
-                            <span>{flight.durationMinutes} dk</span>
+                            <span className="flex items-center gap-1">
+                              <Clock className="h-3 w-3" />
+                              {flight.durationMinutes} dk
+                            </span>
+                          )}
+                          {!flight.takeoffAt && (
+                            <span className="flex items-center gap-1">
+                              <Clock className="h-3 w-3" />
+                              {formatTime(flight.createdAt)}
+                            </span>
                           )}
                         </div>
                       </div>

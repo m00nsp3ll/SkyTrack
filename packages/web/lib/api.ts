@@ -17,6 +17,11 @@ function getApiUrl() {
     return `https://${hostname.replace(/^[^.]+/, 'api')}/api`
   }
 
+  // Capacitor app uses localhost but needs real API
+  if (hostname === 'localhost' && typeof (window as any).Capacitor !== 'undefined') {
+    return 'https://api.skytrackyp.com/api'
+  }
+
   // Local network - use HTTPS
   return `https://${hostname}:3001/api`
 }
@@ -24,6 +29,7 @@ function getApiUrl() {
 export const api = axios.create({
   baseURL: getApiUrl(),
   withCredentials: true,
+  timeout: 15000,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -38,15 +44,32 @@ api.interceptors.request.use((config) => {
   return config
 })
 
+// Track if we're already redirecting to prevent multiple redirects
+let isRedirectingToLogin = false
+
 // Response interceptor to handle errors
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
-      // Token expired or invalid
-      if (typeof window !== 'undefined') {
+    // Only redirect to login for actual auth failures, not network errors
+    if (error.response?.status === 401 && typeof window !== 'undefined') {
+      const currentPath = window.location.pathname
+
+      // Don't redirect if already on login page or if we're already redirecting
+      if (currentPath === '/login' || isRedirectingToLogin) {
+        return Promise.reject(error)
+      }
+
+      // Check the error code - only clear session for definitive auth failures
+      const errorCode = error.response?.data?.error?.code
+      if (errorCode === 'UNAUTHORIZED' || errorCode === 'INVALID_TOKEN') {
+        isRedirectingToLogin = true
         localStorage.removeItem('token')
+        localStorage.removeItem('user')
+        localStorage.removeItem('permissions')
         window.location.href = '/login'
+        // Reset after a delay
+        setTimeout(() => { isRedirectingToLogin = false }, 3000)
       }
     }
     return Promise.reject(error)
@@ -63,6 +86,8 @@ export const authApi = {
   logout: () => {
     if (typeof window !== 'undefined') {
       localStorage.removeItem('token')
+      localStorage.removeItem('user')
+      localStorage.removeItem('permissions')
     }
   },
 }

@@ -4,7 +4,7 @@
 
 ### Çekirdek Sistem
 - [x] Next.js 14 + Express.js + PostgreSQL + Prisma kurulumu
-- [x] JWT tabanlı kimlik doğrulama sistemi (7 gün geçerli token)
+- [x] JWT tabanlı kimlik doğrulama sistemi (30 gün geçerli token + cookie backup)
 - [x] Socket.IO gerçek zamanlı iletişim
 - [x] HTTPS desteği (self-signed certificate)
 - [x] Dinamik IP algılama (LAN için)
@@ -87,20 +87,17 @@
 - [x] Firebase notification servisi (sendNativeToPilot, sendNativeToUser, sendNativeBroadcast)
 - [x] Frontend native push başlatma (nativePush.ts)
 - [x] PWA Push sisteminden tam geçiş (tüm sendPushToPilot çağrıları kaldırıldı)
-- [x] FCM bildirim tetikleyicileri (12 senaryo):
-  - Müşteri atama (pilotQueue.ts)
-  - Müşteri yeniden atama (pilotQueue.ts + flights.ts)
-  - Uçuş tamamlandı (flights.ts)
-  - Uçuş iptali (flights.ts)
-  - Toplu uçuş iptali (flights.ts) - Socket.IO only
-  - Pilot limit uyarısı 6/7 (flights.ts)
-  - Pilot limit doldu 7/7 (flights.ts)
+- [x] FCM bildirim tetikleyicileri (12 senaryo)
 - [x] Admin FCM yönetim paneli (token listesi, broadcast, şablonlar)
 - [x] In-app notification banner (uygulama açıkken)
 - [x] Akıllı bildirim routing (notification type bazlı)
-- [x] Debug APK build (5.5MB - packages/web/android/app/build/outputs/apk/debug/app-debug.apk)
+- [x] Debug APK build (5.6MB - paragliding.png logosuyla)
+- [x] FCM token auto-refresh sistemi (foreground 24h throttle, backend refresh endpoint)
+- [x] FCM token cleanup sistemi (cron jobs: 03:00 stale 30 gün, 03:30 inactive)
+- [x] Logout FCM token cleanup (pilot page + sidebar → cleanupFcmToken)
+- [x] Invalid token auto-delete (sendNativeNotification hata yakalama)
+- [x] NotificationsPage localStorage serialize fix (templateIconMap)
 - [ ] iOS uygulama build (ileride)
-- [ ] FCM token cleanup sistemi (geçersiz/eski tokenlar - ileride)
 - [ ] Admin cron job bildirimleri (ileride)
 
 ### DevOps & Automation (2025-02-10)

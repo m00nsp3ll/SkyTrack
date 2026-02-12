@@ -3,7 +3,7 @@ import { PrismaClient, FlightStatus } from '@prisma/client';
 import { asyncHandler, AppError } from '../middleware/errorHandler.js';
 import { authenticate, requireRole, AuthRequest } from '../middleware/auth.js';
 import { cache } from '../services/cache.js';
-import { sendNativeToPilot } from '../services/firebaseNotification.js';
+import { sendNativeToPilot, getNotificationConfig } from '../services/firebaseNotification.js';
 import fs from 'fs/promises';
 import path from 'path';
 
@@ -464,11 +464,16 @@ router.post('/:id/cancel', authenticate, asyncHandler(async (req: AuthRequest, r
     });
 
     // FCM: Notify pilot about cancellation
-    sendNativeToPilot(updatedFlight.pilot.id, {
-      title: '❌ Uçuş İptal Edildi',
-      body: `${updatedFlight.customer.firstName} ${updatedFlight.customer.lastName} (${updatedFlight.customer.displayId})`,
-      data: { type: 'flight_cancelled', flightId: id },
-    }).catch(err => console.error('FCM cancel notification error:', err));
+    getNotificationConfig('flight_cancelled').then(config => {
+      if (config?.enabled) {
+        const customerName = `${updatedFlight.customer.firstName} ${updatedFlight.customer.lastName}`;
+        sendNativeToPilot(updatedFlight.pilot.id, {
+          title: config.title || '❌ Uçuş İptal Edildi',
+          body: config.body ? config.body.replace('{customer}', customerName).replace('{displayId}', updatedFlight.customer.displayId) : `${customerName} (${updatedFlight.customer.displayId})`,
+          data: { type: 'flight_cancelled', flightId: id },
+        }).catch(err => console.error('FCM cancel notification error:', err));
+      }
+    });
   }
 
   res.json({
@@ -628,11 +633,16 @@ router.post('/:id/reassign', authenticate, requireRole('ADMIN'), asyncHandler(as
     });
 
     // FCM: Notify new pilot about reassignment
-    sendNativeToPilot(newPilot.id, {
-      title: '🪂 Yeni Müşteri Atandı',
-      body: `${updatedFlight.customer.firstName} ${updatedFlight.customer.lastName} (${updatedFlight.customer.displayId})`,
-      data: { type: 'customer_reassigned', flightId: id },
-    }).catch(err => console.error('FCM reassign notification error:', err));
+    getNotificationConfig('customer_reassigned').then(config => {
+      if (config?.enabled) {
+        const customerName = `${updatedFlight.customer.firstName} ${updatedFlight.customer.lastName}`;
+        sendNativeToPilot(newPilot.id, {
+          title: config.title || '🪂 Yeni Müşteri Atandı',
+          body: config.body ? config.body.replace('{customer}', customerName).replace('{displayId}', updatedFlight.customer.displayId) : `${customerName} (${updatedFlight.customer.displayId})`,
+          data: { type: 'customer_reassigned', flightId: id },
+        }).catch(err => console.error('FCM reassign notification error:', err));
+      }
+    });
 
     // Notify admin
     io.to('admin').emit('flight:reassigned', {
@@ -820,15 +830,19 @@ router.patch('/:id/status', authenticate, asyncHandler(async (req: AuthRequest, 
         // (Pilot already knows - they triggered the action)
       } else if (status === 'COMPLETED') {
         // FCM to pilot: Flight completed successfully
-        sendNativeToPilot(updatedFlight.pilot.id, {
-          title: '✅ Uçuş Tamamlandı',
-          body: `${eventData.customer.name} (${eventData.customer.displayId}) - ${updatedFlight.durationMinutes || 0}dk`,
-          data: {
-            type: 'flight_completed',
-            flightId: updatedFlight.id,
-            customerId: eventData.customer.displayId,
-          },
-        }).catch(err => console.error('FCM flight completed error:', err));
+        getNotificationConfig('flight_completed').then(config => {
+          if (config?.enabled) {
+            sendNativeToPilot(updatedFlight.pilot.id, {
+              title: config.title || '✅ Uçuş Tamamlandı',
+              body: config.body ? config.body.replace('{customer}', eventData.customer.name).replace('{displayId}', eventData.customer.displayId).replace('{duration}', String(updatedFlight.durationMinutes || 0)) : `${eventData.customer.name} (${eventData.customer.displayId}) - ${updatedFlight.durationMinutes || 0}dk`,
+              data: {
+                type: 'flight_completed',
+                flightId: updatedFlight.id,
+                customerId: eventData.customer.displayId,
+              },
+            }).catch(err => console.error('FCM flight completed error:', err));
+          }
+        });
       }
 
       // Check if pilot is approaching/reached limit
@@ -844,22 +858,32 @@ router.patch('/:id/status', authenticate, asyncHandler(async (req: AuthRequest, 
             });
 
             // FCM: Limit warning
-            sendNativeToPilot(pilot.id, {
-              title: '⚠️ Limit Uyarısı',
-              body: `Günlük uçuş limitine yaklaştınız: ${pilot.dailyFlightCount + 1}/${pilot.maxDailyFlights}`,
-              data: { type: 'pilot_limit_warning' },
-            }).catch(err => console.error('FCM limit warning error:', err));
+            getNotificationConfig('pilot_limit_warning').then(config => {
+              if (config?.enabled) {
+                const defaultBody = `Günlük uçuş limitine yaklaştınız: ${pilot.dailyFlightCount + 1}/${pilot.maxDailyFlights}`;
+                sendNativeToPilot(pilot.id, {
+                  title: config.title || '⚠️ Limit Uyarısı',
+                  body: config.body ? config.body.replace('{current}', String(pilot.dailyFlightCount + 1)).replace('{max}', String(pilot.maxDailyFlights)) : defaultBody,
+                  data: { type: 'pilot_limit_warning' },
+                }).catch(err => console.error('FCM limit warning error:', err));
+              }
+            });
           } else if (pilot.dailyFlightCount >= pilot.maxDailyFlights) {
             io.to(`pilot:${flight.pilotId}`).emit('pilot:limit-reached', {
               message: `Günlük uçuş limitine ulaştınız: ${pilot.maxDailyFlights}/${pilot.maxDailyFlights} - Bugünlük sıra dışısınız`,
             });
 
             // FCM: Limit reached
-            sendNativeToPilot(pilot.id, {
-              title: '🛑 Günlük Limit Doldu',
-              body: `${pilot.maxDailyFlights}/${pilot.maxDailyFlights} uçuş tamamlandı. Bugünlük sıra dışısınız.`,
-              data: { type: 'pilot_limit_reached' },
-            }).catch(err => console.error('FCM limit reached error:', err));
+            getNotificationConfig('pilot_limit_reached').then(config => {
+              if (config?.enabled) {
+                const defaultBody = `${pilot.maxDailyFlights}/${pilot.maxDailyFlights} uçuş tamamlandı. Bugünlük sıra dışısınız.`;
+                sendNativeToPilot(pilot.id, {
+                  title: config.title || '🛑 Günlük Limit Doldu',
+                  body: config.body ? config.body.replace('{current}', String(pilot.maxDailyFlights)).replace('{max}', String(pilot.maxDailyFlights)) : defaultBody,
+                  data: { type: 'pilot_limit_reached' },
+                }).catch(err => console.error('FCM limit reached error:', err));
+              }
+            });
 
             // Notify admin about pilot reaching limit
             io.to('admin').emit('pilot:limit-reached', {

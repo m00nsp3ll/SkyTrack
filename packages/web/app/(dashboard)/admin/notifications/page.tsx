@@ -20,8 +20,18 @@ import {
   ShoppingCart,
   Shield,
   Camera,
-  Radio,
   Clock,
+  Settings,
+  Save,
+  UserPlus,
+  UserCheck,
+  XCircle,
+  Timer,
+  OctagonX,
+  ChevronDown,
+  ChevronUp,
+  Edit3,
+  Info,
 } from 'lucide-react'
 
 interface FcmToken {
@@ -39,6 +49,16 @@ interface FcmToken {
   }
 }
 
+interface NotificationSettingItem {
+  enabled: boolean
+  label: string
+  description: string
+  title?: string
+  body?: string
+}
+
+type NotificationSettings = Record<string, NotificationSettingItem>
+
 const roleLabels: Record<string, { label: string; color: string; bgColor: string; icon: any }> = {
   ADMIN: { label: 'Yönetici', color: 'text-purple-700', bgColor: 'bg-purple-100', icon: Shield },
   OFFICE_STAFF: { label: 'Kasa', color: 'text-blue-700', bgColor: 'bg-blue-100', icon: ShoppingCart },
@@ -47,16 +67,87 @@ const roleLabels: Record<string, { label: string; color: string; bgColor: string
   CUSTOM: { label: 'Özel Yetki', color: 'text-indigo-700', bgColor: 'bg-indigo-100', icon: Shield },
 }
 
+const notificationIcons: Record<string, any> = {
+  customer_assigned: UserPlus,
+  customer_reassigned: UserCheck,
+  flight_cancelled: XCircle,
+  flight_completed: CheckCircle,
+  pilot_limit_warning: Timer,
+  pilot_limit_reached: OctagonX,
+}
+
+const templateVariableHints: Record<string, string> = {
+  customer_assigned: '{customer} = Müşteri adı, {displayId} = Müşteri kodu, {weight} = Kilo',
+  customer_reassigned: '{customer} = Müşteri adı, {displayId} = Müşteri kodu, {weight} = Kilo',
+  flight_cancelled: '{customer} = Müşteri adı, {displayId} = Müşteri kodu',
+  flight_completed: '{customer} = Müşteri adı, {displayId} = Müşteri kodu, {duration} = Süre (dk)',
+  pilot_limit_warning: '{current} = Mevcut uçuş, {max} = Maksimum uçuş',
+  pilot_limit_reached: '{current} = Mevcut uçuş, {max} = Maksimum uçuş',
+}
+
+// Icon'lar fonksiyon olduğu için localStorage'a serialize edilemez
+// Bu yüzden id bazlı map kullanıyoruz
+const templateIconMap: Record<string, any> = {
+  morning: Plane,
+  weather: AlertCircle,
+  stop: AlertCircle,
+  start: CheckCircle,
+}
+
+const templateIconColorMap: Record<string, string> = {
+  morning: '',
+  weather: 'text-yellow-600',
+  stop: 'text-red-600',
+  start: 'text-green-600',
+}
+
+const defaultTemplates = [
+  {
+    id: 'morning',
+    label: 'Günaydın Mesajı (Pilotlar)',
+    title: '☀️ Günaydın!',
+    body: 'Bugün hava uçuşa müsait. İyi uçuşlar!',
+    target: 'pilots',
+  },
+  {
+    id: 'weather',
+    label: 'Hava Durumu Uyarısı',
+    title: '⚠️ Hava Durumu Uyarısı',
+    body: 'Rüzgar şiddeti artıyor. Uçuşlara dikkat!',
+    target: 'pilots',
+  },
+  {
+    id: 'stop',
+    label: 'Uçuş Durdurma',
+    title: '🛑 Uçuşlar Durduruldu',
+    body: 'Hava koşulları nedeniyle uçuşlar geçici olarak durdurulmuştur.',
+    target: 'pilots',
+  },
+  {
+    id: 'start',
+    label: 'Uçuş Başlatma',
+    title: '✅ Uçuşlar Başladı',
+    body: 'Uçuşlar yeniden başlamıştır. Müsait pilotlar durumlarını güncellesin.',
+    target: 'pilots',
+  },
+]
+
 export default function NotificationsPage() {
   const [tokens, setTokens] = useState<FcmToken[]>([])
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [notifSettings, setNotifSettings] = useState<NotificationSettings | null>(null)
+  const [settingsLoading, setSettingsLoading] = useState(true)
+  const [settingsSaving, setSettingsSaving] = useState(false)
+  const [expandedSetting, setExpandedSetting] = useState<string | null>(null)
+  const [editingTemplate, setEditingTemplate] = useState<string | null>(null)
+  const [templates, setTemplates] = useState(defaultTemplates)
 
   const [broadcastForm, setBroadcastForm] = useState({
     title: '',
     body: '',
-    target: 'all', // 'all', 'pilots', 'admins'
+    target: 'all',
   })
 
   const fetchTokens = async () => {
@@ -72,8 +163,28 @@ export default function NotificationsPage() {
     }
   }
 
+  const fetchSettings = async () => {
+    setSettingsLoading(true)
+    try {
+      const response = await api.get('/fcm/notification-settings')
+      setNotifSettings(response.data.data.settings as NotificationSettings)
+    } catch (error) {
+      console.error('Failed to fetch notification settings:', error)
+    } finally {
+      setSettingsLoading(false)
+    }
+  }
+
   useEffect(() => {
     fetchTokens()
+    fetchSettings()
+    // Load saved templates from localStorage
+    const saved = localStorage.getItem('broadcast_templates')
+    if (saved) {
+      try {
+        setTemplates(JSON.parse(saved))
+      } catch {}
+    }
   }, [])
 
   const handleBroadcast = async (e: React.FormEvent) => {
@@ -89,15 +200,13 @@ export default function NotificationsPage() {
 
     setSending(true)
     try {
-      // TODO: Backend'de toplu FCM endpoint'i oluşturulacak
-      // Şimdilik her role için ayrı istek yapıyoruz
       let endpoint = ''
       if (broadcastForm.target === 'pilots') {
-        endpoint = '/push/role/PILOT' // Geçici - FCM'e çevrilecek
+        endpoint = '/fcm/send-role/PILOT'
       } else if (broadcastForm.target === 'admins') {
-        endpoint = '/push/role/ADMIN' // Geçici - FCM'e çevrilecek
+        endpoint = '/fcm/send-role/ADMIN'
       } else {
-        endpoint = '/push/broadcast' // Geçici - FCM'e çevrilecek
+        endpoint = '/fcm/broadcast'
       }
 
       await api.post(endpoint, {
@@ -124,12 +233,55 @@ export default function NotificationsPage() {
     if (!confirm('Bu cihazı kaldırmak istediğinize emin misiniz?')) return
 
     try {
-      // TODO: Backend'de FCM token silme endpoint'i eklenecek
-      setMessage({ type: 'success', text: 'Cihaz kaldırıldı (geliştiriliyor)' })
+      await api.delete(`/fcm/token/${tokenId}`)
+      setMessage({ type: 'success', text: 'Cihaz kaldırıldı' })
       fetchTokens()
     } catch (error) {
       setMessage({ type: 'error', text: 'Cihaz kaldırılamadı' })
     }
+  }
+
+  const handleToggleSetting = (key: string) => {
+    if (!notifSettings) return
+    setNotifSettings({
+      ...notifSettings,
+      [key]: {
+        ...notifSettings[key],
+        enabled: !notifSettings[key].enabled,
+      },
+    })
+  }
+
+  const handleSettingFieldChange = (key: string, field: 'title' | 'body', value: string) => {
+    if (!notifSettings) return
+    setNotifSettings({
+      ...notifSettings,
+      [key]: {
+        ...notifSettings[key],
+        [field]: value,
+      },
+    })
+  }
+
+  const handleSaveSettings = async () => {
+    if (!notifSettings) return
+    setSettingsSaving(true)
+    try {
+      await api.put('/fcm/notification-settings', { settings: notifSettings })
+      setMessage({ type: 'success', text: 'Bildirim ayarları kaydedildi' })
+    } catch (error) {
+      setMessage({ type: 'error', text: 'Bildirim ayarları kaydedilemedi' })
+    } finally {
+      setSettingsSaving(false)
+    }
+  }
+
+  const handleTemplateChange = (templateId: string, field: 'title' | 'body' | 'label', value: string) => {
+    setTemplates(prev => {
+      const updated = prev.map(t => t.id === templateId ? { ...t, [field]: value } : t)
+      localStorage.setItem('broadcast_templates', JSON.stringify(updated))
+      return updated
+    })
   }
 
   // Group tokens by user
@@ -160,27 +312,13 @@ export default function NotificationsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Bildirim Yönetimi (FCM)</h1>
-          <p className="text-muted-foreground">Firebase Cloud Messaging ile native push bildirimleri</p>
+          <h1 className="text-2xl font-bold">Bildirim Yönetimi</h1>
+          <p className="text-muted-foreground">Push bildirimleri ve sistem bildirim ayarları</p>
         </div>
-        <Button variant="outline" onClick={fetchTokens} disabled={loading}>
+        <Button variant="outline" onClick={() => { fetchTokens(); fetchSettings(); }} disabled={loading}>
           <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
           Yenile
         </Button>
-      </div>
-
-      {/* Info Banner */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <div className="flex items-start gap-3">
-          <Radio className="w-5 h-5 text-blue-600 mt-0.5" />
-          <div>
-            <p className="font-medium text-blue-900">Native Push Notification Sistemi</p>
-            <p className="text-sm text-blue-700 mt-1">
-              PWA push sistemi devre dışı bırakıldı. Artık Firebase FCM kullanıyoruz.
-              Android APK ve iOS uygulamaları native bildirim alır.
-            </p>
-          </div>
-        </div>
       </div>
 
       {/* Message */}
@@ -246,6 +384,126 @@ export default function NotificationsPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* System Notification Settings */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Settings className="w-5 h-5" />
+            Sistem Bildirimleri
+          </CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Otomatik sistem bildirimlerini açıp kapatın ve mesaj şablonlarını düzenleyin
+          </p>
+        </CardHeader>
+        <CardContent>
+          {settingsLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <RefreshCw className="w-8 h-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : notifSettings ? (
+            <div className="space-y-2">
+              {Object.entries(notifSettings).map(([key, setting]) => {
+                const Icon = notificationIcons[key] || Bell
+                const isExpanded = expandedSetting === key
+                return (
+                  <div
+                    key={key}
+                    className={`border rounded-lg transition-colors ${
+                      setting.enabled ? 'border-gray-200' : 'border-gray-100 bg-gray-50/50'
+                    }`}
+                  >
+                    {/* Header row */}
+                    <div className="flex items-center justify-between py-3 px-4">
+                      <div
+                        className="flex items-center gap-3 flex-1 cursor-pointer"
+                        onClick={() => setExpandedSetting(isExpanded ? null : key)}
+                      >
+                        <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${
+                          setting.enabled ? 'bg-blue-100' : 'bg-gray-100'
+                        }`}>
+                          <Icon className={`w-4.5 h-4.5 ${
+                            setting.enabled ? 'text-blue-600' : 'text-gray-400'
+                          }`} />
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <p className={`font-medium text-sm ${!setting.enabled ? 'text-gray-400' : ''}`}>
+                              {setting.label}
+                            </p>
+                            {isExpanded ? (
+                              <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                            ) : (
+                              <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground">{setting.description}</p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleToggleSetting(key)}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors flex-shrink-0 ${
+                          setting.enabled ? 'bg-blue-600' : 'bg-gray-300'
+                        }`}
+                      >
+                        <span
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                            setting.enabled ? 'translate-x-6' : 'translate-x-1'
+                          }`}
+                        />
+                      </button>
+                    </div>
+
+                    {/* Expanded edit area */}
+                    {isExpanded && (
+                      <div className="px-4 pb-4 pt-1 border-t border-gray-100">
+                        <div className="space-y-3 mt-3">
+                          <div>
+                            <Label className="text-xs font-medium text-gray-600">Bildirim Başlığı</Label>
+                            <Input
+                              value={setting.title || ''}
+                              onChange={(e) => handleSettingFieldChange(key, 'title', e.target.value)}
+                              placeholder="Bildirim başlığı"
+                              className="mt-1 text-sm"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs font-medium text-gray-600">Bildirim Mesajı</Label>
+                            <Input
+                              value={setting.body || ''}
+                              onChange={(e) => handleSettingFieldChange(key, 'body', e.target.value)}
+                              placeholder="Bildirim mesajı"
+                              className="mt-1 text-sm"
+                            />
+                          </div>
+                          {templateVariableHints[key] && (
+                            <div className="flex items-start gap-1.5 text-xs text-blue-600 bg-blue-50 rounded-md p-2">
+                              <Info className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                              <span>Kullanılabilir değişkenler: {templateVariableHints[key]}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+              <div className="pt-4 flex justify-end">
+                <Button onClick={handleSaveSettings} disabled={settingsSaving}>
+                  {settingsSaving ? (
+                    <RefreshCw className="w-4 h-4 animate-spin mr-2" />
+                  ) : (
+                    <Save className="w-4 h-4 mr-2" />
+                  )}
+                  Ayarları Kaydet
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <p className="text-muted-foreground text-center py-4">Ayarlar yüklenemedi</p>
+          )}
+        </CardContent>
+      </Card>
 
       <div className="grid lg:grid-cols-2 gap-6">
         {/* Broadcast Form */}
@@ -320,67 +578,71 @@ export default function NotificationsPage() {
               <Bell className="w-5 h-5" />
               Hızlı Şablonlar
             </CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Şablona tıklayarak gönderim formuna aktarın. Kalem ikonuyla düzenleyin.
+            </p>
           </CardHeader>
           <CardContent className="space-y-3">
-            <Button
-              variant="outline"
-              className="w-full justify-start"
-              onClick={() =>
-                setBroadcastForm({
-                  title: '☀️ Günaydın!',
-                  body: 'Bugün hava uçuşa müsait. İyi uçuşlar!',
-                  target: 'pilots',
-                })
-              }
-            >
-              <Plane className="w-4 h-4 mr-2" />
-              Günaydın Mesajı (Pilotlar)
-            </Button>
-
-            <Button
-              variant="outline"
-              className="w-full justify-start"
-              onClick={() =>
-                setBroadcastForm({
-                  title: '⚠️ Hava Durumu Uyarısı',
-                  body: 'Rüzgar şiddeti artıyor. Uçuşlara dikkat!',
-                  target: 'pilots',
-                })
-              }
-            >
-              <AlertCircle className="w-4 h-4 mr-2 text-yellow-600" />
-              Hava Durumu Uyarısı
-            </Button>
-
-            <Button
-              variant="outline"
-              className="w-full justify-start"
-              onClick={() =>
-                setBroadcastForm({
-                  title: '🛑 Uçuşlar Durduruldu',
-                  body: 'Hava koşulları nedeniyle uçuşlar geçici olarak durdurulmuştur.',
-                  target: 'pilots',
-                })
-              }
-            >
-              <AlertCircle className="w-4 h-4 mr-2 text-red-600" />
-              Uçuş Durdurma
-            </Button>
-
-            <Button
-              variant="outline"
-              className="w-full justify-start"
-              onClick={() =>
-                setBroadcastForm({
-                  title: '✅ Uçuşlar Başladı',
-                  body: 'Uçuşlar yeniden başlamıştır. Müsait pilotlar durumlarını güncellesin.',
-                  target: 'pilots',
-                })
-              }
-            >
-              <CheckCircle className="w-4 h-4 mr-2 text-green-600" />
-              Uçuş Başlatma
-            </Button>
+            {templates.map((template) => {
+              const TplIcon = templateIconMap[template.id] || Bell
+              const tplIconColor = templateIconColorMap[template.id] || ''
+              const isEditing = editingTemplate === template.id
+              return (
+                <div key={template.id} className="border rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      className="flex-1 justify-start border-0 shadow-none"
+                      onClick={() =>
+                        setBroadcastForm({
+                          title: template.title,
+                          body: template.body,
+                          target: template.target,
+                        })
+                      }
+                    >
+                      <TplIcon className={`w-4 h-4 mr-2 ${tplIconColor}`} />
+                      {template.label}
+                    </Button>
+                    <button
+                      onClick={() => setEditingTemplate(isEditing ? null : template.id)}
+                      className="p-2 mr-2 rounded hover:bg-gray-100 text-muted-foreground hover:text-gray-700 transition-colors"
+                      title="Şablonu düzenle"
+                    >
+                      <Edit3 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                  {isEditing && (
+                    <div className="px-4 pb-3 space-y-2 border-t border-gray-100 pt-2">
+                      <div>
+                        <Label className="text-xs text-gray-500">Şablon Adı</Label>
+                        <Input
+                          value={template.label}
+                          onChange={(e) => handleTemplateChange(template.id, 'label', e.target.value)}
+                          className="mt-0.5 text-sm h-8"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs text-gray-500">Başlık</Label>
+                        <Input
+                          value={template.title}
+                          onChange={(e) => handleTemplateChange(template.id, 'title', e.target.value)}
+                          className="mt-0.5 text-sm h-8"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs text-gray-500">Mesaj</Label>
+                        <Input
+                          value={template.body}
+                          onChange={(e) => handleTemplateChange(template.id, 'body', e.target.value)}
+                          className="mt-0.5 text-sm h-8"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
           </CardContent>
         </Card>
       </div>
@@ -454,6 +716,13 @@ export default function NotificationsPage() {
                             <span className="text-xs text-muted-foreground">
                               {new Date(token.createdAt).toLocaleDateString('tr-TR')}
                             </span>
+                            <button
+                              onClick={() => handleDeleteToken(token.id)}
+                              className="ml-1 p-1 rounded hover:bg-red-100 text-muted-foreground hover:text-red-600 transition-colors"
+                              title="Cihazı kaldır"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
                           </div>
                         </div>
                       ))}

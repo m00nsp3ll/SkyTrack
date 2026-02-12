@@ -13,14 +13,46 @@ export default function LoginPage() {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
 
-  // Redirect www to non-www to keep localStorage consistent
   useEffect(() => {
+    // Redirect www to non-www to keep localStorage consistent
     if (typeof window !== 'undefined' && window.location.hostname === 'www.skytrackyp.com') {
       window.location.href = window.location.href.replace('www.skytrackyp.com', 'skytrackyp.com')
+      return
     }
-  }, [])
+
+    // If already logged in, redirect to appropriate page
+    const token = localStorage.getItem('token')
+    const user = localStorage.getItem('user')
+
+    if (token && user) {
+      try {
+        const userData = JSON.parse(user)
+        // Verify token is still valid with a quick API call
+        authApi.me().then(() => {
+          if (userData.role === 'PILOT') {
+            router.replace('/pilot')
+          } else {
+            router.replace('/admin')
+          }
+        }).catch(() => {
+          // Token invalid, clear and show login
+          localStorage.removeItem('token')
+          localStorage.removeItem('user')
+          localStorage.removeItem('permissions')
+          setLoading(false)
+        })
+        return
+      } catch {
+        localStorage.removeItem('token')
+        localStorage.removeItem('user')
+        localStorage.removeItem('permissions')
+      }
+    }
+
+    setLoading(false)
+  }, [router])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -38,20 +70,23 @@ export default function LoginPage() {
       }
 
       // Redirect based on role
-      if (user.role === 'ADMIN' || user.role === 'OFFICE_STAFF' || user.role === 'CUSTOM') {
-        router.push('/admin')
-      } else if (user.role === 'PILOT') {
-        router.push('/pilot')
-      } else if (user.role === 'MEDIA_SELLER') {
-        router.push('/admin')
+      if (user.role === 'PILOT') {
+        router.replace('/pilot')
       } else {
-        router.push('/admin')
+        router.replace('/admin')
       }
     } catch (err: any) {
       setError(err.response?.data?.error?.message || 'Giriş başarısız')
-    } finally {
       setLoading(false)
     }
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
+        <div className="animate-pulse text-xl text-muted-foreground">Yükleniyor...</div>
+      </div>
+    )
   }
 
   return (

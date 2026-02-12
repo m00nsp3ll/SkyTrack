@@ -7,8 +7,22 @@ export default function Home() {
   const router = useRouter()
 
   useEffect(() => {
-    // Redirect to login page
-    router.push('/login')
+    const token = localStorage.getItem('token')
+    const user = localStorage.getItem('user')
+
+    if (token && user) {
+      try {
+        const userData = JSON.parse(user)
+        if (userData.role === 'PILOT') {
+          router.replace('/pilot')
+        } else {
+          router.replace('/admin')
+        }
+        return
+      } catch {}
+    }
+
+    router.replace('/login')
   }, [router])
 
   return (

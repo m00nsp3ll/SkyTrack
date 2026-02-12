@@ -2,6 +2,7 @@ import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import dotenv from 'dotenv';
 import fs from 'fs';
+import path from 'path';
 
 // Load environment variables
 dotenv.config();
@@ -27,7 +28,7 @@ function randomPhone(): string {
   return `05${prefix}${number}`;
 }
 
-// Turkish names database
+// Turkish names database (for customers)
 const firstNames = [
   'Ayşe', 'Fatma', 'Zeynep', 'Elif', 'Merve', 'Emine', 'Hatice', 'Büşra', 'Selin', 'Esra',
   'Deniz', 'Gizem', 'Ceren', 'Ece', 'Yağmur', 'İrem', 'Cansu', 'Melis', 'Duygu', 'Aslı',
@@ -42,10 +43,45 @@ const lastNames = [
   'Özcan', 'Güneş', 'Aktaş', 'Yavuz', 'Aksoy', 'Karaca', 'Bulut', 'Tekin', 'Başar', 'Sezer'
 ];
 
-// Pilot names (10 pilots)
+// Real pilot list (37 pilots)
 const pilotNames = [
-  'Ahmet Yılmaz', 'Mehmet Kaya', 'Ali Demir', 'Emre Çelik', 'Burak Şahin',
-  'Serkan Aydın', 'Kemal Öztürk', 'Can Arslan', 'Oğuz Polat', 'Tolga Yavuz',
+  'MİRZA TAYLAN',
+  'TUNAHAN OĞUZ',
+  'HASAN HÜSEYİN IŞIK',
+  'TUGAY KARATEKE',
+  'TOLGA YILDIRIM',
+  'MURAT ARIKAN',
+  'SERKAN YILMAZOĞLU',
+  'BAHADIR A. YALÇIN',
+  'ERGUN ULU',
+  'A.SEHA KARADUMAN',
+  'ABDULLAH AYTEN',
+  'HASAN KARATEKE',
+  'HALİL KARATEKE',
+  'YÜCEL ALBAYRAK',
+  'BARIŞ KORKMAZ',
+  'HAMİT ŞEK',
+  'HARUN KARATEKE',
+  'MUHSİN KARATEKE',
+  'BEDİRHAN ÇELİK',
+  'YİĞİT O. GÜNEŞTEN',
+  'ONUR BURAK AVCI',
+  'SEDAT NARKUZ',
+  'SEDAT KÖKSAL',
+  'ESRA OLGAÇ',
+  'KERİM SARIGÜL',
+  'BÜNYAMİN ÖZİL',
+  'MUSTAFA KİPEL',
+  'ÖZLEM BAĞ ÖZGÜÇ',
+  'ALİ YALÇIN',
+  'BAHADIR AKTAŞ',
+  'KADİR TORBALI',
+  'MEHMET ERMETİN',
+  'EMRE GÜNGÖR',
+  'CEM IŞIK',
+  'EMRE ELKAP',
+  'FURKAN ŞİMŞEK',
+  'ZEYNEP KOÇAK',
 ];
 
 // Helper: Sanitize pilot name for folder path (Turkish chars -> ASCII)
@@ -60,6 +96,16 @@ function sanitizePilotName(name: string): string {
     .replace(/\s+/g, '_');
 }
 
+// Helper: Generate username from pilot name
+function pilotUsername(name: string, index: number): string {
+  const parts = name.toLowerCase().split(/\s+/);
+  let username = parts[0]
+    .replace(/[şŞ]/g, 's').replace(/[ğĞ]/g, 'g').replace(/[üÜ]/g, 'u')
+    .replace(/[öÖ]/g, 'o').replace(/[ıİ]/g, 'i').replace(/[çÇ]/g, 'c')
+    .replace(/[^a-z0-9]/g, '');
+  return `pilot${index + 1}`;
+}
+
 async function main() {
   console.log('🌱 Seeding database with demo data...');
   console.log('');
@@ -71,13 +117,32 @@ async function main() {
   await prisma.flight.deleteMany();
   await prisma.customer.deleteMany();
   await prisma.product.deleteMany();
+  await prisma.fcmToken.deleteMany();
+  await prisma.pushSubscription.deleteMany();
   await prisma.user.deleteMany();
   await prisma.pilot.deleteMany();
 
+  // Clean media folders
+  const MEDIA_STORAGE_PATH = process.env.MEDIA_STORAGE_PATH || './media';
+  try {
+    if (fs.existsSync(MEDIA_STORAGE_PATH)) {
+      const entries = fs.readdirSync(MEDIA_STORAGE_PATH);
+      for (const entry of entries) {
+        const entryPath = path.join(MEDIA_STORAGE_PATH, entry);
+        if (entry !== '.gitkeep') {
+          fs.rmSync(entryPath, { recursive: true, force: true });
+        }
+      }
+      console.log('   ✅ Media folders cleaned');
+    }
+  } catch (error) {
+    console.log('   ⚠️  Media folder cleanup skipped:', error);
+  }
+
   // =====================
-  // 1. CREATE PILOTS (10)
+  // 1. CREATE PILOTS (37)
   // =====================
-  console.log('👨‍✈️ Creating 10 pilots...');
+  console.log(`👨‍✈️ Creating ${pilotNames.length} pilots...`);
 
   const pilots: any[] = [];
   for (let i = 0; i < pilotNames.length; i++) {
@@ -86,9 +151,6 @@ async function main() {
       data: {
         name: name,
         phone: `053${String(i + 10).padStart(2, '0')}${String(1000000 + i * 11111).slice(0, 7)}`,
-        email: `${name.split(' ')[0].toLowerCase().replace(/[şğüöıçİ]/g, c =>
-          ({ 'ş': 's', 'ğ': 'g', 'ü': 'u', 'ö': 'o', 'ı': 'i', 'ç': 'c', 'İ': 'i' }[c] || c)
-        )}@skytrack.local`,
         queuePosition: i + 1,
         isActive: true,
         status: 'AVAILABLE',
@@ -101,7 +163,7 @@ async function main() {
   console.log(`   ✅ Created ${pilots.length} pilots`);
 
   // =====================
-  // 2. CREATE USERS (13 total)
+  // 2. CREATE USERS
   // =====================
   console.log('👤 Creating users...');
 
@@ -125,7 +187,7 @@ async function main() {
     data: { username: 'medya', passwordHash: medyaHash, role: 'MEDIA_SELLER' },
   });
 
-  // Pilot users (10)
+  // Pilot users (37)
   for (let i = 0; i < pilots.length; i++) {
     await prisma.user.create({
       data: {
@@ -136,7 +198,8 @@ async function main() {
       },
     });
   }
-  console.log('   ✅ Created 13 users (1 admin, 1 office, 1 media, 10 pilots)');
+  const totalUsers = 3 + pilots.length;
+  console.log(`   ✅ Created ${totalUsers} users (1 admin, 1 office, 1 media, ${pilots.length} pilots)`);
 
   // =====================
   // 3. CREATE PRODUCTS (17)
@@ -173,16 +236,6 @@ async function main() {
   // =====================
   // 4. SIMULATE REAL QUEUE ROTATION
   // =====================
-  // 10 pilots, customers come one by one.
-  // Each customer is assigned to the first pilot in queue.
-  // That pilot moves to the end of the queue.
-  // This simulates a real day of operations.
-  //
-  // We'll create 25 customers total:
-  //  - First 10: each pilot gets 1 customer (round 1, all completed)
-  //  - Next 7: pilots 1-7 get a 2nd customer (round 2, completed)
-  //  - Pilot 1 gets 5 more (total 7 = limit reached, all completed)
-  //  - 3 more: assigned/in-flight for current state
   console.log('👥 Simulating queue rotation with customers...');
 
   const customers: any[] = [];
@@ -194,8 +247,10 @@ async function main() {
   const dateStr = today.toISOString().split('T')[0];
 
   // Track queue as array of pilot indices - simulates real rotation
-  const queue = pilots.map((_, i) => i); // [0,1,2,3,4,5,6,7,8,9]
-  const pilotFlightCounts: number[] = new Array(10).fill(0);
+  // Use first 15 pilots for simulation (rest are available/waiting)
+  const activePilotCount = 15;
+  const queue = Array.from({ length: activePilotCount }, (_, i) => i);
+  const pilotFlightCounts: number[] = new Array(pilotNames.length).fill(0);
 
   // Helper: assign next customer to first pilot in queue, move pilot to end
   async function assignCustomer(
@@ -272,50 +327,40 @@ async function main() {
     return { pilot, customer, pilotIdx };
   }
 
-  // --- Round 1: 10 customers, each pilot gets 1 (all completed) ---
-  // Queue: [0,1,2,3,4,5,6,7,8,9] -> after round: [0,1,2,3,4,5,6,7,8,9] (full rotation)
-  console.log('   Round 1: Her pilota 1 müşteri (tamamlandı)...');
+  // --- Round 1: 15 customers, first 15 pilots each get 1 (all completed) ---
+  console.log('   Round 1: İlk 15 pilota 1 müşteri (tamamlandı)...');
+  for (let i = 0; i < activePilotCount; i++) {
+    await assignCustomer('COMPLETED', 8 + Math.floor(i * 0.3));
+  }
+
+  // --- Round 2: 10 more customers (pilots 0-9 get 2nd flight, all completed) ---
+  console.log('   Round 2: İlk 10 pilota 2. müşteri (tamamlandı)...');
   for (let i = 0; i < 10; i++) {
-    await assignCustomer('COMPLETED', 8 + Math.floor(i * 0.5));
+    await assignCustomer('COMPLETED', 10 + Math.floor(i * 0.3));
   }
-  // After full rotation, queue is back to [0,1,2,3,4,5,6,7,8,9]
 
-  // --- Round 2: 7 more customers (pilots 0-6 get 2nd flight, all completed) ---
-  console.log('   Round 2: İlk 7 pilota 2. müşteri (tamamlandı)...');
-  for (let i = 0; i < 7; i++) {
-    await assignCustomer('COMPLETED', 10 + Math.floor(i * 0.5));
-  }
-  // After: queue is [7,8,9, 0,1,2,3,4,5,6]
-  // Pilots 0-6 have 2 flights, pilots 7-9 have 1 flight
-
-  // --- Pilot 0 (Ahmet Yılmaz) gets 5 more to reach limit (7 total) ---
-  // We need to manually put pilot 0 at front of queue each time
-  console.log('   Pilot 1 (Ahmet Yılmaz) limit dolduruluyor (7/7)...');
+  // --- Pilot 0 (MİRZA TAYLAN) gets 5 more to reach limit (7 total) ---
+  console.log(`   ${pilotNames[0]} limit dolduruluyor (7/7)...`);
   for (let i = 0; i < 5; i++) {
-    // Move pilot 0 to front of queue for this assignment
     const idx = queue.indexOf(0);
     queue.splice(idx, 1);
     queue.unshift(0);
     await assignCustomer('COMPLETED', 12 + i);
   }
-  // Pilot 0 now has 7 flights = limit reached
 
-  // --- 3 more active customers: 2 assigned, 1 in-flight ---
+  // --- 5 more active customers: 2 in-flight, 2 assigned, 1 in-flight ---
   console.log('   Aktif müşteriler oluşturuluyor...');
-  // Remove pilot 0 from queue consideration (limit reached)
+  // Remove pilot 0 from queue (limit reached)
   const limitPilotIdx = queue.indexOf(0);
   if (limitPilotIdx !== -1) {
     queue.splice(limitPilotIdx, 1);
   }
 
-  // Next in queue gets an IN_FLIGHT customer
   await assignCustomer('IN_FLIGHT', 14);
-
-  // Next gets ASSIGNED
+  await assignCustomer('IN_FLIGHT', 14);
   await assignCustomer('ASSIGNED', 0);
-
-  // Next gets IN_FLIGHT
   await assignCustomer('IN_FLIGHT', 14);
+  await assignCustomer('ASSIGNED', 0);
 
   console.log(`   ✅ Created ${customers.length} customers and ${flights.length} flights`);
 
@@ -324,8 +369,7 @@ async function main() {
   // =====================
   console.log('📊 Updating pilot statistics and queue positions...');
 
-  // Set final queue positions based on the simulated queue order
-  // queue array now has the correct order (without pilot 0 who hit limit)
+  // Update active pilots in queue
   for (let i = 0; i < queue.length; i++) {
     const pilotIdx = queue[i];
     const pilot = pilots[pilotIdx];
@@ -354,7 +398,7 @@ async function main() {
     });
   }
 
-  // Limit reached pilot gets last position
+  // Limit reached pilot gets last active position
   const limitPilot = pilots[0];
   const limitFlights = await prisma.flight.count({
     where: { pilotId: limitPilot.id },
@@ -368,6 +412,18 @@ async function main() {
     },
   });
 
+  // Update remaining pilots (16-36) who didn't fly today
+  for (let i = activePilotCount; i < pilots.length; i++) {
+    await prisma.pilot.update({
+      where: { id: pilots[i].id },
+      data: {
+        queuePosition: queue.length + 2 + (i - activePilotCount),
+        status: 'AVAILABLE',
+        dailyFlightCount: 0,
+      },
+    });
+  }
+
   // =====================
   // 6. CREATE SALES
   // =====================
@@ -380,10 +436,10 @@ async function main() {
   let salesCount = 0;
 
   // Media sales for some completed customers
-  const mediaSaleCount = Math.min(10, completedCustomers.length);
+  const mediaSaleCount = Math.min(15, completedCustomers.length);
   for (let i = 0; i < mediaSaleCount; i++) {
     const customer = completedCustomers[i];
-    const isPaid = i < 7; // first 7 paid, rest unpaid
+    const isPaid = i < 10; // first 10 paid, rest unpaid
 
     await prisma.sale.create({
       data: {
@@ -420,7 +476,7 @@ async function main() {
 
   const paymentMethods: Array<'CASH' | 'CREDIT_CARD' | 'TRANSFER'> = ['CASH', 'CREDIT_CARD', 'TRANSFER'];
 
-  for (let i = 0; i < 15; i++) {
+  for (let i = 0; i < 20; i++) {
     const product = posProducts[Math.floor(Math.random() * posProducts.length)];
     const qty = Math.floor(Math.random() * 3) + 1;
     const customer = completedCustomers[Math.floor(Math.random() * completedCustomers.length)];
@@ -487,6 +543,27 @@ async function main() {
   console.log('   ✅ Created 5 role permission records');
 
   // =====================
+  // 8. CREATE DEFAULT NOTIFICATION SETTINGS
+  // =====================
+  console.log('🔔 Creating default notification settings...');
+
+  await prisma.notificationSetting.deleteMany();
+  await prisma.notificationSetting.create({
+    data: {
+      settings: {
+        customer_assigned: { enabled: true, label: 'Müşteri Atandı', description: 'Pilota yeni müşteri atandığında bildirim gönder', title: '🪂 Yeni Müşteri Atandı', body: '{customer} ({displayId}) - {weight}kg' },
+        customer_reassigned: { enabled: true, label: 'Müşteri Yeniden Atandı', description: 'Pilot değişikliğinde yeni pilota bildirim gönder', title: '🪂 Yeni Müşteri Atandı', body: '{customer} ({displayId}) - {weight}kg' },
+        flight_cancelled: { enabled: true, label: 'Uçuş İptal Edildi', description: 'Uçuş iptal edildiğinde pilota bildirim gönder', title: '❌ Uçuş İptal Edildi', body: '{customer} ({displayId})' },
+        flight_completed: { enabled: true, label: 'Uçuş Tamamlandı', description: 'Uçuş tamamlandığında pilota bildirim gönder', title: '✅ Uçuş Tamamlandı', body: '{customer} ({displayId}) - {duration}dk' },
+        pilot_limit_warning: { enabled: true, label: 'Limit Uyarısı', description: 'Pilot günlük limite yaklaştığında bildirim gönder', title: '⚠️ Limit Uyarısı', body: 'Günlük uçuş limitine yaklaştınız: {current}/{max}' },
+        pilot_limit_reached: { enabled: true, label: 'Limit Doldu', description: 'Pilot günlük limitine ulaştığında bildirim gönder', title: '🛑 Günlük Limit Doldu', body: '{current}/{max} uçuş tamamlandı. Bugünlük sıra dışısınız.' },
+      },
+    },
+  });
+
+  console.log('   ✅ Created default notification settings');
+
+  // =====================
   // PRINT FINAL QUEUE STATE
   // =====================
   const finalPilots = await prisma.pilot.findMany({
@@ -505,12 +582,12 @@ async function main() {
   console.log('   ADMIN:     admin / admin123');
   console.log('   OFFICE:    ofis / ofis123');
   console.log('   MEDIA:     medya / medya123');
-  console.log('   PILOTS:    pilot1 / pilot123  →  pilot10 / pilot123');
+  console.log(`   PILOTS:    pilot1 / pilot123  →  pilot${pilots.length} / pilot123`);
   console.log('───────────────────────────────────────────────────────────────');
   console.log('');
   console.log('📊 DATA SUMMARY:');
-  console.log(`   • 10 Pilots (1 limit dolu: Ahmet Yılmaz)`);
-  console.log(`   • 13 Users`);
+  console.log(`   • ${pilots.length} Pilots (1 limit dolu: ${pilotNames[0]})`);
+  console.log(`   • ${totalUsers} Users`);
   console.log(`   • 17 Products`);
   console.log(`   • ${customers.length} Customers`);
   console.log(`   • ${flights.length} Flights`);
@@ -522,7 +599,7 @@ async function main() {
     const isLimit = p.dailyFlightCount >= p.maxDailyFlights;
     const statusLabel = p.status === 'IN_FLIGHT' ? '✈️  Uçuşta' : p.status === 'ASSIGNED' ? '👤 Müşteri Atandı' : p.status === 'AVAILABLE' ? '✅ Müsait' : `⏸  ${p.status}`;
     const limitLabel = isLimit ? ' ❌ LİMİT' : '';
-    console.log(`   ${p.queuePosition}. ${p.name.padEnd(20)} ${p.dailyFlightCount}/${p.maxDailyFlights}  ${statusLabel}${limitLabel}`);
+    console.log(`   ${String(p.queuePosition).padStart(2)}. ${p.name.padEnd(25)} ${p.dailyFlightCount}/${p.maxDailyFlights}  ${statusLabel}${limitLabel}`);
   }
   console.log('');
 }

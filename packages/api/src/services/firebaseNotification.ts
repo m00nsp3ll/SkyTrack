@@ -57,15 +57,19 @@ export async function sendNativeNotification(fcmToken: string, payload: Notifica
     });
     console.log('FCM sent OK to', fcmToken.slice(0, 20) + '...');
   } catch (error: any) {
+    const errorCode = error?.code || error?.errorInfo?.code || '';
     console.error('FCM error:', error.message);
-    // Token geçersizse sil
-    if (error.code === 'messaging/registration-token-not-registered' ||
-        error.code === 'messaging/invalid-registration-token') {
-      await prisma.fcmToken.updateMany({
+
+    // Geçersiz veya süresi dolmuş token → otomatik sil
+    if (
+      errorCode === 'messaging/registration-token-not-registered' ||
+      errorCode === 'messaging/invalid-registration-token' ||
+      errorCode === 'messaging/invalid-argument'
+    ) {
+      console.log(`Invalid FCM token, removing: ${fcmToken.substring(0, 20)}...`);
+      await prisma.fcmToken.deleteMany({
         where: { token: fcmToken },
-        data: { isActive: false },
       });
-      console.log('Deactivated invalid FCM token');
     }
   }
 }
@@ -142,6 +146,29 @@ export async function sendNativeBroadcast(payload: NotificationPayload) {
   } catch (error) {
     console.error('FCM broadcast error:', error);
   }
+}
+
+// Get notification config for a type (enabled + custom title/body)
+export async function getNotificationConfig(type: string): Promise<{ enabled: boolean; title?: string; body?: string } | null> {
+  try {
+    const record = await prisma.notificationSetting.findFirst();
+    if (!record) return { enabled: true };
+    const settings = record.settings as Record<string, any>;
+    if (!settings[type]) return { enabled: true };
+    return {
+      enabled: settings[type].enabled !== false,
+      title: settings[type].title || undefined,
+      body: settings[type].body || undefined,
+    };
+  } catch {
+    return { enabled: true };
+  }
+}
+
+// Check if a notification type is enabled
+export async function isNotificationEnabled(type: string): Promise<boolean> {
+  const config = await getNotificationConfig(type);
+  return config?.enabled !== false;
 }
 
 export { firebaseInitialized };
