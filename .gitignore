@@ -48,3 +48,19 @@ coverage/
 # Misc
 *.tsbuildinfo
 .turbo
+
+# Firebase (SENSITIVE - DO NOT COMMIT)
+firebase-service-account.json
+google-services.json
+
+# Capacitor / Android
+packages/web/android/
+packages/web/ios/
+packages/web/build-tools/
+packages/web/platform-tools/
+packages/web/platforms/
+packages/web/licenses/
+packages/web/.knownPackages
+
+# Test files
+test-*.js

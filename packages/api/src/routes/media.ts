@@ -12,11 +12,9 @@ import {
   ensureFolderStructure,
   scanAndProcessFolder,
   listMediaFiles,
-  generateImageThumbnail,
-  generateVideoThumbnail,
-  getFileType,
   getDiskStats,
   getTodayMediaStats,
+  sanitizePilotName,
 } from '../services/media.js';
 
 const router = Router();
@@ -59,15 +57,25 @@ const storage = multer.diskStorage({
       if (latestFlight.mediaFolder) {
         folderPath = latestFlight.mediaFolder.folderPath;
       } else {
-        // Create folder path
+        // Create folder path with pilot name and sorti number
         const today = new Date().toISOString().split('T')[0];
-        folderPath = getMediaFolderPath(today, latestFlight.pilotId, customer.displayId);
+        const pilotName = latestFlight.pilot?.name || 'unknown';
+        // Count completed flights for this pilot today to determine sorti number
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+        const pilotFlightsToday = await prisma.flight.count({
+          where: {
+            pilotId: latestFlight.pilotId,
+            createdAt: { gte: todayStart },
+          },
+        });
+        const sortiNumber = pilotFlightsToday;
+        folderPath = getMediaFolderPath(today, pilotName, sortiNumber, customer.displayId);
       }
 
-      const originalsPath = path.join(folderPath, 'originals');
-      await fs.mkdir(originalsPath, { recursive: true });
+      await fs.mkdir(folderPath, { recursive: true });
 
-      cb(null, originalsPath);
+      cb(null, folderPath);
     } catch (error) {
       cb(error as Error, '');
     }
@@ -253,31 +261,7 @@ router.post(
       throw new AppError('Müşterinin uçuşu bulunamadı', 404, 'FLIGHT_NOT_FOUND');
     }
 
-    const folderPath = path.dirname(files[0].destination);
-    const thumbnailsPath = path.join(folderPath, 'thumbnails');
-    await fs.mkdir(thumbnailsPath, { recursive: true });
-
-    // Generate thumbnails for uploaded files
-    const processed: string[] = [];
-    const errors: string[] = [];
-
-    for (const file of files) {
-      try {
-        const fileType = getFileType(file.mimetype);
-        const thumbnailName = path.basename(file.filename, path.extname(file.filename)) + '_thumb.jpg';
-        const thumbnailPath = path.join(thumbnailsPath, thumbnailName);
-
-        if (fileType === 'photo') {
-          await generateImageThumbnail(file.path, thumbnailPath);
-        } else if (fileType === 'video') {
-          await generateVideoThumbnail(file.path, thumbnailPath);
-        }
-
-        processed.push(file.filename);
-      } catch (err) {
-        errors.push(`${file.filename}: ${(err as Error).message}`);
-      }
-    }
+    const folderPath = files[0].destination;
 
     // Update media folder stats
     const allFiles = await listMediaFiles(folderPath);
@@ -303,10 +287,8 @@ router.post(
       success: true,
       data: {
         uploaded: files.length,
-        processed: processed.length,
-        errors,
       },
-      message: `${files.length} dosya yüklendi, ${processed.length} thumbnail oluşturuldu`,
+      message: `${files.length} dosya yüklendi`,
     });
   })
 );
@@ -347,7 +329,16 @@ router.post(
       folderPath = latestFlight.mediaFolder.folderPath;
     } else {
       const today = new Date().toISOString().split('T')[0];
-      folderPath = getMediaFolderPath(today, latestFlight.pilotId, customer.displayId);
+      const pilotName = latestFlight.pilot?.name || 'unknown';
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const pilotFlightsToday = await prisma.flight.count({
+        where: {
+          pilotId: latestFlight.pilotId,
+          createdAt: { gte: todayStart },
+        },
+      });
+      folderPath = getMediaFolderPath(today, pilotName, pilotFlightsToday, customer.displayId);
     }
 
     // Ensure folder structure exists
@@ -463,9 +454,6 @@ router.get(
     const filesWithUrls = files.map((file) => ({
       ...file,
       url: `http://${serverIp}/media/${path.relative(MEDIA_BASE_PATH, file.path)}`,
-      thumbnailUrl: file.thumbnailPath
-        ? `http://${serverIp}/media/${path.relative(MEDIA_BASE_PATH, file.thumbnailPath)}`
-        : null,
     }));
 
     res.json({
@@ -569,8 +557,6 @@ router.get(
       throw new AppError('Ödeme yapılmadan indirilemez', 403, 'PAYMENT_REQUIRED');
     }
 
-    const originalsPath = path.join(mediaFolder.folderPath, 'originals');
-
     // Set response headers for ZIP download
     const zipFilename = `${customer.displayId}_medya.zip`;
     res.setHeader('Content-Type', 'application/zip');
@@ -579,15 +565,15 @@ router.get(
     // Create ZIP archive
     const archive = archiver('zip', { zlib: { level: 5 } });
 
-    archive.on('error', (err) => {
+    archive.on('error', () => {
       throw new AppError('ZIP oluşturma hatası', 500, 'ZIP_ERROR');
     });
 
     // Pipe archive to response
     archive.pipe(res);
 
-    // Add originals folder to archive with "Alanya Paragliding" folder name
-    archive.directory(originalsPath, 'Alanya Paragliding');
+    // Add media folder to archive with "Alanya Paragliding" folder name
+    archive.directory(mediaFolder.folderPath, 'Alanya Paragliding');
 
     // Finalize archive
     await archive.finalize();
@@ -636,7 +622,7 @@ router.get(
       throw new AppError('Ödeme yapılmadan indirilemez', 403, 'PAYMENT_REQUIRED');
     }
 
-    const filePath = path.join(mediaFolder.folderPath, 'originals', filename);
+    const filePath = path.join(mediaFolder.folderPath, filename);
 
     try {
       await fs.access(filePath);
@@ -809,35 +795,29 @@ router.post(
 
     // Create target folder if not exists
     const today = new Date().toISOString().split('T')[0];
-    const targetFolderPath = getMediaFolderPath(today, targetFlight.pilotId, targetCustomer.displayId);
+    const pilotName = targetFlight.pilot?.name || 'unknown';
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const pilotFlightsToday = await prisma.flight.count({
+      where: {
+        pilotId: targetFlight.pilotId,
+        createdAt: { gte: todayStart },
+      },
+    });
+    const targetFolderPath = getMediaFolderPath(today, pilotName, pilotFlightsToday, targetCustomer.displayId);
     await ensureFolderStructure(targetFolderPath);
 
-    // Move files from source to target
-    const sourceOriginalsPath = path.join(sourceFolder.folderPath, 'originals');
-    const targetOriginalsPath = path.join(targetFolderPath, 'originals');
-
-    const files = await fs.readdir(sourceOriginalsPath);
-    for (const file of files) {
+    // Move files from source to target (flat folder)
+    const files = await fs.readdir(sourceFolder.folderPath);
+    const mediaFiles = files.filter(f => {
+      const ext = path.extname(f).toLowerCase();
+      return ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.mp4', '.mov', '.avi', '.mkv', '.webm'].includes(ext);
+    });
+    for (const file of mediaFiles) {
       await fs.rename(
-        path.join(sourceOriginalsPath, file),
-        path.join(targetOriginalsPath, file)
+        path.join(sourceFolder.folderPath, file),
+        path.join(targetFolderPath, file)
       );
-    }
-
-    // Move thumbnails
-    const sourceThumbnailsPath = path.join(sourceFolder.folderPath, 'thumbnails');
-    const targetThumbnailsPath = path.join(targetFolderPath, 'thumbnails');
-
-    try {
-      const thumbnails = await fs.readdir(sourceThumbnailsPath);
-      for (const thumb of thumbnails) {
-        await fs.rename(
-          path.join(sourceThumbnailsPath, thumb),
-          path.join(targetThumbnailsPath, thumb)
-        );
-      }
-    } catch {
-      // Thumbnails folder might not exist
     }
 
     // Update or create target media folder record
@@ -903,22 +883,13 @@ router.delete(
       throw new AppError('Medya klasörü bulunamadı', 404, 'MEDIA_FOLDER_NOT_FOUND');
     }
 
-    const filePath = path.join(mediaFolder.folderPath, 'originals', filename);
-    const thumbName = path.basename(filename, path.extname(filename)) + '_thumb.jpg';
-    const thumbPath = path.join(mediaFolder.folderPath, 'thumbnails', thumbName);
+    const filePath = path.join(mediaFolder.folderPath, filename);
 
-    // Delete original file
+    // Delete file
     try {
       await fs.unlink(filePath);
     } catch {
       throw new AppError('Dosya bulunamadı', 404, 'FILE_NOT_FOUND');
-    }
-
-    // Delete thumbnail if exists
-    try {
-      await fs.unlink(thumbPath);
-    } catch {
-      // Thumbnail might not exist
     }
 
     // Update folder stats

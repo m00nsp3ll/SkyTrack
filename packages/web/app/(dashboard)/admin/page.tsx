@@ -209,33 +209,37 @@ export default function AdminDashboard() {
 
       {/* Summary Cards - Row 1 */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Müşteriler
-            </CardTitle>
-            <Users className="h-4 w-4 text-blue-600" />
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold">{cards?.totalCustomers || 0}</p>
-            <p className="text-xs text-muted-foreground">Bugün kayıtlı</p>
-          </CardContent>
-        </Card>
+        <Link href="/admin/customers">
+          <Card className="cursor-pointer hover:shadow-md transition-shadow">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Müşteriler
+              </CardTitle>
+              <Users className="h-4 w-4 text-blue-600" />
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-bold">{cards?.totalCustomers || 0}</p>
+              <p className="text-xs text-muted-foreground">Bugün kayıtlı</p>
+            </CardContent>
+          </Card>
+        </Link>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Uçuşlar
-            </CardTitle>
-            <Plane className="h-4 w-4 text-green-600" />
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold">
-              {cards?.completedFlights || 0}/{cards?.totalFlights || 0}
-            </p>
-            <p className="text-xs text-muted-foreground">Tamamlanan/Toplam</p>
-          </CardContent>
-        </Card>
+        <Link href="/admin/flights">
+          <Card className="cursor-pointer hover:shadow-md transition-shadow">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Uçuşlar
+              </CardTitle>
+              <Plane className="h-4 w-4 text-green-600" />
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-bold">
+                {cards?.completedFlights || 0}/{cards?.totalFlights || 0}
+              </p>
+              <p className="text-xs text-muted-foreground">Tamamlanan/Toplam</p>
+            </CardContent>
+          </Card>
+        </Link>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -298,46 +302,48 @@ export default function AdminDashboard() {
 
       {/* Revenue Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="border-green-200 bg-green-50">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-green-800">
-              Toplam Gelir
-            </CardTitle>
-            <TrendingUp className="h-5 w-5 text-green-600" />
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold text-green-700">
-              {formatCurrency(cards?.totalRevenue || 0)}
-            </p>
-            <div className="flex items-center gap-4 mt-2 text-sm">
-              <span className="text-green-600">
-                Medya: {formatCurrency(cards?.mediaRevenue || 0)}
-              </span>
-              <span className="text-green-600">
-                POS: {formatCurrency(cards?.posRevenue || 0)}
-              </span>
-            </div>
-          </CardContent>
-        </Card>
+        <Link href="/admin/sales/daily">
+          <Card className="border-green-200 bg-green-50 cursor-pointer hover:shadow-md transition-shadow">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-green-800">
+                Toplam Gelir
+              </CardTitle>
+              <TrendingUp className="h-5 w-5 text-green-600" />
+            </CardHeader>
+            <CardContent>
+              <p className="text-3xl font-bold text-green-700">
+                {formatCurrency(cards?.totalRevenue || 0)}
+              </p>
+              <div className="flex items-center gap-4 mt-2 text-sm">
+                <span className="text-green-600">
+                  Medya: {formatCurrency(cards?.mediaRevenue || 0)}
+                </span>
+                <span className="text-green-600">
+                  POS: {formatCurrency(cards?.posRevenue || 0)}
+                </span>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
 
-        <Card className="border-red-200 bg-red-50">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-red-800">
-              Ödenmemiş
-            </CardTitle>
-            <AlertCircle className="h-5 w-5 text-red-600" />
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold text-red-700">
-              {formatCurrency(cards?.unpaidTotal || 0)}
-            </p>
-            <Link href="/admin/sales/unpaid">
+        <Link href="/admin/sales/unpaid">
+          <Card className="border-red-200 bg-red-50 cursor-pointer hover:shadow-md transition-shadow">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-red-800">
+                Ödenmemiş
+              </CardTitle>
+              <AlertCircle className="h-5 w-5 text-red-600" />
+            </CardHeader>
+            <CardContent>
+              <p className="text-3xl font-bold text-red-700">
+                {formatCurrency(cards?.unpaidTotal || 0)}
+              </p>
               <Button variant="link" className="p-0 h-auto text-red-600">
                 Detayları gör →
               </Button>
-            </Link>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </Link>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -534,7 +540,7 @@ export default function AdminDashboard() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-lg">Son Kayıtlar</CardTitle>
-            <Link href="/customers">
+            <Link href="/admin/customers">
               <Button variant="ghost" size="sm">
                 Tümü →
               </Button>
@@ -583,7 +589,7 @@ export default function AdminDashboard() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-lg">Son Uçuşlar</CardTitle>
-            <Link href="/flights">
+            <Link href="/admin/flights/list">
               <Button variant="ghost" size="sm">
                 Tümü →
               </Button>

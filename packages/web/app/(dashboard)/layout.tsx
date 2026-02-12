@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Sidebar } from '@/components/layout/Sidebar'
 import { Header } from '@/components/layout/Header'
+import { InAppNotificationBanner } from '@/components/native/InAppNotificationBanner'
 
 export default function DashboardLayout({
   children,
@@ -30,9 +31,25 @@ export default function DashboardLayout({
     }
 
     const userData = JSON.parse(user)
-    if (userData.role !== 'ADMIN' && userData.role !== 'OFFICE_STAFF') {
+    // ADMIN, OFFICE_STAFF, MEDIA_SELLER, CUSTOM can access dashboard
+    const dashboardRoles = ['ADMIN', 'OFFICE_STAFF', 'MEDIA_SELLER', 'CUSTOM']
+    if (!dashboardRoles.includes(userData.role)) {
       router.push('/pilot')
       return
+    }
+
+    // Load permissions from API if not cached
+    const cachedPerms = localStorage.getItem('permissions')
+    if (!cachedPerms && token) {
+      import('@/lib/api').then(({ api }) => {
+        api.get(`/users/permissions/${userData.role}`)
+          .then(res => {
+            if (res.data?.data?.permissions) {
+              localStorage.setItem('permissions', JSON.stringify(res.data.data.permissions))
+            }
+          })
+          .catch(() => {})
+      })
     }
 
     setIsLoading(false)
@@ -48,6 +65,9 @@ export default function DashboardLayout({
 
   return (
     <div className="flex min-h-screen bg-gray-50">
+      {/* In-App Notification Banner (FCM native only) */}
+      <InAppNotificationBanner />
+
       {/* Desktop Sidebar */}
       <div className="hidden md:block">
         <Sidebar />

@@ -1,6 +1,7 @@
 import { PrismaClient, Pilot, PilotStatus } from '@prisma/client';
 import { cache } from './cache.js';
-import { sendPushToPilot, notifications } from './pushNotification.js';
+import { sendNativeToPilot } from './firebaseNotification.js';
+import { sanitizePilotName } from './media.js';
 import fs from 'fs';
 import path from 'path';
 
@@ -48,8 +49,7 @@ export const pilotQueueService = {
         dailyFlightCount: { lt: prisma.pilot.fields.maxDailyFlights },
       },
       orderBy: [
-        { dailyFlightCount: 'asc' },
-        { queuePosition: 'asc' },
+        { queuePosition: 'asc' }, // ONLY queue position - round-robin order
       ],
     });
 
@@ -76,8 +76,7 @@ export const pilotQueueService = {
       const pilots = await prisma.pilot.findMany({
         where: { isActive: true },
         orderBy: [
-          { dailyFlightCount: 'asc' },
-          { queuePosition: 'asc' },
+          { queuePosition: 'asc' }, // ONLY queue position - round-robin
         ],
         select: {
           id: true,
@@ -119,19 +118,29 @@ export const pilotQueueService = {
       return null;
     }
 
-    // Create media folder path
+    // Create media folder path with pilot name and sorti number
     const today = new Date().toISOString().slice(0, 10);
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const pilotFlightsToday = await prisma.flight.count({
+      where: {
+        pilotId: pilot.id,
+        createdAt: { gte: todayStart },
+      },
+    });
+    const sortiNumber = pilotFlightsToday + 1;
+    const safePilotName = sanitizePilotName(pilot.name);
     const mediaFolderPath = path.join(
       MEDIA_STORAGE_PATH,
       today,
-      `pilot_${pilot.id}`,
-      `customer_${customerDisplayId}`
+      safePilotName,
+      `${sortiNumber}_sorti`,
+      customerDisplayId
     );
 
-    // Create the directory
+    // Create the directory (flat - no subdirectories)
     try {
       fs.mkdirSync(mediaFolderPath, { recursive: true });
-      fs.mkdirSync(path.join(mediaFolderPath, 'thumbnails'), { recursive: true });
     } catch (error) {
       console.error('Error creating media folder:', error);
     }
@@ -174,11 +183,12 @@ export const pilotQueueService = {
       });
       const maxQueuePosition = maxQueuePilot?.queuePosition || 0;
 
-      // Update pilot: increment flight count and move to end of queue
+      // Update pilot: increment flight count, set status to ASSIGNED, move to end of queue
       await tx.pilot.update({
         where: { id: pilot.id },
         data: {
           dailyFlightCount: { increment: 1 },
+          status: 'ASSIGNED',
           queuePosition: maxQueuePosition + 1,
         },
       });
@@ -229,13 +239,16 @@ export const pilotQueueService = {
         },
       });
 
-      // Send push notification to pilot (works even when app is closed)
+      // Send notification to pilot
       if (customer) {
         const customerName = `${customer.firstName} ${customer.lastName}`;
-        sendPushToPilot(
-          pilot.id,
-          notifications.customerAssigned(customerName, customer.displayId, customer.weight || 0)
-        ).catch(err => console.error('Push notification error:', err));
+
+        // Firebase Native Push (FCM) - Primary notification channel
+        sendNativeToPilot(pilot.id, {
+          title: '🪂 Yeni Müşteri Atandı',
+          body: `${customerName} (${customer.displayId}) - ${customer.weight || 0}kg`,
+          data: { type: 'customer_assigned', flightId: result.id },
+        }).catch(err => console.error('FCM notification error:', err));
       }
     }
 
@@ -323,6 +336,54 @@ export const pilotQueueService = {
             data: { dailyFlightCount: { increment: 1 } },
           });
         }
+
+        // Queue management: old pilot goes to top (position 1), new pilot goes to end
+        if (oldPilotId !== pilot!.id) {
+          const oldPilot = await tx.pilot.findUnique({
+            where: { id: oldPilotId },
+            select: { queuePosition: true },
+          });
+          const newPilotData = await tx.pilot.findUnique({
+            where: { id: pilot!.id },
+            select: { queuePosition: true },
+          });
+
+          if (oldPilot && newPilotData) {
+            // Move all pilots with position < old pilot's position down by 1
+            // to make room for old pilot at position 1
+            await tx.pilot.updateMany({
+              where: {
+                isActive: true,
+                id: { notIn: [oldPilotId, pilot!.id] },
+                queuePosition: { lt: oldPilot.queuePosition },
+              },
+              data: { queuePosition: { increment: 1 } },
+            });
+
+            // Old pilot goes to position 1 (top of queue, available)
+            await tx.pilot.update({
+              where: { id: oldPilotId },
+              data: {
+                queuePosition: 1,
+                status: 'AVAILABLE',
+              },
+            });
+
+            // Get max queue position for the new pilot
+            const maxQueuePilot = await tx.pilot.findFirst({
+              where: { isActive: true, id: { not: pilot!.id } },
+              orderBy: { queuePosition: 'desc' },
+              select: { queuePosition: true },
+            });
+            const maxPos = maxQueuePilot?.queuePosition || 0;
+
+            // New pilot goes to end of queue with ASSIGNED status
+            await tx.pilot.update({
+              where: { id: pilot!.id },
+              data: { queuePosition: maxPos + 1, status: 'ASSIGNED' },
+            });
+          }
+        }
       });
 
       // Invalidate caches
@@ -339,12 +400,15 @@ export const pilotQueueService = {
           },
         });
 
-        // Send push notification to new pilot
+        // Send notification to new pilot
         const customerName = `${customer.firstName} ${customer.lastName}`;
-        sendPushToPilot(
-          pilot.id,
-          notifications.customerAssigned(customerName, customer.displayId, customer.weight || 0)
-        ).catch(err => console.error('Push notification error:', err));
+
+        // Firebase Native Push (FCM) - Primary notification channel
+        sendNativeToPilot(pilot.id, {
+          title: '🪂 Yeni Müşteri Atandı',
+          body: `${customerName} (${customer.displayId}) - ${customer.weight || 0}kg`,
+          data: { type: 'customer_reassigned' },
+        }).catch(err => console.error('FCM notification error:', err));
       }
     }
 
@@ -358,8 +422,7 @@ export const pilotQueueService = {
     const pilots = await prisma.pilot.findMany({
       where: { isActive: true },
       orderBy: [
-        { dailyFlightCount: 'asc' },
-        { queuePosition: 'asc' },
+        { queuePosition: 'asc' }, // ONLY queue position - pure round-robin
       ],
       select: {
         id: true,

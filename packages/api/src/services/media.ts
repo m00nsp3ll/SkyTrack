@@ -1,19 +1,15 @@
 import fs from 'fs/promises';
 import path from 'path';
-import sharp from 'sharp';
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
 const MEDIA_BASE_PATH = process.env.MEDIA_STORAGE_PATH || './media';
-const THUMBNAIL_WIDTH = 300;
-const THUMBNAIL_QUALITY = 80;
 
 export interface MediaFile {
   filename: string;
   originalName: string;
   path: string;
-  thumbnailPath?: string;
   size: number;
   mimeType: string;
   type: 'photo' | 'video';
@@ -27,50 +23,28 @@ export interface MediaStats {
   videos: number;
 }
 
+// Sanitize pilot name for folder path (Turkish chars -> ASCII, spaces -> underscores)
+export function sanitizePilotName(name: string): string {
+  return name
+    .replace(/[şŞ]/g, c => c === 'ş' ? 's' : 'S')
+    .replace(/[ğĞ]/g, c => c === 'ğ' ? 'g' : 'G')
+    .replace(/[üÜ]/g, c => c === 'ü' ? 'u' : 'U')
+    .replace(/[öÖ]/g, c => c === 'ö' ? 'o' : 'O')
+    .replace(/[ıİ]/g, c => c === 'ı' ? 'i' : 'I')
+    .replace(/[çÇ]/g, c => c === 'ç' ? 'c' : 'C')
+    .replace(/\s+/g, '_');
+}
+
 // Get media folder path for a customer
-export function getMediaFolderPath(date: string, pilotId: string, customerDisplayId: string): string {
-  return path.join(MEDIA_BASE_PATH, date, `pilot_${pilotId}`, `customer_${customerDisplayId}`);
+// Structure: media/YYYY-MM-DD/Pilot_Name/X_sorti/DisplayId/
+export function getMediaFolderPath(date: string, pilotName: string, sortiNumber: number, customerDisplayId: string): string {
+  const safePilotName = sanitizePilotName(pilotName);
+  return path.join(MEDIA_BASE_PATH, date, safePilotName, `${sortiNumber}_sorti`, customerDisplayId);
 }
 
-// Ensure folder structure exists
+// Ensure folder structure exists (flat folder - files go directly here)
 export async function ensureFolderStructure(folderPath: string): Promise<void> {
-  await fs.mkdir(path.join(folderPath, 'originals'), { recursive: true });
-  await fs.mkdir(path.join(folderPath, 'thumbnails'), { recursive: true });
-}
-
-// Generate thumbnail for an image
-export async function generateImageThumbnail(
-  inputPath: string,
-  outputPath: string
-): Promise<void> {
-  await sharp(inputPath)
-    .resize(THUMBNAIL_WIDTH, null, { withoutEnlargement: true })
-    .jpeg({ quality: THUMBNAIL_QUALITY })
-    .toFile(outputPath);
-}
-
-// Generate thumbnail for a video (first frame)
-export async function generateVideoThumbnail(
-  inputPath: string,
-  outputPath: string
-): Promise<void> {
-  // Using ffmpeg for video thumbnails
-  const ffmpeg = await import('fluent-ffmpeg');
-  const ffmpegInstaller = await import('@ffmpeg-installer/ffmpeg');
-
-  ffmpeg.default.setFfmpegPath(ffmpegInstaller.path);
-
-  return new Promise((resolve, reject) => {
-    ffmpeg.default(inputPath)
-      .screenshots({
-        timestamps: ['00:00:01'],
-        filename: path.basename(outputPath),
-        folder: path.dirname(outputPath),
-        size: `${THUMBNAIL_WIDTH}x?`,
-      })
-      .on('end', () => resolve())
-      .on('error', (err: Error) => reject(err));
-  });
+  await fs.mkdir(folderPath, { recursive: true });
 }
 
 // Determine file type from mime type
@@ -79,75 +53,31 @@ export function getFileType(mimeType: string): 'photo' | 'video' {
   return 'photo';
 }
 
-// Scan folder for media files and generate thumbnails
+// Scan folder for media files (flat folder, no thumbnails)
 export async function scanAndProcessFolder(
   folderPath: string,
   customerId: string,
   pilotId: string
 ): Promise<{ processed: number; errors: string[] }> {
-  const originalsPath = path.join(folderPath, 'originals');
-  const thumbnailsPath = path.join(folderPath, 'thumbnails');
-
-  // Ensure folders exist
+  // Ensure folder exists
   await ensureFolderStructure(folderPath);
 
   let processed = 0;
   const errors: string[] = [];
 
   try {
-    // Check if originals folder exists
-    await fs.access(originalsPath);
-  } catch {
-    // If no originals folder, check root for files (GoPro direct copy)
-    const rootFiles = await fs.readdir(folderPath);
-    for (const file of rootFiles) {
+    const files = await fs.readdir(folderPath);
+
+    for (const file of files) {
       const filePath = path.join(folderPath, file);
       const stat = await fs.stat(filePath);
 
       if (stat.isFile() && isMediaFile(file)) {
-        // Move to originals folder
-        await fs.rename(filePath, path.join(originalsPath, file));
-      }
-    }
-  }
-
-  // Now process originals folder
-  try {
-    const files = await fs.readdir(originalsPath);
-
-    for (const file of files) {
-      if (!isMediaFile(file)) continue;
-
-      const filePath = path.join(originalsPath, file);
-      const thumbnailName = getThumbnailName(file);
-      const thumbnailPath = path.join(thumbnailsPath, thumbnailName);
-
-      // Check if thumbnail already exists
-      try {
-        await fs.access(thumbnailPath);
         processed++;
-        continue; // Already processed
-      } catch {
-        // Thumbnail doesn't exist, generate it
-      }
-
-      try {
-        const mimeType = getMimeType(file);
-        const fileType = getFileType(mimeType);
-
-        if (fileType === 'photo') {
-          await generateImageThumbnail(filePath, thumbnailPath);
-        } else if (fileType === 'video') {
-          await generateVideoThumbnail(filePath, thumbnailPath.replace(/\.[^.]+$/, '.jpg'));
-        }
-
-        processed++;
-      } catch (err) {
-        errors.push(`Failed to process ${file}: ${(err as Error).message}`);
       }
     }
   } catch (err) {
-    errors.push(`Failed to read originals folder: ${(err as Error).message}`);
+    errors.push(`Failed to read folder: ${(err as Error).message}`);
   }
 
   // Update MediaFolder record with file count and size
@@ -181,48 +111,24 @@ function getMimeType(filename: string): string {
   return mimeTypes[ext] || 'application/octet-stream';
 }
 
-// Get thumbnail filename
-function getThumbnailName(filename: string): string {
-  const ext = path.extname(filename);
-  const name = path.basename(filename, ext);
-  return `${name}_thumb.jpg`;
-}
-
-// List all media files for a customer
+// List all media files for a customer (flat folder, no thumbnails)
 export async function listMediaFiles(folderPath: string): Promise<MediaFile[]> {
-  const originalsPath = path.join(folderPath, 'originals');
-  const thumbnailsPath = path.join(folderPath, 'thumbnails');
   const files: MediaFile[] = [];
 
   try {
-    const fileList = await fs.readdir(originalsPath);
+    const fileList = await fs.readdir(folderPath);
 
     for (const filename of fileList) {
       if (!isMediaFile(filename)) continue;
 
-      const filePath = path.join(originalsPath, filename);
+      const filePath = path.join(folderPath, filename);
       const stat = await fs.stat(filePath);
       const mimeType = getMimeType(filename);
-      const thumbnailName = getThumbnailName(filename);
-
-      // For videos, thumbnail has .jpg extension
-      const actualThumbnailName = mimeType.startsWith('video/')
-        ? thumbnailName.replace(/\.[^.]+$/, '.jpg')
-        : thumbnailName;
-
-      let thumbnailPath: string | undefined;
-      try {
-        await fs.access(path.join(thumbnailsPath, actualThumbnailName));
-        thumbnailPath = path.join(thumbnailsPath, actualThumbnailName);
-      } catch {
-        // No thumbnail
-      }
 
       files.push({
         filename,
         originalName: filename,
         path: filePath,
-        thumbnailPath,
         size: stat.size,
         mimeType,
         type: getFileType(mimeType),

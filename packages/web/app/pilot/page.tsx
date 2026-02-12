@@ -10,6 +10,7 @@ import { useSocket } from '@/hooks/useSocket'
 import { SOCKET_EVENTS } from '@/lib/socket'
 import { PushNotificationManager } from '@/components/pwa/PushNotificationManager'
 import { PWAInstallPrompt } from '@/components/pwa/PWAInstallGuide'
+import { initNativePush } from '@/lib/nativePush'
 import {
   Plane,
   User,
@@ -143,6 +144,9 @@ export default function PilotPanel() {
     setUser(parsed)
     fetchPanelData(parsed.pilotId)
     setLoading(false)
+
+    // Initialize native push notifications (Capacitor/FCM)
+    initNativePush().catch(console.error)
 
     // Fallback polling every 10 seconds (Socket.IO handles real-time updates)
     const interval = setInterval(() => {

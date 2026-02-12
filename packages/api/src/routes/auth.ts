@@ -32,6 +32,9 @@ router.post('/login', asyncHandler(async (req: AuthRequest, res: any) => {
 
   const token = generateToken(user);
 
+  // Get role permissions
+  const rolePerm = await prisma.rolePermission.findUnique({ where: { role: user.role } });
+
   res.json({
     success: true,
     data: {
@@ -43,6 +46,7 @@ router.post('/login', asyncHandler(async (req: AuthRequest, res: any) => {
         pilotId: user.pilotId,
         pilotName: user.pilot?.name || null,
       },
+      permissions: rolePerm?.permissions || null,
     },
   });
 }));
@@ -58,6 +62,8 @@ router.get('/me', authenticate, asyncHandler(async (req: AuthRequest, res: any) 
     throw new AppError('Kullanıcı bulunamadı', 404, 'USER_NOT_FOUND');
   }
 
+  const rolePerm = await prisma.rolePermission.findUnique({ where: { role: user.role } });
+
   res.json({
     success: true,
     data: {
@@ -66,6 +72,7 @@ router.get('/me', authenticate, asyncHandler(async (req: AuthRequest, res: any) 
       role: user.role,
       pilotId: user.pilotId,
       pilotName: user.pilot?.name || null,
+      permissions: rolePerm?.permissions || null,
     },
   });
 }));

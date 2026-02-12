@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
@@ -103,6 +103,57 @@ const menuGroups: MenuGroup[] = [
   },
 ]
 
+// Group title to permission key mapping
+const groupPermissionKeys: Record<string, string> = {
+  'GENEL': 'GENEL',
+  'OPERASYON': 'OPERASYON',
+  'PİLOT YÖNETİMİ': 'PILOT_YONETIMI',
+  'MEDYA': 'MEDYA',
+  'SATIŞ': 'SATIS',
+  'RAPORLAR': 'RAPORLAR',
+  'SİSTEM': 'SISTEM',
+}
+
+function getFilteredMenuGroups(): MenuGroup[] {
+  if (typeof window === 'undefined') return menuGroups
+
+  const userStr = localStorage.getItem('user')
+  if (!userStr) return menuGroups
+
+  const user = JSON.parse(userStr)
+  if (user.role === 'ADMIN') return menuGroups
+
+  const permStr = localStorage.getItem('permissions')
+  if (!permStr) return menuGroups
+
+  try {
+    const permissions = JSON.parse(permStr)
+    if (!permissions || !permissions.items) return menuGroups
+
+    return menuGroups
+      .map(group => {
+        const groupKey = groupPermissionKeys[group.title]
+        // If group is entirely disabled, skip it
+        if (groupKey && permissions.groups && permissions.groups[groupKey] === false) {
+          // Check if any individual items are enabled
+          const hasEnabledItem = group.items.some(item => permissions.items[item.href] === true)
+          if (!hasEnabledItem) return null
+        }
+
+        // Filter items
+        const filteredItems = group.items.filter(item => {
+          return permissions.items[item.href] !== false
+        })
+
+        if (filteredItems.length === 0) return null
+        return { ...group, items: filteredItems }
+      })
+      .filter(Boolean) as MenuGroup[]
+  } catch {
+    return menuGroups
+  }
+}
+
 interface SidebarProps {
   onNavigate?: () => void
 }
@@ -110,10 +161,16 @@ interface SidebarProps {
 export function Sidebar({ onNavigate }: SidebarProps) {
   const pathname = usePathname()
   const [isCollapsed, setIsCollapsed] = useState(false)
+  const [filteredGroups, setFilteredGroups] = useState<MenuGroup[]>(menuGroups)
+
+  useEffect(() => {
+    setFilteredGroups(getFilteredMenuGroups())
+  }, [])
 
   const handleLogout = () => {
     localStorage.removeItem('token')
     localStorage.removeItem('user')
+    localStorage.removeItem('permissions')
     window.location.href = '/login'
   }
 
@@ -158,7 +215,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
 
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto py-2">
-        {menuGroups.map((group, groupIndex) => (
+        {filteredGroups.map((group, groupIndex) => (
           <div key={group.title} className="mb-1">
             {/* Group Title */}
             {!isCollapsed && (
@@ -198,7 +255,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
             </ul>
 
             {/* Divider between groups */}
-            {groupIndex < menuGroups.length - 1 && (
+            {groupIndex < filteredGroups.length - 1 && (
               <div className="mx-4 my-2 border-b border-gray-100" />
             )}
           </div>

@@ -106,7 +106,7 @@ interface Sale {
 interface MediaFile {
   filename: string
   url: string
-  thumbnailUrl?: string
+  thumbnailUrl?: string  // deprecated - kept for backward compat
   type: 'photo' | 'video'
   size: number
 }
@@ -170,8 +170,12 @@ export default function CustomerDetailPage() {
   const [processingPayment, setProcessingPayment] = useState(false)
   const [uploadingFiles, setUploadingFiles] = useState(false)
   const [markingDelivered, setMarkingDelivered] = useState(false)
-  const [showPilotConfirm, setShowPilotConfirm] = useState(false)
-  const [nextPilot, setNextPilot] = useState<{ id: string; name: string } | null>(null)
+  const [showPilotModal, setShowPilotModal] = useState(false)
+  const [availablePilots, setAvailablePilots] = useState<{ id: string; name: string; dailyFlightCount: number; maxDailyFlights: number; queuePosition: number }[]>([])
+  const [loadingPilots, setLoadingPilots] = useState(false)
+  const [pilotSearch, setPilotSearch] = useState('')
+  const [selectedPilot, setSelectedPilot] = useState<{ id: string; name: string } | null>(null)
+  const [showPilotConfirmDialog, setShowPilotConfirmDialog] = useState(false)
 
   // Media state
   const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([])
@@ -181,9 +185,9 @@ export default function CustomerDetailPage() {
   // POS Modal state
   const [showPosModal, setShowPosModal] = useState(false)
   const [posProducts, setPosProducts] = useState<any[]>([])
-  const [posFavorites, setPosFavorites] = useState<any[]>([])
+  const [_posFavorites, setPosFavorites] = useState<any[]>([])
   const [posCart, setPosCart] = useState<any[]>([])
-  const [posActiveCategory, setPosActiveCategory] = useState('Favori')
+  const [posActiveCategory, setPosActiveCategory] = useState('Tüm Ürünler')
   const [posProductSearch, setPosProductSearch] = useState('')
   const [posLoading, setPosLoading] = useState(false)
   const [posProcessing, setPosProcessing] = useState(false)
@@ -577,37 +581,48 @@ Bu belgeyi imzalayarak asagidaki hususlari kabul ve beyan ederim:
 
   const handleReassignPilot = async () => {
     if (!customer) return
-
-    // First, get the next available pilot from queue
-    setReassigning(true)
+    setShowPilotModal(true)
+    setLoadingPilots(true)
+    setPilotSearch('')
+    setSelectedPilot(null)
     try {
+      // Fetch queue and available pilots
       const response = await api.get('/pilots/queue')
-      const pilot = response.data.data?.nextPilot
-      if (pilot) {
-        setNextPilot({ id: pilot.id, name: pilot.name })
-        setShowPilotConfirm(true)
-      } else {
-        alert('Şu an müsait pilot bulunmuyor')
-      }
+      const queueData = response.data.data
+      // Get all available pilots (exclude current pilot and limit-reached ones)
+      const allPilots = (queueData?.queue || []).filter(
+        (p: any) =>
+          p.status === 'AVAILABLE' &&
+          p.dailyFlightCount < p.maxDailyFlights &&
+          p.id !== customer.assignedPilot?.id
+      )
+      setAvailablePilots(allPilots)
     } catch (error: any) {
       alert(error.response?.data?.error?.message || 'Pilot bilgisi alınamadı')
+      setShowPilotModal(false)
     } finally {
-      setReassigning(false)
+      setLoadingPilots(false)
     }
   }
 
+  const handleSelectPilot = (pilot: { id: string; name: string }) => {
+    setSelectedPilot(pilot)
+    setShowPilotConfirmDialog(true)
+  }
+
   const confirmReassignPilot = async () => {
-    if (!customer || !nextPilot) return
+    if (!customer || !selectedPilot) return
     setReassigning(true)
-    setShowPilotConfirm(false)
+    setShowPilotConfirmDialog(false)
+    setShowPilotModal(false)
     try {
-      await api.post(`/customers/${customer.id}/reassign-pilot`, { pilotId: nextPilot.id })
+      await api.post(`/customers/${customer.id}/reassign-pilot`, { pilotId: selectedPilot.id })
       await fetchCustomer()
     } catch (error: any) {
       alert(error.response?.data?.error?.message || 'Pilot atanamadı')
     } finally {
       setReassigning(false)
-      setNextPilot(null)
+      setSelectedPilot(null)
     }
   }
 
@@ -645,17 +660,25 @@ Bu belgeyi imzalayarak asagidaki hususlari kabul ve beyan ederim:
     }
   }
 
+  // Lock body scroll when POS modal is open
+  useEffect(() => {
+    if (showPosModal) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+    }
+    return () => {
+      document.body.style.overflow = ''
+    }
+  }, [showPosModal])
+
   // POS Modal functions
   const openPosModal = async () => {
     setShowPosModal(true)
     setPosLoading(true)
     try {
-      const [productsRes, favoritesRes] = await Promise.all([
-        productsApi.getAll({ activeOnly: 'true' }),
-        productsApi.getFavorites(),
-      ])
+      const productsRes = await productsApi.getAll({ activeOnly: 'true' })
       setPosProducts(productsRes.data.data.products || [])
-      setPosFavorites(favoritesRes.data.data || [])
     } catch (error) {
       console.error('Failed to fetch products:', error)
     } finally {
@@ -667,7 +690,7 @@ Bu belgeyi imzalayarak asagidaki hususlari kabul ve beyan ederim:
     setShowPosModal(false)
     setPosCart([])
     setPosProductSearch('')
-    setPosActiveCategory('Favori')
+    setPosActiveCategory('Tüm Ürünler')
   }
 
   const addToPosCart = (product: any) => {
@@ -746,8 +769,10 @@ Bu belgeyi imzalayarak asagidaki hususlari kabul ve beyan ederim:
 
   const getPosDisplayProducts = () => {
     let list: any[] = []
-    if (posActiveCategory === 'Favori') {
-      list = posFavorites
+    if (posActiveCategory === 'Tüm Ürünler') {
+      list = posProducts
+    } else if (posActiveCategory === 'Fotoğraf/Video') {
+      list = posProducts.filter((p) => ['VIDEO', 'PHOTO', 'PACKAGE', 'Fotoğraf/Video', 'Medya'].includes(p.category))
     } else {
       list = posProducts.filter((p) => p.category === posActiveCategory)
     }
@@ -758,7 +783,7 @@ Bu belgeyi imzalayarak asagidaki hususlari kabul ve beyan ederim:
     return list
   }
 
-  const POS_CATEGORIES = ['Favori', 'İçecek', 'Yiyecek', 'Hediyelik', 'Diğer']
+  const POS_CATEGORIES = ['Tüm Ürünler', 'İçecek', 'Yiyecek', 'Hediyelik', 'Fotoğraf/Video', 'Diğer']
 
   // Computed values
   const flight = customer?.flights[0]
@@ -916,6 +941,10 @@ Bu belgeyi imzalayarak asagidaki hususlari kabul ve beyan ederim:
               </h1>
               <span className="text-xl text-muted-foreground">—</span>
               <span className="text-2xl font-mono font-bold text-primary">{customer.displayId}</span>
+              <Button size="sm" onClick={openPosModal} className="ml-2">
+                <Plus className="w-4 h-4 mr-1" />
+                Satış Ekle
+              </Button>
             </div>
             <div className="flex items-center gap-3 mt-1">
               <span className={`px-3 py-1 rounded-full text-sm font-semibold ${status?.bgColor} ${status?.color}`}>
@@ -1153,18 +1182,14 @@ Bu belgeyi imzalayarak asagidaki hususlari kabul ve beyan ederim:
                 </div>
               </div>
 
-              {/* Thumbnail preview */}
+              {/* File preview */}
               {mediaFiles.length > 0 && (
                 <div className="flex gap-2 overflow-x-auto pb-2">
                   {mediaFiles.slice(0, 5).map((file, i) => (
                     <div key={i} className="w-20 h-20 bg-gray-100 rounded flex-shrink-0 overflow-hidden">
-                      {file.thumbnailUrl ? (
-                        <img src={file.thumbnailUrl} alt="" className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <Camera className="w-6 h-6 text-muted-foreground" />
-                        </div>
-                      )}
+                      <div className="w-full h-full flex items-center justify-center">
+                        <Camera className="w-6 h-6 text-muted-foreground" />
+                      </div>
                     </div>
                   ))}
                   {mediaFiles.length > 5 && (
@@ -1306,10 +1331,6 @@ Bu belgeyi imzalayarak asagidaki hususlari kabul ve beyan ederim:
                 </span>
               )}
             </div>
-            <Button size="sm" onClick={openPosModal}>
-              <Plus className="w-4 h-4 mr-1" />
-              Satış Ekle
-            </Button>
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -1457,17 +1478,119 @@ Bu belgeyi imzalayarak asagidaki hususlari kabul ve beyan ederim:
         </div>
       )}
 
-      {/* Pilot Reassign Confirm Modal */}
-      {showPilotConfirm && nextPilot && (
+      {/* Pilot Reassign Modal */}
+      {showPilotModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded-lg max-w-md w-full mx-4" onClick={e => e.stopPropagation()}>
             <div className="text-center mb-6">
               <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <User className="w-8 h-8 text-blue-600" />
               </div>
-              <h3 className="text-xl font-bold mb-2">Pilot Değişikliği</h3>
+              <h3 className="text-xl font-bold mb-2">Pilot Değiştir</h3>
+              <p className="text-sm text-muted-foreground">
+                Mevcut pilot: <span className="font-semibold text-foreground">{customer.assignedPilot?.name}</span>
+              </p>
+            </div>
+
+            {loadingPilots ? (
+              <div className="flex items-center justify-center py-8">
+                <RefreshCw className="w-6 h-6 animate-spin text-primary" />
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {/* Next pilot button */}
+                {availablePilots.length > 0 && (
+                  <Button
+                    className="w-full h-14 bg-green-600 hover:bg-green-700 text-base"
+                    onClick={() => handleSelectPilot({ id: availablePilots[0].id, name: availablePilots[0].name })}
+                    disabled={reassigning}
+                  >
+                    <Check className="w-5 h-5 mr-2" />
+                    Sıradaki Pilot: {availablePilots[0].name}
+                  </Button>
+                )}
+
+                {/* Divider */}
+                {availablePilots.length > 1 && (
+                  <>
+                    <div className="relative">
+                      <div className="absolute inset-0 flex items-center">
+                        <span className="w-full border-t" />
+                      </div>
+                      <div className="relative flex justify-center text-xs uppercase">
+                        <span className="bg-white px-2 text-muted-foreground">veya pilot seç</span>
+                      </div>
+                    </div>
+
+                    {/* Search */}
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Pilot ismi ara..."
+                        value={pilotSearch}
+                        onChange={(e) => setPilotSearch(e.target.value)}
+                        className="pl-10"
+                      />
+                    </div>
+
+                    {/* Available pilots list */}
+                    <div className="max-h-48 overflow-y-auto space-y-1 border rounded-lg">
+                      {availablePilots
+                        .filter(p => p.id !== availablePilots[0]?.id)
+                        .filter(p => !pilotSearch || p.name.toLowerCase().includes(pilotSearch.toLowerCase()))
+                        .map((pilot) => (
+                          <button
+                            key={pilot.id}
+                            onClick={() => handleSelectPilot({ id: pilot.id, name: pilot.name })}
+                            disabled={reassigning}
+                            className="w-full flex items-center justify-between p-3 hover:bg-blue-50 transition-colors text-left border-b last:border-b-0"
+                          >
+                            <div>
+                              <p className="font-medium">{pilot.name}</p>
+                              <p className="text-xs text-muted-foreground">
+                                Sıra: {pilot.queuePosition}
+                              </p>
+                            </div>
+                            <span className="text-sm text-muted-foreground">
+                              {pilot.dailyFlightCount}/{pilot.maxDailyFlights}
+                            </span>
+                          </button>
+                        ))}
+                    </div>
+                  </>
+                )}
+
+                {availablePilots.length === 0 && (
+                  <p className="text-center text-muted-foreground py-4">Müsait pilot bulunmuyor</p>
+                )}
+              </div>
+            )}
+
+            <Button
+              variant="outline"
+              className="w-full mt-4"
+              onClick={() => {
+                setShowPilotModal(false)
+                setSelectedPilot(null)
+                setPilotSearch('')
+              }}
+            >
+              İptal
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Pilot Reassign Confirm Dialog */}
+      {showPilotConfirmDialog && selectedPilot && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]">
+          <div className="bg-white p-6 rounded-lg max-w-sm w-full mx-4" onClick={e => e.stopPropagation()}>
+            <div className="text-center mb-6">
+              <AlertTriangle className="w-12 h-12 text-yellow-500 mx-auto mb-3" />
+              <h3 className="text-lg font-bold mb-2">Pilot Değişikliği Onayı</h3>
               <p className="text-muted-foreground">
-                Sıradaki pilot <span className="font-semibold text-foreground">{nextPilot.name}</span> olarak atansın mı?
+                <span className="font-semibold text-foreground">{customer.assignedPilot?.name}</span> yerine{' '}
+                <span className="font-semibold text-foreground">{selectedPilot.name}</span> atansın mı?
               </p>
             </div>
             <div className="flex gap-3">
@@ -1475,11 +1598,11 @@ Bu belgeyi imzalayarak asagidaki hususlari kabul ve beyan ederim:
                 variant="outline"
                 className="flex-1"
                 onClick={() => {
-                  setShowPilotConfirm(false)
-                  setNextPilot(null)
+                  setShowPilotConfirmDialog(false)
+                  setSelectedPilot(null)
                 }}
               >
-                İptal
+                Vazgeç
               </Button>
               <Button
                 className="flex-1"
@@ -1500,7 +1623,7 @@ Bu belgeyi imzalayarak asagidaki hususlari kabul ve beyan ederim:
 
       {/* POS Modal */}
       {showPosModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 w-screen h-screen bg-black/50 flex items-center justify-center z-[100]" style={{ top: 0, left: 0 }}>
           <div className="bg-white rounded-lg w-full max-w-5xl mx-4 max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
             {/* Header */}
             <div className="flex items-center justify-between p-4 border-b">
@@ -1510,7 +1633,7 @@ Bu belgeyi imzalayarak asagidaki hususlari kabul ve beyan ederim:
                   {customer.firstName} {customer.lastName} - {customer.displayId}
                 </p>
               </div>
-              <Button variant="ghost" size="icon" onClick={closePosModal}>
+              <Button variant="ghost" size="icon" onClick={closePosModal} className="text-red-500 hover:text-red-700 hover:bg-red-50">
                 <X className="w-6 h-6" />
               </Button>
             </div>

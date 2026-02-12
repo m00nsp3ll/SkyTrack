@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -74,6 +75,7 @@ interface CustomerSale {
 const CATEGORIES = ['Tüm Ürünler', 'İçecek', 'Yiyecek', 'Hediyelik', 'Fotoğraf/Video', 'Diğer']
 
 export default function POSPage() {
+  const searchParams = useSearchParams()
   const [products, setProducts] = useState<Product[]>([])
   const [cart, setCart] = useState<CartItem[]>([])
   const [pendingPayments, setPendingPayments] = useState<PendingPayment[]>([])
@@ -93,6 +95,35 @@ export default function POSPage() {
     fetchProducts()
   }, [])
 
+  // Auto-load customer from URL parameter
+  useEffect(() => {
+    const customerParam = searchParams.get('customer')
+    if (customerParam && !customer) {
+      setSearchId(customerParam)
+      setSearchingCustomer(true)
+      customersApi.getById(customerParam)
+        .then(response => {
+          const data = response.data.data
+          const customerData = {
+            id: data.id,
+            displayId: data.displayId,
+            firstName: data.firstName,
+            lastName: data.lastName,
+            pilotName: data.assignedPilot?.name,
+          }
+          setCustomer(customerData)
+          setSearchId('')
+          fetchCustomerSales(data.id, true) // Auto-add unpaid sales to cart
+        })
+        .catch(() => {
+          alert('Müşteri bulunamadı: ' + customerParam)
+        })
+        .finally(() => {
+          setSearchingCustomer(false)
+        })
+    }
+  }, [searchParams, customer])
+
   const fetchProducts = async () => {
     setLoading(true)
     try {
@@ -105,7 +136,7 @@ export default function POSPage() {
     }
   }
 
-  const fetchCustomerSales = async (customerId: string) => {
+  const fetchCustomerSales = async (customerId: string, autoAddUnpaid = false) => {
     try {
       const response = await salesApi.getByCustomer(customerId)
       const data = response.data.data
@@ -120,6 +151,17 @@ export default function POSPage() {
 
       // Use summary from API
       setCustomerBalance(data.summary?.totalUnpaid || 0)
+
+      // Auto-add unpaid sales to pending payments if requested
+      if (autoAddUnpaid) {
+        const unpaidSales = sortedSales.filter((sale: CustomerSale) => sale.paymentStatus === 'UNPAID')
+        const newPendingPayments = unpaidSales.map((sale: CustomerSale) => ({
+          saleId: sale.id,
+          itemName: sale.itemName,
+          totalPrice: sale.totalPrice,
+        }))
+        setPendingPayments(newPendingPayments)
+      }
     } catch (error) {
       console.error('Failed to fetch customer sales:', error)
       setCustomerSales([])

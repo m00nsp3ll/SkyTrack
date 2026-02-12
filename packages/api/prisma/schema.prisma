@@ -12,6 +12,7 @@ enum UserRole {
   OFFICE_STAFF
   PILOT
   MEDIA_SELLER
+  CUSTOM
 }
 
 enum CustomerStatus {
@@ -44,6 +45,8 @@ enum PaymentMethod {
 
 enum PilotStatus {
   AVAILABLE
+  ASSIGNED
+  PICKED_UP
   IN_FLIGHT
   ON_BREAK
   OFF_DUTY
@@ -66,6 +69,7 @@ model User {
   pilot             Pilot?             @relation(fields: [pilotId], references: [id])
   sales             Sale[]
   pushSubscriptions PushSubscription[]
+  fcmTokens         FcmToken[]
   createdAt         DateTime           @default(now()) @map("created_at")
   updatedAt         DateTime           @updatedAt @map("updated_at")
 
@@ -232,4 +236,29 @@ model PushSubscription {
   @@index([userId])
   @@index([isActive])
   @@map("push_subscriptions")
+}
+
+model RolePermission {
+  id          String   @id @default(uuid())
+  role        UserRole @unique
+  permissions Json     @default("{}")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("role_permissions")
+}
+
+model FcmToken {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  device    String?
+  platform  String?
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@index([isActive])
+  @@map("fcm_tokens")
 }

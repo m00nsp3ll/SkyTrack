@@ -14,12 +14,14 @@ import {
   Plane,
   Coffee,
   Moon,
+  UserPlus,
+  User,
 } from 'lucide-react'
 
 interface Pilot {
   id: string
   name: string
-  status: 'AVAILABLE' | 'IN_FLIGHT' | 'ON_BREAK' | 'OFF_DUTY'
+  status: 'AVAILABLE' | 'ASSIGNED' | 'PICKED_UP' | 'IN_FLIGHT' | 'ON_BREAK' | 'OFF_DUTY'
   dailyFlightCount: number
   maxDailyFlights: number
   queuePosition: number
@@ -27,6 +29,8 @@ interface Pilot {
 
 const statusConfig = {
   AVAILABLE: { label: 'Müsait', color: 'text-green-600', icon: CheckCircle },
+  ASSIGNED: { label: 'Müşteri Atandı', color: 'text-purple-600', icon: UserPlus },
+  PICKED_UP: { label: 'Müşteri Alındı', color: 'text-blue-500', icon: User },
   IN_FLIGHT: { label: 'Uçuşta', color: 'text-blue-600', icon: Plane },
   ON_BREAK: { label: 'Molada', color: 'text-yellow-600', icon: Coffee },
   OFF_DUTY: { label: 'Mesai Dışı', color: 'text-gray-500', icon: Moon },
@@ -148,14 +152,15 @@ export default function PilotQueuePage() {
       <Card>
         <CardContent className="p-4 text-sm text-muted-foreground">
           <p>
-            <strong>Not:</strong> Müşteri ataması şu kriterlere göre yapılır:
+            <strong>Not:</strong> Müşteri ataması <strong>tamamen sıraya göre</strong> yapılır.
           </p>
           <ol className="list-decimal ml-4 mt-2 space-y-1">
-            <li>Günlük uçuş sayısı en az olan pilot</li>
-            <li>Aynı sayıda ise, sıra numarası küçük olan pilot</li>
+            <li><strong>Sıradaki pilot</strong> (listenin en üstündeki müsait pilot) yeni müşteriyi alır</li>
+            <li>Müşteri aldıktan sonra pilot otomatik olarak <strong>sıranın sonuna</strong> geçer</li>
+            <li>Günlük limit dolana kadar (varsayılan 7 uçuş) pilot sırada kalır</li>
           </ol>
-          <p className="mt-2">
-            Bu sayfada sıra numarasını manuel olarak ayarlayabilirsiniz.
+          <p className="mt-2 text-blue-600 dark:text-blue-400">
+            💡 Bu sayede <strong>round-robin</strong> (döngüsel) sıralama ile her pilot eşit fırsat alır.
           </p>
         </CardContent>
       </Card>

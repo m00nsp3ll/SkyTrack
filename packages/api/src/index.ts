@@ -25,6 +25,7 @@ import salesRoutes from './routes/sales.js';
 import reportsRoutes from './routes/reports.js';
 import usersRoutes from './routes/users.js';
 import pushRoutes from './routes/push.js';
+import fcmRoutes from './routes/fcm.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { setupSocket } from './socket/index.js';
 import { setupCronJobs } from './cron/dailyReset.js';
@@ -145,6 +146,7 @@ app.use('/api/sales', salesRoutes);
 app.use('/api/reports', reportsRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/push', pushRoutes);
+app.use('/api/fcm', fcmRoutes);
 
 // Error handler
 app.use(errorHandler);

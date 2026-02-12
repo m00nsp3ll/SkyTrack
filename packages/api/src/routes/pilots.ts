@@ -11,8 +11,7 @@ const prisma = new PrismaClient();
 router.get('/', authenticate, asyncHandler(async (req: AuthRequest, res: any) => {
   const pilots = await prisma.pilot.findMany({
     orderBy: [
-      { dailyFlightCount: 'asc' },
-      { queuePosition: 'asc' },
+      { queuePosition: 'asc' }, // ONLY queue position, not flight count
     ],
     include: {
       _count: {
@@ -39,8 +38,7 @@ router.get('/queue', authenticate, asyncHandler(async (req: AuthRequest, res: an
     const pilots = await prisma.pilot.findMany({
       where: { isActive: true },
       orderBy: [
-        { dailyFlightCount: 'asc' },
-        { queuePosition: 'asc' },
+        { queuePosition: 'asc' }, // ONLY queue position, round-robin
       ],
       select: {
         id: true,
@@ -283,8 +281,7 @@ router.get('/:id/panel', authenticate, asyncHandler(async (req: AuthRequest, res
       status: { in: ['AVAILABLE', 'ON_BREAK'] },
     },
     orderBy: [
-      { dailyFlightCount: 'asc' },
-      { queuePosition: 'asc' },
+      { queuePosition: 'asc' }, // ONLY queue position
     ],
     select: {
       id: true,

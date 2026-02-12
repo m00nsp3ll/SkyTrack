@@ -1,9 +1,13 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Bell, BellOff, X, Smartphone, Check } from 'lucide-react'
+/**
+ * PWA Push Notification Manager - DEPRECATED
+ *
+ * Bu component artık kullanılmıyor. Firebase FCM native push'a geçtik.
+ * Uyumluluk için boş component olarak bırakıldı.
+ *
+ * @deprecated Native push notifications (FCM) kullanın
+ */
 
 interface PushNotificationManagerProps {
   onSubscribed?: () => void
@@ -11,6 +15,9 @@ interface PushNotificationManagerProps {
 }
 
 export function PushNotificationManager({ onSubscribed, showOnMount = true }: PushNotificationManagerProps) {
+  // PWA Push sistemi artık kullanılmıyor - FCM native push kullanıyoruz
+  return null
+}
   const [permission, setPermission] = useState<NotificationPermission>('default')
   const [isSubscribed, setIsSubscribed] = useState(false)
   const [showModal, setShowModal] = useState(false)

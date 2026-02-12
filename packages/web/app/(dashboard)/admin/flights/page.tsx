@@ -14,7 +14,7 @@ import {
   Clock,
   RefreshCw,
   User,
-  Scale,
+  UserPlus,
   Coffee,
   Moon,
   AlertTriangle,
@@ -36,7 +36,7 @@ interface Customer {
 interface Pilot {
   id: string
   name: string
-  status: 'AVAILABLE' | 'IN_FLIGHT' | 'ON_BREAK' | 'OFF_DUTY'
+  status: 'AVAILABLE' | 'ASSIGNED' | 'PICKED_UP' | 'IN_FLIGHT' | 'ON_BREAK' | 'OFF_DUTY'
   dailyFlightCount: number
   maxDailyFlights: number
 }
@@ -73,6 +73,8 @@ interface LiveData {
 
 const pilotStatusConfig = {
   AVAILABLE: { label: 'Müsait', color: 'bg-green-500', textColor: 'text-green-600', icon: CheckCircle },
+  ASSIGNED: { label: 'Müşteri Atandı', color: 'bg-purple-500', textColor: 'text-purple-600', icon: UserPlus },
+  PICKED_UP: { label: 'Müşteri Alındı', color: 'bg-blue-400', textColor: 'text-blue-500', icon: User },
   IN_FLIGHT: { label: 'Uçuşta', color: 'bg-blue-500', textColor: 'text-blue-600', icon: Plane },
   ON_BREAK: { label: 'Molada', color: 'bg-yellow-500', textColor: 'text-yellow-600', icon: Coffee },
   OFF_DUTY: { label: 'Mesai Dışı', color: 'bg-gray-500', textColor: 'text-gray-500', icon: Moon },
@@ -298,10 +300,11 @@ export default function LiveFlightsPage() {
                       <CardContent className="p-3">
                         <div className="flex items-start justify-between mb-2">
                           <div>
-                            <p className="text-xs text-muted-foreground">{flight.customer.displayId}</p>
-                            <p className="font-semibold">
-                              {flight.customer.firstName} {flight.customer.lastName}
+                            <p className="font-bold text-lg">{flight.pilot.name}</p>
+                            <p className="text-sm text-muted-foreground">
+                              {flight.customer.firstName} {flight.customer.lastName} — {flight.customer.weight} kg
                             </p>
+                            <p className="text-xs text-muted-foreground">{flight.customer.displayId}</p>
                           </div>
                           <div className="text-right">
                             <p className={`text-lg font-bold ${
@@ -313,16 +316,6 @@ export default function LiveFlightsPage() {
                             </p>
                             <p className="text-xs text-muted-foreground">uçuş süresi</p>
                           </div>
-                        </div>
-                        <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                          <span className="flex items-center gap-1">
-                            <User className="h-3 w-3" />
-                            {flight.pilot.name}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <Scale className="h-3 w-3" />
-                            {flight.customer.weight} kg
-                          </span>
                         </div>
                       </CardContent>
                     </Card>
@@ -354,10 +347,11 @@ export default function LiveFlightsPage() {
                       <CardContent className="p-3">
                         <div className="flex items-start justify-between mb-2">
                           <div>
-                            <p className="text-xs text-muted-foreground">{flight.customer.displayId}</p>
-                            <p className="font-semibold">
-                              {flight.customer.firstName} {flight.customer.lastName}
+                            <p className="font-bold text-lg">{flight.pilot.name}</p>
+                            <p className="text-sm text-muted-foreground">
+                              {flight.customer.firstName} {flight.customer.lastName} — {flight.customer.weight} kg
                             </p>
+                            <p className="text-xs text-muted-foreground">{flight.customer.displayId}</p>
                           </div>
                           <div className="text-right">
                             <p className="text-lg font-bold text-yellow-600">
@@ -366,11 +360,7 @@ export default function LiveFlightsPage() {
                             <p className="text-xs text-muted-foreground">bekleme</p>
                           </div>
                         </div>
-                        <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                          <span className="flex items-center gap-1">
-                            <User className="h-3 w-3" />
-                            {flight.pilot.name}
-                          </span>
+                        <div className="flex items-center gap-2">
                           <span className={`px-1.5 py-0.5 rounded text-xs ${
                             flight.status === 'PICKED_UP' ? 'bg-yellow-200 text-yellow-700' : 'bg-gray-200 text-gray-700'
                           }`}>
@@ -405,8 +395,10 @@ export default function LiveFlightsPage() {
                   <Link key={flight.id} href={`/admin/customers/${flight.customer.displayId}`}>
                     <div className="flex items-center justify-between p-2 bg-green-50 rounded-lg hover:bg-green-100 cursor-pointer text-sm">
                       <div>
-                        <p className="font-medium">{flight.customer.firstName} {flight.customer.lastName}</p>
-                        <p className="text-xs text-muted-foreground">{flight.pilot.name}</p>
+                        <p className="font-bold">{flight.pilot.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {flight.customer.firstName} {flight.customer.lastName} — {flight.customer.weight} kg
+                        </p>
                       </div>
                       {flight.durationMinutes && (
                         <span className="text-xs text-green-600 font-medium">{flight.durationMinutes} dk</span>

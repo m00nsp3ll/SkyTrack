@@ -60,22 +60,58 @@
 - [x] Depolama: `./media/Risk Formlari/{displayId}/{Ad Soyad} risk_formu.pdf`
 
 ### Personel Yönetimi
-- [x] Kullanıcı rolleri (ADMIN, OFFICE_STAFF, PILOT, MEDIA_STAFF)
+- [x] Kullanıcı rolleri (ADMIN, OFFICE_STAFF, PILOT, MEDIA_SELLER, CUSTOM)
 - [x] Personel CRUD işlemleri
 - [x] Pilot-kullanıcı eşleştirme
+- [x] Rol bazlı yetki yönetimi (RolePermission modeli)
+- [x] Personel Rolleri paneli (grup/öğe bazında toggle)
+- [x] Sidebar rol bazlı menü filtreleme
+- [x] CUSTOM (Özel Yetki) rol desteği
 
-### PWA ve Push Bildirimler
-- [x] Web Push Notification altyapısı (web-push + VAPID)
-- [x] PushSubscription veritabanı modeli
-- [x] Push notification servisi (sendPushToUser, sendPushToPilot, sendPushBroadcast)
-- [x] Push API endpoint'leri (subscribe, unsubscribe, test, broadcast)
-- [x] Service Worker push handler
+### PWA ve Push Bildirimler (DEPRECATED - FCM'e Geçildi)
+- [x] ~~Web Push Notification altyapısı (web-push + VAPID)~~ - DEPRECATED
+- [x] ~~PushSubscription veritabanı modeli~~ - DEPRECATED
+- [x] ~~Push notification servisi (sendPushToUser, sendPushToPilot, sendPushBroadcast)~~ - DEPRECATED
+- [x] ~~Push API endpoint'leri (subscribe, unsubscribe, test, broadcast)~~ - DEPRECATED (410 Gone)
+- [x] Service Worker (sadece caching için aktif, push disabled)
 - [x] PWA manifest ve next-pwa yapılandırması
-- [x] Bildirim izin modal'ı (PushNotificationManager)
+- [x] ~~Bildirim izin modal'ı (PushNotificationManager)~~ - Boş component
 - [x] PWA kurulum rehberi (iOS talimatları dahil)
-- [x] Müşteri atamalarında push bildirimi
-- [x] Admin bildirim yönetim sayfası
-- [x] Custom domain desteği (api.skytrackyp.com)
+
+### Firebase FCM Native Push (PRIMARY - PWA Deprecated)
+- [x] Capacitor.js kurulumu ve yapılandırması (com.skytrackyp.app)
+- [x] Android projesi oluşturuldu
+- [x] Firebase Admin SDK entegrasyonu (firebase-service-account.json)
+- [x] FcmToken veritabanı modeli ve migration
+- [x] FCM token kayıt/silme API endpoint'leri (/api/fcm/register, /unregister, /tokens)
+- [x] Firebase notification servisi (sendNativeToPilot, sendNativeToUser, sendNativeBroadcast)
+- [x] Frontend native push başlatma (nativePush.ts)
+- [x] PWA Push sisteminden tam geçiş (tüm sendPushToPilot çağrıları kaldırıldı)
+- [x] FCM bildirim tetikleyicileri (12 senaryo):
+  - Müşteri atama (pilotQueue.ts)
+  - Müşteri yeniden atama (pilotQueue.ts + flights.ts)
+  - Uçuş tamamlandı (flights.ts)
+  - Uçuş iptali (flights.ts)
+  - Toplu uçuş iptali (flights.ts) - Socket.IO only
+  - Pilot limit uyarısı 6/7 (flights.ts)
+  - Pilot limit doldu 7/7 (flights.ts)
+- [x] Admin FCM yönetim paneli (token listesi, broadcast, şablonlar)
+- [x] In-app notification banner (uygulama açıkken)
+- [x] Akıllı bildirim routing (notification type bazlı)
+- [x] Debug APK build (5.5MB - packages/web/android/app/build/outputs/apk/debug/app-debug.apk)
+- [ ] iOS uygulama build (ileride)
+- [ ] FCM token cleanup sistemi (geçersiz/eski tokenlar - ileride)
+- [ ] Admin cron job bildirimleri (ileride)
+
+### DevOps & Automation (2025-02-10)
+- [x] Hızlı başlatma sistemi (tek komutla tüm servisler)
+- [x] Otomatik başlatma scripti (start-all.sh)
+- [x] Otomatik durdurma scripti (stop-all.sh)
+- [x] Veritabanı migration sistemi düzeltildi
+- [x] Demo seed data (100 pilot, 100 müşteri, 80 uçuş)
+- [x] Healthcheck ve hata yönetimi
+- [x] Log dosyaları (/tmp/skytrack-*.log)
+- [x] Process ID takibi
 
 ### Medya Yönetimi
 - [x] Medya yükleme sistemi
@@ -116,4 +152,19 @@
 - Custom domain: skytrackyp.com
 - API subdomain: api.skytrackyp.com
 - Tunnel config: ~/.cloudflared/config.yml
-- Tunnel başlatma: `cloudflared tunnel run skytrack`
+
+### Hızlı Başlatma (2025-02-10)
+
+**Tek Komut:**
+```bash
+./scripts/start-all.sh
+```
+
+**Durdurma:**
+```bash
+./scripts/stop-all.sh
+```
+
+**Detaylı Rehber:**
+- `memory-bank/quickstart.md` dosyasını oku
+- Tüm başlatma komutları ve sorun giderme adımları içerir

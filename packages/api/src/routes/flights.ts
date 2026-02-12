@@ -3,6 +3,7 @@ import { PrismaClient, FlightStatus } from '@prisma/client';
 import { asyncHandler, AppError } from '../middleware/errorHandler.js';
 import { authenticate, requireRole, AuthRequest } from '../middleware/auth.js';
 import { cache } from '../services/cache.js';
+import { sendNativeToPilot } from '../services/firebaseNotification.js';
 import fs from 'fs/promises';
 import path from 'path';
 
@@ -461,6 +462,13 @@ router.post('/:id/cancel', authenticate, asyncHandler(async (req: AuthRequest, r
       },
       reason,
     });
+
+    // FCM: Notify pilot about cancellation
+    sendNativeToPilot(updatedFlight.pilot.id, {
+      title: '❌ Uçuş İptal Edildi',
+      body: `${updatedFlight.customer.firstName} ${updatedFlight.customer.lastName} (${updatedFlight.customer.displayId})`,
+      data: { type: 'flight_cancelled', flightId: id },
+    }).catch(err => console.error('FCM cancel notification error:', err));
   }
 
   res.json({
@@ -619,6 +627,13 @@ router.post('/:id/reassign', authenticate, requireRole('ADMIN'), asyncHandler(as
       pilot: { id: newPilot.id, name: newPilot.name },
     });
 
+    // FCM: Notify new pilot about reassignment
+    sendNativeToPilot(newPilot.id, {
+      title: '🪂 Yeni Müşteri Atandı',
+      body: `${updatedFlight.customer.firstName} ${updatedFlight.customer.lastName} (${updatedFlight.customer.displayId})`,
+      data: { type: 'customer_reassigned', flightId: id },
+    }).catch(err => console.error('FCM reassign notification error:', err));
+
     // Notify admin
     io.to('admin').emit('flight:reassigned', {
       flightId: id,
@@ -711,7 +726,17 @@ router.patch('/:id/status', authenticate, asyncHandler(async (req: AuthRequest, 
     });
 
     // Update pilot status and counters based on flight status
-    if (status === 'IN_FLIGHT') {
+    if (status === 'PICKED_UP') {
+      await tx.pilot.update({
+        where: { id: flight.pilotId },
+        data: { status: 'PICKED_UP' },
+      });
+
+      await tx.customer.update({
+        where: { id: flight.customerId },
+        data: { status: 'ASSIGNED' },
+      });
+    } else if (status === 'IN_FLIGHT') {
       await tx.pilot.update({
         where: { id: flight.pilotId },
         data: { status: 'IN_FLIGHT' },
@@ -734,11 +759,6 @@ router.patch('/:id/status', authenticate, asyncHandler(async (req: AuthRequest, 
       await tx.customer.update({
         where: { id: flight.customerId },
         data: { status: 'COMPLETED' },
-      });
-    } else if (status === 'PICKED_UP') {
-      await tx.customer.update({
-        where: { id: flight.customerId },
-        data: { status: 'ASSIGNED' },
       });
     }
 
@@ -791,6 +811,26 @@ router.patch('/:id/status', authenticate, asyncHandler(async (req: AuthRequest, 
       // Notify pilot
       io.to(`pilot:${flight.pilotId}`).emit(event, eventData);
 
+      // Send FCM notifications based on status
+      if (status === 'PICKED_UP') {
+        // FCM to admin: Customer picked up
+        // (Pilot already knows - they triggered the action)
+      } else if (status === 'IN_FLIGHT') {
+        // FCM to admin: Flight started
+        // (Pilot already knows - they triggered the action)
+      } else if (status === 'COMPLETED') {
+        // FCM to pilot: Flight completed successfully
+        sendNativeToPilot(updatedFlight.pilot.id, {
+          title: '✅ Uçuş Tamamlandı',
+          body: `${eventData.customer.name} (${eventData.customer.displayId}) - ${updatedFlight.durationMinutes || 0}dk`,
+          data: {
+            type: 'flight_completed',
+            flightId: updatedFlight.id,
+            customerId: eventData.customer.displayId,
+          },
+        }).catch(err => console.error('FCM flight completed error:', err));
+      }
+
       // Check if pilot is approaching/reached limit
       if (status === 'COMPLETED') {
         const pilot = await prisma.pilot.findUnique({
@@ -802,10 +842,24 @@ router.patch('/:id/status', authenticate, asyncHandler(async (req: AuthRequest, 
             io.to(`pilot:${flight.pilotId}`).emit('pilot:limit-warning', {
               message: `Günlük uçuş limitine yaklaştınız: ${pilot.dailyFlightCount + 1}/${pilot.maxDailyFlights}`,
             });
+
+            // FCM: Limit warning
+            sendNativeToPilot(pilot.id, {
+              title: '⚠️ Limit Uyarısı',
+              body: `Günlük uçuş limitine yaklaştınız: ${pilot.dailyFlightCount + 1}/${pilot.maxDailyFlights}`,
+              data: { type: 'pilot_limit_warning' },
+            }).catch(err => console.error('FCM limit warning error:', err));
           } else if (pilot.dailyFlightCount >= pilot.maxDailyFlights) {
             io.to(`pilot:${flight.pilotId}`).emit('pilot:limit-reached', {
               message: `Günlük uçuş limitine ulaştınız: ${pilot.maxDailyFlights}/${pilot.maxDailyFlights} - Bugünlük sıra dışısınız`,
             });
+
+            // FCM: Limit reached
+            sendNativeToPilot(pilot.id, {
+              title: '🛑 Günlük Limit Doldu',
+              body: `${pilot.maxDailyFlights}/${pilot.maxDailyFlights} uçuş tamamlandı. Bugünlük sıra dışısınız.`,
+              data: { type: 'pilot_limit_reached' },
+            }).catch(err => console.error('FCM limit reached error:', err));
 
             // Notify admin about pilot reaching limit
             io.to('admin').emit('pilot:limit-reached', {

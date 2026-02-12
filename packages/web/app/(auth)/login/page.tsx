@@ -29,18 +29,21 @@ export default function LoginPage() {
 
     try {
       const response = await authApi.login(username, password)
-      const { token, user } = response.data.data
+      const { token, user, permissions } = response.data.data
 
       localStorage.setItem('token', token)
       localStorage.setItem('user', JSON.stringify(user))
+      if (permissions) {
+        localStorage.setItem('permissions', JSON.stringify(permissions))
+      }
 
       // Redirect based on role
-      if (user.role === 'ADMIN' || user.role === 'OFFICE_STAFF') {
+      if (user.role === 'ADMIN' || user.role === 'OFFICE_STAFF' || user.role === 'CUSTOM') {
         router.push('/admin')
       } else if (user.role === 'PILOT') {
         router.push('/pilot')
       } else if (user.role === 'MEDIA_SELLER') {
-        router.push('/media')
+        router.push('/admin')
       } else {
         router.push('/admin')
       }

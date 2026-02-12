@@ -1,16 +1,39 @@
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
-import { asyncHandler, AppError } from '../middleware/errorHandler.js';
-import { authenticate, requireRole, AuthRequest } from '../middleware/auth.js';
-import {
-  sendPushToUser,
-  sendPushToPilot,
-  sendPushToRole,
-  sendPushBroadcast,
-} from '../services/pushNotification.js';
+
+/**
+ * PWA Push Notification Routes - DEPRECATED
+ *
+ * Bu route'lar artık kullanılmıyor. Firebase FCM native push'a geçtik.
+ * Uyumluluk için minimal endpoint bırakıldı.
+ *
+ * @deprecated FCM routes (/api/fcm) kullanın
+ */
 
 const router = Router();
-const prisma = new PrismaClient();
+
+// GET /api/push/vapid-public-key - Deprecated but kept for compatibility
+router.get('/vapid-public-key', (req, res) => {
+  res.status(410).json({
+    success: false,
+    error: {
+      code: 'DEPRECATED',
+      message: 'PWA Push artık desteklenmiyor. Native FCM push kullanın.',
+    },
+  });
+});
+
+// All other PWA push endpoints are deprecated
+router.all('*', (req, res) => {
+  res.status(410).json({
+    success: false,
+    error: {
+      code: 'DEPRECATED',
+      message: 'PWA Push sistemi artık kullanılmıyor. Firebase FCM native push kullanın. Endpoint: /api/fcm',
+    },
+  });
+});
+
+export default router;
 
 // POST /api/push/subscribe - Register a push subscription
 router.post(

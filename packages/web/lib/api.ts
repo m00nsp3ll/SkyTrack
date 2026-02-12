@@ -125,7 +125,7 @@ export const mediaApi = {
       headers: { 'Content-Type': 'multipart/form-data' },
     }),
 
-  // Scan folder and generate thumbnails
+  // Scan folder for media files
   scanFolder: (customerId: string) => api.post(`/media/${customerId}/scan`),
 
   // Update payment status

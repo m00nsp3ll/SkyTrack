@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { salesApi } from '@/lib/api'
@@ -13,6 +14,7 @@ import {
   ChevronDown,
   ChevronRight,
   CheckCircle,
+  ShoppingCart,
 } from 'lucide-react'
 
 interface Sale {
@@ -184,27 +186,13 @@ export default function UnpaidSalesPage() {
                           <p className="text-xs text-muted-foreground">{group.sales.length} kalem</p>
                         </div>
                         {group.customer.id && (
-                          <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handlePayAll(group.customer.id!, 'CASH')}
-                              disabled={processing === group.customer.id}
-                            >
-                              {processing === group.customer.id ? (
-                                <RefreshCw className="h-4 w-4 animate-spin" />
-                              ) : (
-                                <Banknote className="h-4 w-4" />
-                              )}
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handlePayAll(group.customer.id!, 'CREDIT_CARD')}
-                              disabled={processing === group.customer.id}
-                            >
-                              <CreditCard className="h-4 w-4" />
-                            </Button>
+                          <div onClick={(e) => e.stopPropagation()}>
+                            <Link href={`/pos?customer=${group.customer.displayId}`}>
+                              <Button size="sm" className="bg-green-600 hover:bg-green-700">
+                                <ShoppingCart className="h-4 w-4 mr-1" />
+                                Ödeme Al
+                              </Button>
+                            </Link>
                           </div>
                         )}
                       </div>
