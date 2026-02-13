@@ -241,6 +241,9 @@ router.get('/unpaid', authenticate, asyncHandler(async (req: AuthRequest, res: a
       customer: {
         select: { id: true, displayId: true, firstName: true, lastName: true },
       },
+      soldBy: {
+        select: { id: true, username: true, name: true },
+      },
     },
   });
 

@@ -1,84 +1,84 @@
 # Active Context - SkyTrack
 
-## Son Çalışma Oturumu: 2026-02-12 (Oturum 3)
+## Son Çalışma Oturumu: 2026-02-12 (Oturum 4)
 
 ### Yapılan İşler
 
-1. **Personel Satış Takip ve Raporlama Sistemi**
+1. **Ödenmemiş Satışlar Sayfası - Personel ve Saat Bilgisi Eklendi**
 
-   **Özellikler:**
-   - Her satışta personel bilgisi (`soldById`, `soldBy`) kaydediliyor
-   - Gelir raporunda personel performans tablosu (top 10)
-   - Kasa raporunda satış yapan personel ve saat bilgisi
-   - Yeni "Vezne Raporu" sayfası - tüm personel performansı
-   - Personel detay sayfası - kategori bazlı satış analizi
-   - Tıklanabilir linklerle sayfa geçişleri (personel → detay, müşteri → portfolyo)
+   **Sorun:** `/admin/sales/unpaid` sayfasında satışları kimin ne zaman yaptığı görünmüyordu
+
+   **Çözüm:**
+   - Backend API'ye `soldBy` ilişkisi eklendi (`GET /api/sales/unpaid`)
+   - Frontend'de tarih, saat ve personel bilgisi gösterimi eklendi
+   - Null kontrolü eklendi (eski satışlar için güvenlik)
 
    **Değiştirilen Dosyalar:**
-   - Backend: `/packages/api/src/routes/reports.ts` (staff-sales endpoint eklendi)
-   - Revenue Report: `/packages/web/app/(dashboard)/admin/reports/revenue/page.tsx`
-   - Daily Sales: `/packages/web/app/(dashboard)/admin/sales/daily/page.tsx`
-   - **YENİ** Cashier Report: `/packages/web/app/(dashboard)/admin/reports/cashier/page.tsx`
-   - **YENİ** Staff Sales Detail: `/packages/web/app/(dashboard)/admin/reports/staff-sales/page.tsx`
-   - Sidebar: `/packages/web/components/layout/Sidebar.tsx` (menü isimleri güncellendi)
+   - Backend: `/packages/api/src/routes/sales.ts` (soldBy include eklendi)
+   - Frontend: `/packages/web/app/(dashboard)/admin/sales/unpaid/page.tsx`
 
-2. **Personel Detay Sayfası İyileştirmeleri**
+   **Görünüm:**
+   ```
+   Paraşüt Uçuşu
+   12/02/2026 • 14:30 • 2 adet • Ahmet Yılmaz    [150.00 ₺] [💰] [💳]
+   ```
 
-   **Değişiklikler:**
-   - Bekleyen Ödeme kartı sarıdan **kırmızıya** çevrildi (header'da)
-   - Saatlik Satış Dağılımı kaldırıldı (gereksiz)
-   - Bekleyen ödemeler için **modal/panel** sistemi eklendi
-   - Header'daki kırmızı karta tıklayınca bekleyen ödemeler pop-up açılıyor
-   - Modal: Kırmızı tema, tüm ödenmemiş satışlar liste halinde, müşteri linkleriyle
+2. **Next.js Build Hatası Düzeltildi**
 
-3. **Cloudflare Tunnel Yeniden Başlatıldı**
+   **Sorun:** "missing required error components, refreshing..." hatası
 
-   - Önceki oturumdan kalma durum
-   - 4 QUIC bağlantısı aktif (Istanbul sunucuları)
+   **Çözüm:**
+   - Port 3000 temizlendi (EADDRINUSE hatası)
+   - `.next` cache klasörü silindi
+   - Next.js temiz build yapıldı
+   - `soldBy` için null kontrolü eklendi
 
-### Yeni Sayfalar ve Rotalar
+3. **Sistem Servisleri Yeniden Başlatıldı**
 
-| Rota | Sayfa | Açıklama |
-|------|-------|----------|
-| `/admin/sales/daily` | Kasa Raporu | Günlük satış detayları + personel/saat bilgisi |
-| `/admin/reports/cashier` | Vezne Raporu | Tüm personel performansı (kartlar + tablo) |
-| `/admin/reports/staff-sales?staffId=xxx` | Personel Detay | Bireysel satış analizi + bekleyen ödemeler modal |
+   **İşlemler:**
+   - Tüm servisler durduruldu (`./scripts/stop-all.sh`)
+   - Docker container'lar temizlendi ve yeniden başlatıldı
+   - API, Web, Cloudflare Tunnel yeniden başlatıldı
+   - 4 QUIC bağlantısı aktif (Istanbul: ist06, ist08)
 
-### API Endpoint'ler
+### Güncellenen API Endpoint'ler
 
-**Yeni:**
-- `GET /api/reports/staff-sales` - Tüm personel özet listesi
-- `GET /api/reports/staff-sales?staffId=xxx` - Personel detaylı rapor
-
-**Güncellenen:**
-- `GET /api/reports/revenue` - `topStaff` alanı eklendi (id dahil)
-- `GET /api/reports/daily/:date` - Satışlara `soldBy` bilgisi eklendi
+**Değişiklik:**
+- `GET /api/sales/unpaid` - Artık `soldBy` bilgisi döndürüyor
+  ```json
+  {
+    "soldBy": {
+      "id": "xxx",
+      "username": "admin",
+      "name": "Ahmet Yılmaz"
+    }
+  }
+  ```
 
 ### Önemli Dosyalar
 
 | Dosya | Açıklama |
 |-------|----------|
-| `/packages/api/src/routes/reports.ts` | Raporlama API'leri (staff-sales endpoint - 150+ satır) |
-| `/packages/web/app/(dashboard)/admin/reports/staff-sales/page.tsx` | Personel detay sayfası + bekleyen ödemeler modal |
-| `/packages/web/app/(dashboard)/admin/reports/cashier/page.tsx` | Vezne raporu - personel performans kartları |
-| `/packages/web/components/layout/Sidebar.tsx` | Güncellenmiş menü yapısı |
+| `/packages/api/src/routes/sales.ts` | Unpaid sales endpoint - soldBy eklendi |
+| `/packages/web/app/(dashboard)/admin/sales/unpaid/page.tsx` | Personel/saat bilgisi + null kontrolü |
 
-### Tasarım Kararları
+### Teknik Detaylar
 
-1. **Bekleyen Ödemeler Modal Yaklaşımı:**
-   - Ana sayfada büyük kart yerine header'da kompakt kart
-   - Karta tıklayınca full-screen modal açılıyor
-   - Müşteri linkleri modal içinden çalışıyor (modal kapanıyor, sayfaya gidiyor)
+**Null Safety Pattern:**
+```typescript
+{sale.soldBy && (
+  <>
+    <span>•</span>
+    <span className="font-medium text-primary">
+      {sale.soldBy.name || sale.soldBy.username}
+    </span>
+  </>
+)}
+```
 
-2. **Kategori Bazlı Satış Gösterimi:**
-   - Accordion pattern kullanıldı (ChevronDown/ChevronUp)
-   - Her kategori genişletilebilir, altında satışlar liste halinde
-   - Progress bar ile görsel gösterim
-
-3. **Personel Performans Gösterimi:**
-   - İlk 3 sıra için madalya sistemli kartlar (🥇🥈🥉)
-   - Progress bar ile katkı oranı gösterimi
-   - Tıklanabilir kartlarla detay sayfasına yönlendirme
+**Tarih/Saat Formatı:**
+- Tarih: `toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' })`
+- Saat: `toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })`
 
 ### Hızlı Başlatma Komutları
 
@@ -100,11 +100,31 @@ cloudflared tunnel run skytrack &
 ./scripts/stop-all.sh
 ```
 
+**Cache Temizleme (Hata durumunda):**
+```bash
+lsof -ti:3000 | xargs kill -9
+rm -rf .next
+npm run dev:https
+```
+
+### Sistem Durumu
+
+```
+✅ PostgreSQL         - Çalışıyor (healthy)
+✅ Redis              - Çalışıyor (healthy)
+✅ Express API        - PID: 47686
+✅ Next.js Web        - PID: 47851
+✅ Cloudflare Tunnel  - PID: 48008
+   - 4 QUIC Bağlantısı (Istanbul)
+   - Tunnel ID: 4ef0fae8-2ca5-4900-9351-4fd95cf0135b
+```
+
 ### Sonraki Adımlar
 
 1. ~~Personel satış takip sistemi~~ ✅ TAMAMLANDI
-2. Pilot performans raporu detaylandırma
-3. Müşteri akışı raporu geliştirme
-4. PDF Türkçe font desteği
-5. Production deployment yapılandırması (PM2)
-6. iOS uygulama build (ileride)
+2. ~~Ödenmemiş satışlarda personel bilgisi~~ ✅ TAMAMLANDI
+3. Pilot performans raporu detaylandırma
+4. Müşteri akışı raporu geliştirme
+5. PDF Türkçe font desteği
+6. Production deployment yapılandırması (PM2)
+7. iOS uygulama build (ileride)

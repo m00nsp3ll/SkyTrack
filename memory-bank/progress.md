@@ -124,6 +124,7 @@
 - [x] Müşteri bazlı satış geçmişi
 - [x] Borç tahsilat sistemi
 - [x] Personel satış takip sistemi (soldBy kaydı)
+- [x] Ödenmemiş satışlar sayfası - personel/saat bilgisi (/admin/sales/unpaid)
 
 ### Raporlama (2026-02-12)
 - [x] Dashboard - Ana panel özet kartları

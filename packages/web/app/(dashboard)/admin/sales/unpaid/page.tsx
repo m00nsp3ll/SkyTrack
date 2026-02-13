@@ -23,6 +23,11 @@ interface Sale {
   quantity: number
   totalPrice: number
   createdAt: string
+  soldBy: {
+    id: string
+    username: string
+    name: string | null
+  }
 }
 
 interface CustomerGroup {
@@ -206,12 +211,38 @@ export default function UnpaidSalesPage() {
                             key={sale.id}
                             className="flex items-center justify-between p-3 border-b last:border-b-0"
                           >
-                            <div>
+                            <div className="flex-1">
                               <p className="font-medium">{sale.itemName}</p>
-                              <p className="text-xs text-muted-foreground">
-                                {new Date(sale.createdAt).toLocaleString('tr-TR')}
-                                {sale.quantity > 1 && ` • ${sale.quantity} adet`}
-                              </p>
+                              <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
+                                <span>
+                                  {new Date(sale.createdAt).toLocaleDateString('tr-TR', {
+                                    day: '2-digit',
+                                    month: '2-digit',
+                                    year: 'numeric',
+                                  })}
+                                </span>
+                                <span>•</span>
+                                <span>
+                                  {new Date(sale.createdAt).toLocaleTimeString('tr-TR', {
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                  })}
+                                </span>
+                                {sale.quantity > 1 && (
+                                  <>
+                                    <span>•</span>
+                                    <span>{sale.quantity} adet</span>
+                                  </>
+                                )}
+                                {sale.soldBy && (
+                                  <>
+                                    <span>•</span>
+                                    <span className="font-medium text-primary">
+                                      {sale.soldBy.name || sale.soldBy.username}
+                                    </span>
+                                  </>
+                                )}
+                              </div>
                             </div>
                             <div className="flex items-center gap-3">
                               <span className="font-medium text-red-600">{sale.totalPrice.toFixed(2)} ₺</span>
