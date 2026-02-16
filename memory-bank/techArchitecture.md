@@ -87,8 +87,11 @@ Pilot (id, name, phone, status, dailyFlightCount, maxDailyFlights, queuePosition
 Customer (id, displayId, firstName, lastName, phone, weight, waiverSigned, signatureData)
 Flight (id, customerId, pilotId, status, takeoffAt, landingAt)
 MediaFolder (id, flightId, customerId, pilotId, folderPath, fileCount, paymentStatus, deliveryStatus)
-Sale (id, customerId, items, total, paymentMethod)
-Product (id, name, price, category)
+Sale (id, customerId, items, totalPrice, paymentMethod, totalAmountEUR, totalAmountTRY, primaryCurrency, isSplitPayment, paymentDetails[])
+Product (id, name, price, priceCurrency, category)
+ExchangeRate (id, baseCurrency, currency, buyRate, sellRate, source, fetchedAt)
+ExchangeRateHistory (id, baseCurrency, currency, buyRate, sellRate, source, fetchedAt)
+PaymentDetail (id, saleId, currency, amount, amountInEUR, amountInTRY, exchangeRate, exchangeSource, paymentMethod)
 ```
 
 ## Ortam Değişkenleri

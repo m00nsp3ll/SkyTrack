@@ -126,6 +126,25 @@
 - [x] Personel satış takip sistemi (soldBy kaydı)
 - [x] Ödenmemiş satışlar sayfası - personel/saat bilgisi (/admin/sales/unpaid)
 
+### Multi-Currency (Döviz) Sistemi (2026-02-14)
+- [x] TCMB XML API entegrasyonu (kur çekme, cross-rate hesaplama)
+- [x] Fallback zinciri (TCMB → Frankfurter API → .env sabit kurlar)
+- [x] In-memory cache + 15dk otomatik güncelleme (cron job)
+- [x] ExchangeRate, ExchangeRateHistory, PaymentDetail DB modelleri
+- [x] Currency API endpoints (/api/currency/rates, /convert, /history)
+- [x] 5 para birimi desteği (EUR, USD, GBP, RUB, TRY)
+- [x] EUR bazlı fiyatlandırma (ürünler EUR'da tutulur)
+- [x] Split payment (bölünmüş ödeme — max 5 satır)
+- [x] Para birimi-ödeme yöntemi kısıtlamaları (GBP/RUB sadece nakit)
+- [x] POS sayfası — compact buton tabanlı ödeme UI + kur barı + kur hesaplama aracı
+- [x] Müşteri detay — medya ödeme, POS modal, borç tahsilat döviz desteği
+- [x] Reusable renderPaymentLinesUI component
+- [x] Canlı kur göstergesi (sidebar)
+- [x] Seed data EUR fiyatlara çevrildi
+- [x] Cross-rate hesaplama hatası düzeltildi (EUR_TRY / X_TRY formülü)
+- [x] Ürün fiyatları makul EUR değerlerine güncellendi
+- [x] "Medya" kategorisi → "Foto/Video" olarak tüm sistemde değiştirildi
+
 ### Raporlama (2026-02-12)
 - [x] Dashboard - Ana panel özet kartları
 - [x] Kasa Raporu (/admin/sales/daily) - Günlük satış detayları + personel/saat

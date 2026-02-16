@@ -163,8 +163,8 @@ export default function AdminDashboard() {
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('tr-TR', {
       style: 'currency',
-      currency: 'TRY',
-      minimumFractionDigits: 0,
+      currency: 'EUR',
+      minimumFractionDigits: 2,
     }).format(value)
   }
 

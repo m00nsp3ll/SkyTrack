@@ -1,9 +1,26 @@
 import cron from 'node-cron';
 import { PrismaClient } from '@prisma/client';
+import { fetchAndUpdateRates, loadRatesFromDB } from './currencyService.js';
 
 const prisma = new PrismaClient();
 
 export function startCronJobs() {
+  // Uygulama başlatıldığında kurları yükle
+  loadRatesFromDB().then(() => {
+    fetchAndUpdateRates().catch(err => {
+      console.error('[CRON] Initial currency fetch error:', err);
+    });
+  });
+
+  // Her 15 dakikada bir döviz kurlarını güncelle (sabah 6 - gece 23 arası)
+  cron.schedule('*/15 6-23 * * *', async () => {
+    try {
+      await fetchAndUpdateRates();
+    } catch (error) {
+      console.error('[CRON] Currency rate update error:', error);
+    }
+  });
+
   // Her gece 03:00'te eski FCM token'ları temizle
   cron.schedule('0 3 * * *', async () => {
     try {
@@ -40,5 +57,5 @@ export function startCronJobs() {
     }
   });
 
-  console.log('⏰ Cron jobs started (FCM cleanup: daily 03:00, 03:30)');
+  console.log('⏰ Cron jobs started (FCM cleanup: daily 03:00, 03:30 | Currency: every 15min 06-23)');
 }

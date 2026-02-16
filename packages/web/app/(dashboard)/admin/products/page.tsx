@@ -31,7 +31,7 @@ interface Product {
   lowStockAlert: number | null
 }
 
-const CATEGORIES = ['İçecek', 'Yiyecek', 'Hediyelik', 'Fotoğraf/Video', 'Diğer']
+const CATEGORIES = ['İçecek', 'Yiyecek', 'Hediyelik', 'Foto/Video', 'Diğer']
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([])

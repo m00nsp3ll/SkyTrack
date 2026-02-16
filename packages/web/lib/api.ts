@@ -234,18 +234,26 @@ export const productsApi = {
 
 // Sales API
 export const salesApi = {
-  create: (data: { customerId?: string; items: any[]; paymentStatus?: string; paymentMethod?: string }) =>
+  create: (data: { customerId?: string; items: any[]; paymentStatus?: string; paymentMethod?: string; primaryCurrency?: string; paymentDetails?: any[] }) =>
     api.post('/sales', data),
   getAll: (params?: { customerId?: string; paymentStatus?: string; date?: string; category?: string; cursor?: string }) =>
     api.get('/sales', { params }),
   getByCustomer: (customerId: string) => api.get(`/sales/customer/${customerId}`),
   getUnpaid: (date?: string) => api.get('/sales/unpaid', { params: { date } }),
   getDailyReport: (date?: string) => api.get('/sales/daily-report', { params: { date } }),
-  updatePayment: (id: string, paymentStatus: string, paymentMethod?: string) =>
-    api.patch(`/sales/${id}/payment`, { paymentStatus, paymentMethod }),
-  bulkPay: (customerId: string, paymentMethod?: string) =>
-    api.post(`/sales/bulk-pay/${customerId}`, { paymentMethod }),
+  updatePayment: (id: string, paymentStatus: string, paymentMethod?: string, currency?: string) =>
+    api.patch(`/sales/${id}/payment`, { paymentStatus, paymentMethod, currency }),
+  bulkPay: (customerId: string, paymentMethod?: string, currency?: string) =>
+    api.post(`/sales/bulk-pay/${customerId}`, { paymentMethod, currency }),
   delete: (id: string) => api.delete(`/sales/${id}`),
+}
+
+// Currency API
+export const currencyApi = {
+  getRates: () => api.get('/currency/rates'),
+  convert: (data: { amount: number; from: string; to: string }) => api.post('/currency/convert', data),
+  updateRate: (currency: string, data: { buyRate: number; sellRate: number }) => api.put(`/currency/rates/${currency}`, data),
+  getHistory: (currency: string, days?: number) => api.get(`/currency/history?currency=${currency}&days=${days || 7}`),
 }
 
 // Reports API

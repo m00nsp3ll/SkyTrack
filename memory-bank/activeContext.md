@@ -1,130 +1,51 @@
 # Active Context - SkyTrack
 
-## Son Çalışma Oturumu: 2026-02-12 (Oturum 4)
+## Son Çalışma Oturumu: 2026-02-14 (Oturum 6)
 
 ### Yapılan İşler
 
-1. **Ödenmemiş Satışlar Sayfası - Personel ve Saat Bilgisi Eklendi**
+1. **Multi-Currency (Döviz) Sistemi — Tam Uygulama** ✅
+   - 5 para birimi desteği (EUR, USD, GBP, RUB, TRY)
+   - TCMB XML API → Frankfurter API → .env fallback zinciri
+   - Split payment (max 5 satır), para birimi-ödeme yöntemi kısıtlamaları
 
-   **Sorun:** `/admin/sales/unpaid` sayfasında satışları kimin ne zaman yaptığı görünmüyordu
+2. **Kritik Kur Hesaplama Hatası Düzeltildi** ✅
+   - Cross-rate formülü `X_TRY / EUR_TRY` → `EUR_TRY / X_TRY` olarak düzeltildi
+   - 300€ = $252.97 (YANLIŞ) → $355.77 (DOĞRU) gibi tüm döviz karşılıkları düzeltildi
 
-   **Çözüm:**
-   - Backend API'ye `soldBy` ilişkisi eklendi (`GET /api/sales/unpaid`)
-   - Frontend'de tarih, saat ve personel bilgisi gösterimi eklendi
-   - Null kontrolü eklendi (eski satışlar için güvenlik)
+3. **POS Sayfası Yeniden Tasarımı** ✅
+   - Compact buton tabanlı ödeme sistemi (PaymentEntry)
+   - Döviz kurları barı: Türkçe etiketler (Euro/Dolar/Sterlin/Ruble), TL karşılıkları
+   - Renkli "Güncelle" butonu, kurların yanında
+   - Kur Hesapla aracı: otomatik hesaplama, bold etiket, geniş select kutuları (min-w-[80px])
+   - Sepet toplam: 2 sütunlu grid, okunabilir format
+   - Döviz butonları: sadece semboller renkli (€ mavi, $ yeşil, £ mor, ₽ kırmızı, ₺ turuncu)
 
-   **Değiştirilen Dosyalar:**
-   - Backend: `/packages/api/src/routes/sales.ts` (soldBy include eklendi)
-   - Frontend: `/packages/web/app/(dashboard)/admin/sales/unpaid/page.tsx`
+4. **Ürün Fiyatları Güncellendi** ✅
+   - Makul EUR fiyatları: Kola €2, Çay €1.50, Kahve €2.50, Tost €3, Tişört €10 vb.
 
-   **Görünüm:**
-   ```
-   Paraşüt Uçuşu
-   12/02/2026 • 14:30 • 2 adet • Ahmet Yılmaz    [150.00 ₺] [💰] [💳]
-   ```
+5. **"Medya" → "Foto/Video" Kategori Değişikliği** ✅
+   - Backend: seed.ts, products.ts, reports.ts
+   - Frontend: pos, customers/[id], products (list, new, edit)
 
-2. **Next.js Build Hatası Düzeltildi**
+### Değiştirilen/Oluşturulan Dosyalar
 
-   **Sorun:** "missing required error components, refreshing..." hatası
-
-   **Çözüm:**
-   - Port 3000 temizlendi (EADDRINUSE hatası)
-   - `.next` cache klasörü silindi
-   - Next.js temiz build yapıldı
-   - `soldBy` için null kontrolü eklendi
-
-3. **Sistem Servisleri Yeniden Başlatıldı**
-
-   **İşlemler:**
-   - Tüm servisler durduruldu (`./scripts/stop-all.sh`)
-   - Docker container'lar temizlendi ve yeniden başlatıldı
-   - API, Web, Cloudflare Tunnel yeniden başlatıldı
-   - 4 QUIC bağlantısı aktif (Istanbul: ist06, ist08)
-
-### Güncellenen API Endpoint'ler
-
-**Değişiklik:**
-- `GET /api/sales/unpaid` - Artık `soldBy` bilgisi döndürüyor
-  ```json
-  {
-    "soldBy": {
-      "id": "xxx",
-      "username": "admin",
-      "name": "Ahmet Yılmaz"
-    }
-  }
-  ```
-
-### Önemli Dosyalar
-
-| Dosya | Açıklama |
-|-------|----------|
-| `/packages/api/src/routes/sales.ts` | Unpaid sales endpoint - soldBy eklendi |
-| `/packages/web/app/(dashboard)/admin/sales/unpaid/page.tsx` | Personel/saat bilgisi + null kontrolü |
-
-### Teknik Detaylar
-
-**Null Safety Pattern:**
-```typescript
-{sale.soldBy && (
-  <>
-    <span>•</span>
-    <span className="font-medium text-primary">
-      {sale.soldBy.name || sale.soldBy.username}
-    </span>
-  </>
-)}
-```
-
-**Tarih/Saat Formatı:**
-- Tarih: `toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' })`
-- Saat: `toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })`
-
-### Hızlı Başlatma Komutları
-
-**Tek Komut (Önerilen):**
-```bash
-./scripts/start-all.sh
-```
-
-**Manuel Başlatma:**
-```bash
-docker-compose up -d
-npm run dev:api &
-npm run dev:web:https &
-cloudflared tunnel run skytrack &
-```
-
-**Durdurma:**
-```bash
-./scripts/stop-all.sh
-```
-
-**Cache Temizleme (Hata durumunda):**
-```bash
-lsof -ti:3000 | xargs kill -9
-rm -rf .next
-npm run dev:https
-```
-
-### Sistem Durumu
-
-```
-✅ PostgreSQL         - Çalışıyor (healthy)
-✅ Redis              - Çalışıyor (healthy)
-✅ Express API        - PID: 47686
-✅ Next.js Web        - PID: 47851
-✅ Cloudflare Tunnel  - PID: 48008
-   - 4 QUIC Bağlantısı (Istanbul)
-   - Tunnel ID: 4ef0fae8-2ca5-4900-9351-4fd95cf0135b
-```
+| Dosya | İşlem |
+|-------|-------|
+| `packages/api/src/services/currencyService.ts` | Cross-rate hesaplama düzeltmesi |
+| `packages/api/prisma/seed.ts` | EUR fiyatlar güncellendi, Foto/Video kategorisi |
+| `packages/api/src/routes/products.ts` | CATEGORIES: Foto/Video |
+| `packages/api/src/routes/reports.ts` | Foto/Video filtre ve etiket |
+| `packages/web/app/(dashboard)/pos/page.tsx` | Kur barı, converter, compact ödeme UI |
+| `packages/web/app/(dashboard)/admin/customers/[id]/page.tsx` | Foto/Video kategorisi |
+| `packages/web/app/(dashboard)/admin/products/page.tsx` | CATEGORIES: Foto/Video |
+| `packages/web/app/(dashboard)/admin/products/new/page.tsx` | CATEGORIES: Foto/Video |
+| `packages/web/app/(dashboard)/admin/products/[id]/edit/page.tsx` | CATEGORIES: Foto/Video |
 
 ### Sonraki Adımlar
 
-1. ~~Personel satış takip sistemi~~ ✅ TAMAMLANDI
-2. ~~Ödenmemiş satışlarda personel bilgisi~~ ✅ TAMAMLANDI
-3. Pilot performans raporu detaylandırma
-4. Müşteri akışı raporu geliştirme
-5. PDF Türkçe font desteği
-6. Production deployment yapılandırması (PM2)
-7. iOS uygulama build (ileride)
+1. Rapor sayfalarında EUR/TRY gösterimi iyileştirme
+2. Pilot performans raporu detaylandırma
+3. PDF Türkçe font desteği
+4. Production deployment yapılandırması (PM2)
+5. iOS uygulama build (ileride)

@@ -136,11 +136,11 @@ router.get('/dashboard/charts', authenticate, asyncHandler(async (req: AuthReque
   }
 
   // Revenue by type (Media vs POS)
-  const mediaTotal = sales.filter(s => s.itemType === 'Fotoğraf/Video').reduce((sum, s) => sum + s.totalPrice, 0);
-  const posTotal = sales.filter(s => s.itemType !== 'Fotoğraf/Video').reduce((sum, s) => sum + s.totalPrice, 0);
+  const mediaTotal = sales.filter(s => s.itemType === 'Foto/Video').reduce((sum, s) => sum + s.totalPrice, 0);
+  const posTotal = sales.filter(s => s.itemType !== 'Foto/Video').reduce((sum, s) => sum + s.totalPrice, 0);
 
   const revenueByType = [
-    { name: 'Medya', value: mediaTotal },
+    { name: 'Foto/Video', value: mediaTotal },
     { name: 'POS', value: posTotal },
   ];
 

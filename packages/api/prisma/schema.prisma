@@ -52,6 +52,14 @@ enum PilotStatus {
   OFF_DUTY
 }
 
+enum Currency {
+  EUR
+  USD
+  GBP
+  RUB
+  TRY
+}
+
 enum MediaDeliveryStatus {
   PENDING
   PAID
@@ -180,20 +188,25 @@ model MediaFolder {
 }
 
 model Sale {
-  id            String         @id @default(uuid())
-  customerId    String?        @map("customer_id")
-  customer      Customer?      @relation(fields: [customerId], references: [id])
-  itemType      String         @map("item_type")
-  itemName      String         @map("item_name")
-  quantity      Int            @default(1)
-  unitPrice     Float          @map("unit_price")
-  totalPrice    Float          @map("total_price")
-  paymentStatus PaymentStatus  @default(UNPAID)
-  paymentMethod PaymentMethod? @map("payment_method")
-  soldById      String         @map("sold_by_id")
-  soldBy        User           @relation(fields: [soldById], references: [id])
-  createdAt     DateTime       @default(now()) @map("created_at")
-  updatedAt     DateTime       @updatedAt @map("updated_at")
+  id              String          @id @default(uuid())
+  customerId      String?         @map("customer_id")
+  customer        Customer?       @relation(fields: [customerId], references: [id])
+  itemType        String          @map("item_type")
+  itemName        String          @map("item_name")
+  quantity        Int             @default(1)
+  unitPrice       Float           @map("unit_price")
+  totalPrice      Float           @map("total_price")
+  totalAmountEUR  Float?          @map("total_amount_eur")
+  totalAmountTRY  Float?          @map("total_amount_try")
+  primaryCurrency Currency        @default(TRY) @map("primary_currency")
+  isSplitPayment  Boolean         @default(false) @map("is_split_payment")
+  paymentStatus   PaymentStatus   @default(UNPAID)
+  paymentMethod   PaymentMethod?  @map("payment_method")
+  soldById        String          @map("sold_by_id")
+  soldBy          User            @relation(fields: [soldById], references: [id])
+  paymentDetails  PaymentDetail[]
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
 
   @@index([customerId])
   @@index([paymentStatus])
@@ -202,23 +215,68 @@ model Sale {
 }
 
 model Product {
-  id          String   @id @default(uuid())
-  name        String
-  category    String
-  price       Float
-  isActive    Boolean  @default(true) @map("is_active")
-  isFavorite  Boolean  @default(false) @map("is_favorite")
-  stock       Int?
-  lowStockAlert Int?   @map("low_stock_alert")
-  imageUrl    String?  @map("image_url")
-  sortOrder   Int      @default(0) @map("sort_order")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  id            String   @id @default(uuid())
+  name          String
+  category      String
+  price         Float
+  priceCurrency Currency @default(EUR) @map("price_currency")
+  isActive      Boolean  @default(true) @map("is_active")
+  isFavorite    Boolean  @default(false) @map("is_favorite")
+  stock         Int?
+  lowStockAlert Int?     @map("low_stock_alert")
+  imageUrl      String?  @map("image_url")
+  sortOrder     Int      @default(0) @map("sort_order")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
 
   @@index([category])
   @@index([isActive])
   @@index([isFavorite])
   @@map("products")
+}
+
+model ExchangeRate {
+  id           String   @id @default(uuid())
+  baseCurrency Currency @default(EUR) @map("base_currency")
+  currency     Currency
+  buyRate      Float    @map("buy_rate")
+  sellRate     Float    @map("sell_rate")
+  source       String   @default("TCMB")
+  fetchedAt    DateTime @map("fetched_at")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@unique([baseCurrency, currency])
+  @@map("exchange_rates")
+}
+
+model ExchangeRateHistory {
+  id           String   @id @default(uuid())
+  baseCurrency Currency @default(EUR) @map("base_currency")
+  currency     Currency
+  buyRate      Float    @map("buy_rate")
+  sellRate     Float    @map("sell_rate")
+  source       String
+  fetchedAt    DateTime @map("fetched_at")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@index([currency, fetchedAt])
+  @@map("exchange_rate_history")
+}
+
+model PaymentDetail {
+  id             String        @id @default(uuid())
+  saleId         String        @map("sale_id")
+  sale           Sale          @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  currency       Currency
+  amount         Float
+  amountInEUR    Float         @map("amount_in_eur")
+  amountInTRY    Float         @map("amount_in_try")
+  exchangeRate   Float         @map("exchange_rate")
+  exchangeSource String        @map("exchange_source")
+  paymentMethod  PaymentMethod @map("payment_method")
+  createdAt      DateTime      @default(now()) @map("created_at")
+
+  @@map("payment_details")
 }
 
 model PushSubscription {

@@ -112,7 +112,10 @@ async function main() {
 
   // Clear existing data
   console.log('🗑️  Clearing existing data...');
+  await prisma.paymentDetail.deleteMany();
   await prisma.sale.deleteMany();
+  await prisma.exchangeRateHistory.deleteMany();
+  await prisma.exchangeRate.deleteMany();
   await prisma.mediaFolder.deleteMany();
   await prisma.flight.deleteMany();
   await prisma.customer.deleteMany();
@@ -208,30 +211,30 @@ async function main() {
 
   await prisma.product.createMany({
     data: [
-      // İçecekler
-      { name: 'Kola', category: 'İçecek', price: 40, stock: 100, isActive: true, isFavorite: true, sortOrder: 1 },
-      { name: 'Su', category: 'İçecek', price: 20, stock: 200, isActive: true, isFavorite: true, sortOrder: 2 },
-      { name: 'Ayran', category: 'İçecek', price: 30, stock: 80, isActive: true, isFavorite: false, sortOrder: 3 },
-      { name: 'Çay', category: 'İçecek', price: 25, stock: null, isActive: true, isFavorite: true, sortOrder: 4 },
-      { name: 'Kahve', category: 'İçecek', price: 35, stock: null, isActive: true, isFavorite: false, sortOrder: 5 },
-      { name: 'Meyve Suyu', category: 'İçecek', price: 45, stock: 60, isActive: true, isFavorite: false, sortOrder: 6 },
-      // Yiyecekler
-      { name: 'Tost', category: 'Yiyecek', price: 60, stock: 30, isActive: true, isFavorite: true, sortOrder: 7 },
-      { name: 'Gözleme', category: 'Yiyecek', price: 70, stock: 25, isActive: true, isFavorite: true, sortOrder: 8 },
-      { name: 'Sandviç', category: 'Yiyecek', price: 65, stock: 20, isActive: true, isFavorite: false, sortOrder: 9 },
-      // Hediyelik
-      { name: 'Magnet', category: 'Hediyelik', price: 50, stock: 150, isActive: true, isFavorite: false, sortOrder: 10 },
-      { name: 'Anahtarlık', category: 'Hediyelik', price: 40, stock: 120, isActive: true, isFavorite: false, sortOrder: 11 },
-      { name: 'Tişört', category: 'Hediyelik', price: 150, stock: 40, isActive: true, isFavorite: false, sortOrder: 12 },
-      { name: 'Şapka', category: 'Hediyelik', price: 100, stock: 50, isActive: true, isFavorite: false, sortOrder: 13 },
-      { name: 'Bardak', category: 'Hediyelik', price: 60, stock: 80, isActive: true, isFavorite: false, sortOrder: 14 },
-      // Medya
-      { name: 'Fotoğraf/Video Paketi', category: 'Medya', price: 500, stock: null, isActive: true, isFavorite: true, sortOrder: 15 },
-      { name: 'Sadece Fotoğraf', category: 'Medya', price: 300, stock: null, isActive: true, isFavorite: false, sortOrder: 16 },
-      { name: 'Sadece Video', category: 'Medya', price: 250, stock: null, isActive: true, isFavorite: false, sortOrder: 17 },
+      // İçecekler (EUR)
+      { name: 'Kola', category: 'İçecek', price: 2.00, priceCurrency: 'EUR', stock: 100, isActive: true, isFavorite: true, sortOrder: 1 },
+      { name: 'Su', category: 'İçecek', price: 1.00, priceCurrency: 'EUR', stock: 200, isActive: true, isFavorite: true, sortOrder: 2 },
+      { name: 'Ayran', category: 'İçecek', price: 1.50, priceCurrency: 'EUR', stock: 80, isActive: true, isFavorite: false, sortOrder: 3 },
+      { name: 'Çay', category: 'İçecek', price: 1.50, priceCurrency: 'EUR', stock: null, isActive: true, isFavorite: true, sortOrder: 4 },
+      { name: 'Kahve', category: 'İçecek', price: 2.50, priceCurrency: 'EUR', stock: null, isActive: true, isFavorite: false, sortOrder: 5 },
+      { name: 'Meyve Suyu', category: 'İçecek', price: 2.00, priceCurrency: 'EUR', stock: 60, isActive: true, isFavorite: false, sortOrder: 6 },
+      // Yiyecekler (EUR)
+      { name: 'Tost', category: 'Yiyecek', price: 3.00, priceCurrency: 'EUR', stock: 30, isActive: true, isFavorite: true, sortOrder: 7 },
+      { name: 'Gözleme', category: 'Yiyecek', price: 4.00, priceCurrency: 'EUR', stock: 25, isActive: true, isFavorite: true, sortOrder: 8 },
+      { name: 'Sandviç', category: 'Yiyecek', price: 3.50, priceCurrency: 'EUR', stock: 20, isActive: true, isFavorite: false, sortOrder: 9 },
+      // Hediyelik (EUR)
+      { name: 'Magnet', category: 'Hediyelik', price: 3.00, priceCurrency: 'EUR', stock: 150, isActive: true, isFavorite: false, sortOrder: 10 },
+      { name: 'Anahtarlık', category: 'Hediyelik', price: 2.00, priceCurrency: 'EUR', stock: 120, isActive: true, isFavorite: false, sortOrder: 11 },
+      { name: 'Tişört', category: 'Hediyelik', price: 10.00, priceCurrency: 'EUR', stock: 40, isActive: true, isFavorite: false, sortOrder: 12 },
+      { name: 'Şapka', category: 'Hediyelik', price: 7.00, priceCurrency: 'EUR', stock: 50, isActive: true, isFavorite: false, sortOrder: 13 },
+      { name: 'Bardak', category: 'Hediyelik', price: 4.00, priceCurrency: 'EUR', stock: 80, isActive: true, isFavorite: false, sortOrder: 14 },
+      // Foto/Video (EUR)
+      { name: 'Fotoğraf/Video Paketi', category: 'Foto/Video', price: 25.00, priceCurrency: 'EUR', stock: null, isActive: true, isFavorite: true, sortOrder: 15 },
+      { name: 'Sadece Fotoğraf', category: 'Foto/Video', price: 15.00, priceCurrency: 'EUR', stock: null, isActive: true, isFavorite: false, sortOrder: 16 },
+      { name: 'Sadece Video', category: 'Foto/Video', price: 20.00, priceCurrency: 'EUR', stock: null, isActive: true, isFavorite: false, sortOrder: 17 },
     ],
   });
-  console.log('   ✅ Created 17 products');
+  console.log('   ✅ Created 17 products (EUR prices)');
 
   // =====================
   // 4. SIMULATE REAL QUEUE ROTATION
@@ -446,10 +449,13 @@ async function main() {
         customerId: customer.id,
         soldById: adminUser.id,
         itemName: 'Fotoğraf/Video Paketi',
-        itemType: 'Medya',
+        itemType: 'Foto/Video',
         quantity: 1,
-        unitPrice: 500,
-        totalPrice: 500,
+        unitPrice: 25,
+        totalPrice: 25,
+        totalAmountEUR: 25,
+        totalAmountTRY: 25 * 38.50,
+        primaryCurrency: 'EUR',
         paymentStatus: isPaid ? 'PAID' : 'UNPAID',
         paymentMethod: Math.random() > 0.5 ? 'CASH' : 'CREDIT_CARD',
       },
@@ -464,22 +470,25 @@ async function main() {
     }
   }
 
-  // POS sales
+  // POS sales (EUR prices)
   const posProducts = [
-    { name: 'Kola', type: 'İçecek', price: 40 },
-    { name: 'Su', type: 'İçecek', price: 20 },
-    { name: 'Çay', type: 'İçecek', price: 25 },
-    { name: 'Tost', type: 'Yiyecek', price: 60 },
-    { name: 'Gözleme', type: 'Yiyecek', price: 70 },
-    { name: 'Magnet', type: 'Hediyelik', price: 50 },
+    { name: 'Kola', type: 'İçecek', price: 1.00 },
+    { name: 'Su', type: 'İçecek', price: 0.50 },
+    { name: 'Çay', type: 'İçecek', price: 0.70 },
+    { name: 'Tost', type: 'Yiyecek', price: 1.50 },
+    { name: 'Gözleme', type: 'Yiyecek', price: 2.00 },
+    { name: 'Magnet', type: 'Hediyelik', price: 2.00 },
   ];
 
   const paymentMethods: Array<'CASH' | 'CREDIT_CARD' | 'TRANSFER'> = ['CASH', 'CREDIT_CARD', 'TRANSFER'];
+  const currencies: Array<'EUR' | 'USD' | 'TRY'> = ['EUR', 'USD', 'TRY'];
 
   for (let i = 0; i < 20; i++) {
     const product = posProducts[Math.floor(Math.random() * posProducts.length)];
     const qty = Math.floor(Math.random() * 3) + 1;
     const customer = completedCustomers[Math.floor(Math.random() * completedCustomers.length)];
+    const totalPrice = product.price * qty;
+    const currency = currencies[Math.floor(Math.random() * currencies.length)];
 
     await prisma.sale.create({
       data: {
@@ -489,7 +498,10 @@ async function main() {
         itemType: product.type,
         quantity: qty,
         unitPrice: product.price,
-        totalPrice: product.price * qty,
+        totalPrice,
+        totalAmountEUR: totalPrice,
+        totalAmountTRY: totalPrice * 38.50,
+        primaryCurrency: currency,
         paymentStatus: Math.random() < 0.8 ? 'PAID' : 'UNPAID',
         paymentMethod: paymentMethods[Math.floor(Math.random() * paymentMethods.length)],
       },
@@ -498,6 +510,43 @@ async function main() {
   }
 
   console.log(`   ✅ Created ${salesCount} sales records`);
+
+  // =====================
+  // 6b. SEED EXCHANGE RATES
+  // =====================
+  console.log('💱 Creating default exchange rates...');
+
+  const now = new Date();
+  const defaultRates = [
+    { currency: 'TRY' as const, buyRate: 38.50, sellRate: 39.27 },
+    { currency: 'USD' as const, buyRate: 0.9143, sellRate: 0.9326 },
+    { currency: 'GBP' as const, buyRate: 1.1558, sellRate: 1.1789 },
+    { currency: 'RUB' as const, buyRate: 0.00935, sellRate: 0.00954 },
+  ];
+
+  for (const rate of defaultRates) {
+    await prisma.exchangeRate.create({
+      data: {
+        baseCurrency: 'EUR',
+        currency: rate.currency,
+        buyRate: rate.buyRate,
+        sellRate: rate.sellRate,
+        source: 'SEED',
+        fetchedAt: now,
+      },
+    });
+    await prisma.exchangeRateHistory.create({
+      data: {
+        baseCurrency: 'EUR',
+        currency: rate.currency,
+        buyRate: rate.buyRate,
+        sellRate: rate.sellRate,
+        source: 'SEED',
+        fetchedAt: now,
+      },
+    });
+  }
+  console.log('   ✅ Created 4 exchange rates (EUR base)');
 
   // =====================
   // 7. CREATE ROLE PERMISSIONS

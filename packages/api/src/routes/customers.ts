@@ -154,6 +154,9 @@ router.get('/:id', authenticate, asyncHandler(async (req: AuthRequest, res: any)
         orderBy: { createdAt: 'desc' },
       },
       sales: {
+        include: {
+          soldBy: { select: { id: true, name: true, username: true } },
+        },
         orderBy: { createdAt: 'desc' },
       },
       mediaFolders: true,

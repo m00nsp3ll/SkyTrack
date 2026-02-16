@@ -2,17 +2,23 @@ import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { asyncHandler, AppError } from '../middleware/errorHandler.js';
 import { authenticate, requireRole, AuthRequest } from '../middleware/auth.js';
+import { convertAmount, getRate } from '../services/currencyService.js';
 
 const router = Router();
 const prisma = new PrismaClient();
 
+type Currency = 'EUR' | 'USD' | 'GBP' | 'RUB' | 'TRY';
+
 // POST /api/sales - Create new sale(s)
 router.post('/', authenticate, asyncHandler(async (req: AuthRequest, res: any) => {
-  const { customerId, items, paymentStatus, paymentMethod } = req.body;
+  const { customerId, items, paymentStatus, paymentMethod, primaryCurrency, paymentDetails } = req.body;
 
   if (!items || !Array.isArray(items) || items.length === 0) {
     throw new AppError('En az bir ürün gerekli', 400, 'NO_ITEMS');
   }
+
+  const currency: Currency = primaryCurrency || 'EUR';
+  const isSplitPayment = Array.isArray(paymentDetails) && paymentDetails.length > 0;
 
   const sales: any[] = [];
 
@@ -25,6 +31,7 @@ router.post('/', authenticate, asyncHandler(async (req: AuthRequest, res: any) =
       let finalItemType = itemType;
       let finalItemName = itemName;
       let finalUnitPrice = unitPrice;
+      let productCurrency: Currency = 'EUR';
 
       if (productId) {
         const product = await tx.product.findUnique({ where: { id: productId } });
@@ -32,6 +39,7 @@ router.post('/', authenticate, asyncHandler(async (req: AuthRequest, res: any) =
           finalItemType = product.category;
           finalItemName = product.name;
           finalUnitPrice = product.price;
+          productCurrency = product.priceCurrency as Currency;
 
           // Decrease stock if tracked
           if (product.stock !== null) {
@@ -44,6 +52,16 @@ router.post('/', authenticate, asyncHandler(async (req: AuthRequest, res: any) =
         }
       }
 
+      const totalPrice = finalUnitPrice * (quantity || 1);
+
+      // Calculate EUR and TRY equivalents
+      const eurAmount = productCurrency === 'EUR'
+        ? totalPrice
+        : convertAmount(totalPrice, productCurrency, 'EUR').converted;
+      const tryAmount = productCurrency === 'TRY'
+        ? totalPrice
+        : convertAmount(totalPrice, productCurrency, 'TRY').converted;
+
       const sale = await tx.sale.create({
         data: {
           customerId: customerId || null,
@@ -51,7 +69,11 @@ router.post('/', authenticate, asyncHandler(async (req: AuthRequest, res: any) =
           itemName: finalItemName,
           quantity: quantity || 1,
           unitPrice: finalUnitPrice,
-          totalPrice: finalUnitPrice * (quantity || 1),
+          totalPrice,
+          totalAmountEUR: eurAmount,
+          totalAmountTRY: tryAmount,
+          primaryCurrency: isSplitPayment ? currency : (paymentStatus === 'UNPAID' ? 'EUR' : currency),
+          isSplitPayment,
           paymentStatus: paymentStatus || 'UNPAID',
           paymentMethod: paymentStatus === 'PAID' ? (paymentMethod || 'CASH') : null,
           soldById: req.user!.id,
@@ -60,8 +82,47 @@ router.post('/', authenticate, asyncHandler(async (req: AuthRequest, res: any) =
           customer: {
             select: { id: true, displayId: true, firstName: true, lastName: true },
           },
+          paymentDetails: true,
         },
       });
+
+      // Create payment details if split payment
+      if (isSplitPayment && paymentStatus === 'PAID') {
+        for (const detail of paymentDetails) {
+          const detailCurrency: Currency = detail.currency || 'EUR';
+          const detailRate = getRate(detailCurrency, 'EUR');
+          const detailAmountEUR = convertAmount(detail.amount, detailCurrency, 'EUR').converted;
+          const detailAmountTRY = convertAmount(detail.amount, detailCurrency, 'TRY').converted;
+
+          await tx.paymentDetail.create({
+            data: {
+              saleId: sale.id,
+              currency: detailCurrency,
+              amount: detail.amount,
+              amountInEUR: detailAmountEUR,
+              amountInTRY: detailAmountTRY,
+              exchangeRate: detailRate.rate,
+              exchangeSource: detailRate.source,
+              paymentMethod: detail.paymentMethod || 'CASH',
+            },
+          });
+        }
+      } else if (paymentStatus === 'PAID' && !isSplitPayment) {
+        // Single payment - create one PaymentDetail
+        const rateInfo = getRate(currency, 'EUR');
+        await tx.paymentDetail.create({
+          data: {
+            saleId: sale.id,
+            currency,
+            amount: totalPrice,
+            amountInEUR: eurAmount,
+            amountInTRY: tryAmount,
+            exchangeRate: rateInfo.rate,
+            exchangeSource: rateInfo.source,
+            paymentMethod: paymentMethod || 'CASH',
+          },
+        });
+      }
 
       sales.push(sale);
     }
@@ -137,6 +198,7 @@ router.get('/', authenticate, asyncHandler(async (req: AuthRequest, res: any) =>
       soldBy: {
         select: { id: true, username: true },
       },
+      paymentDetails: true,
     },
   });
 
@@ -180,6 +242,7 @@ router.get('/customer/:customerId', authenticate, asyncHandler(async (req: AuthR
       soldBy: {
         select: { id: true, username: true },
       },
+      paymentDetails: true,
     },
   });
 
@@ -244,11 +307,12 @@ router.get('/unpaid', authenticate, asyncHandler(async (req: AuthRequest, res: a
       soldBy: {
         select: { id: true, username: true, name: true },
       },
+      paymentDetails: true,
     },
   });
 
   // Group by customer
-  const grouped: Record<string, { customer: any; sales: any[]; total: number }> = {};
+  const grouped: Record<string, { customer: any; sales: any[]; total: number; totalEUR: number; totalTRY: number }> = {};
 
   for (const sale of sales) {
     const customerId = sale.customerId || 'anonymous';
@@ -257,10 +321,14 @@ router.get('/unpaid', authenticate, asyncHandler(async (req: AuthRequest, res: a
         customer: sale.customer || { id: null, displayId: 'Anonim', firstName: 'Müşterisiz', lastName: 'Satış' },
         sales: [],
         total: 0,
+        totalEUR: 0,
+        totalTRY: 0,
       };
     }
     grouped[customerId].sales.push(sale);
     grouped[customerId].total += sale.totalPrice;
+    grouped[customerId].totalEUR += sale.totalAmountEUR || sale.totalPrice;
+    grouped[customerId].totalTRY += sale.totalAmountTRY || 0;
   }
 
   const customers = Object.values(grouped).sort((a, b) => b.total - a.total);
@@ -270,6 +338,8 @@ router.get('/unpaid', authenticate, asyncHandler(async (req: AuthRequest, res: a
     data: {
       customers,
       totalUnpaid: sales.reduce((sum, s) => sum + s.totalPrice, 0),
+      totalUnpaidEUR: sales.reduce((sum, s) => sum + (s.totalAmountEUR || s.totalPrice), 0),
+      totalUnpaidTRY: sales.reduce((sum, s) => sum + (s.totalAmountTRY || 0), 0),
       unpaidCount: sales.length,
     },
   });
@@ -296,6 +366,7 @@ router.get('/daily-report', authenticate, asyncHandler(async (req: AuthRequest, 
       soldBy: {
         select: { id: true, username: true },
       },
+      paymentDetails: true,
     },
     orderBy: { createdAt: 'desc' },
   });
@@ -310,11 +381,26 @@ router.get('/daily-report', authenticate, asyncHandler(async (req: AuthRequest, 
 
   // Calculate totals
   const totalSales = sales.reduce((sum, s) => sum + s.totalPrice, 0);
+  const totalSalesEUR = sales.reduce((sum, s) => sum + (s.totalAmountEUR || s.totalPrice), 0);
+  const totalSalesTRY = sales.reduce((sum, s) => sum + (s.totalAmountTRY || 0), 0);
   const cashSales = sales.filter(s => s.paymentMethod === 'CASH' && s.paymentStatus === 'PAID').reduce((sum, s) => sum + s.totalPrice, 0);
   const cardSales = sales.filter(s => s.paymentMethod === 'CREDIT_CARD' && s.paymentStatus === 'PAID').reduce((sum, s) => sum + s.totalPrice, 0);
   const transferSales = sales.filter(s => s.paymentMethod === 'TRANSFER' && s.paymentStatus === 'PAID').reduce((sum, s) => sum + s.totalPrice, 0);
   const unpaidSales = sales.filter(s => s.paymentStatus === 'UNPAID').reduce((sum, s) => sum + s.totalPrice, 0);
   const mediaSales = mediaFolders.reduce((sum, m) => sum + (m.paymentAmount || 0), 0);
+
+  // Currency breakdown from payment details
+  const allPaymentDetails = sales.flatMap(s => s.paymentDetails || []);
+  const currencyBreakdown: Record<string, { count: number; total: number; totalEUR: number; totalTRY: number }> = {};
+  for (const detail of allPaymentDetails) {
+    if (!currencyBreakdown[detail.currency]) {
+      currencyBreakdown[detail.currency] = { count: 0, total: 0, totalEUR: 0, totalTRY: 0 };
+    }
+    currencyBreakdown[detail.currency].count += 1;
+    currencyBreakdown[detail.currency].total += detail.amount;
+    currencyBreakdown[detail.currency].totalEUR += detail.amountInEUR;
+    currencyBreakdown[detail.currency].totalTRY += detail.amountInTRY;
+  }
 
   // Category breakdown
   const categories: Record<string, { count: number; total: number }> = {};
@@ -350,6 +436,8 @@ router.get('/daily-report', authenticate, asyncHandler(async (req: AuthRequest, 
       date: filterDate.toISOString().split('T')[0],
       summary: {
         totalSales,
+        totalSalesEUR,
+        totalSalesTRY,
         cashSales,
         cardSales,
         transferSales,
@@ -360,6 +448,7 @@ router.get('/daily-report', authenticate, asyncHandler(async (req: AuthRequest, 
       },
       categories,
       paymentMethods,
+      currencyBreakdown,
       hourly: Object.entries(hourly).map(([hour, amount]) => ({
         hour: parseInt(hour),
         amount,
@@ -372,25 +461,53 @@ router.get('/daily-report', authenticate, asyncHandler(async (req: AuthRequest, 
 // PATCH /api/sales/:id/payment - Update payment status
 router.patch('/:id/payment', authenticate, asyncHandler(async (req: AuthRequest, res: any) => {
   const { id } = req.params;
-  const { paymentStatus, paymentMethod } = req.body;
+  const { paymentStatus, paymentMethod, currency: payCurrency } = req.body;
 
   const existing = await prisma.sale.findUnique({ where: { id } });
   if (!existing) {
     throw new AppError('Satış bulunamadı', 404, 'SALE_NOT_FOUND');
   }
 
+  const cur: Currency = payCurrency || 'EUR';
+  const method = paymentMethod || 'CASH';
+
+  // Calculate EUR/TRY amounts if not already set
+  const totalAmountEUR = existing.totalAmountEUR || convertAmount(existing.totalPrice, cur, 'EUR').converted;
+  const totalAmountTRY = existing.totalAmountTRY || convertAmount(existing.totalPrice, cur, 'TRY').converted;
+
   const sale = await prisma.sale.update({
     where: { id },
     data: {
       paymentStatus: paymentStatus || 'PAID',
-      paymentMethod: paymentMethod || 'CASH',
+      paymentMethod: method,
+      primaryCurrency: cur,
+      totalAmountEUR,
+      totalAmountTRY,
     },
     include: {
       customer: {
         select: { id: true, displayId: true, firstName: true, lastName: true },
       },
+      paymentDetails: true,
     },
   });
+
+  // Create payment detail record
+  if ((paymentStatus || 'PAID') === 'PAID') {
+    const rateInfo = getRate(cur, 'EUR');
+    await prisma.paymentDetail.create({
+      data: {
+        saleId: id,
+        currency: cur,
+        amount: existing.totalPrice,
+        amountInEUR: totalAmountEUR,
+        amountInTRY: totalAmountTRY,
+        exchangeRate: rateInfo.rate,
+        exchangeSource: rateInfo.source,
+        paymentMethod: method,
+      },
+    });
+  }
 
   res.json({
     success: true,
@@ -402,7 +519,9 @@ router.patch('/:id/payment', authenticate, asyncHandler(async (req: AuthRequest,
 // POST /api/sales/bulk-pay/:customerId - Pay all unpaid sales for a customer
 router.post('/bulk-pay/:customerId', authenticate, asyncHandler(async (req: AuthRequest, res: any) => {
   const { customerId } = req.params;
-  const { paymentMethod } = req.body;
+  const { paymentMethod, currency: payCurrency } = req.body;
+
+  const cur: Currency = payCurrency || 'EUR';
 
   // Find customer
   const customer = await prisma.customer.findFirst({
@@ -418,22 +537,50 @@ router.post('/bulk-pay/:customerId', authenticate, asyncHandler(async (req: Auth
     throw new AppError('Müşteri bulunamadı', 404, 'CUSTOMER_NOT_FOUND');
   }
 
-  // Update all unpaid sales
-  const result = await prisma.sale.updateMany({
-    where: {
-      customerId: customer.id,
-      paymentStatus: 'UNPAID',
-    },
-    data: {
-      paymentStatus: 'PAID',
-      paymentMethod: paymentMethod || 'CASH',
-    },
+  // Get unpaid sales
+  const unpaidSales = await prisma.sale.findMany({
+    where: { customerId: customer.id, paymentStatus: 'UNPAID' },
+  });
+
+  const method = paymentMethod || 'CASH';
+
+  // Update all unpaid sales and create payment details
+  await prisma.$transaction(async (tx) => {
+    for (const sale of unpaidSales) {
+      const totalAmountEUR = sale.totalAmountEUR || convertAmount(sale.totalPrice, 'EUR', 'EUR').converted;
+      const totalAmountTRY = sale.totalAmountTRY || convertAmount(sale.totalPrice, 'EUR', 'TRY').converted;
+
+      await tx.sale.update({
+        where: { id: sale.id },
+        data: {
+          paymentStatus: 'PAID',
+          paymentMethod: method,
+          primaryCurrency: cur,
+          totalAmountEUR,
+          totalAmountTRY,
+        },
+      });
+
+      const rateInfo = getRate(cur, 'EUR');
+      await tx.paymentDetail.create({
+        data: {
+          saleId: sale.id,
+          currency: cur,
+          amount: sale.totalPrice,
+          amountInEUR: totalAmountEUR,
+          amountInTRY: totalAmountTRY,
+          exchangeRate: rateInfo.rate,
+          exchangeSource: rateInfo.source,
+          paymentMethod: method,
+        },
+      });
+    }
   });
 
   res.json({
     success: true,
-    data: { paidCount: result.count },
-    message: `${result.count} satış ödendi olarak işaretlendi`,
+    data: { paidCount: unpaidSales.length },
+    message: `${unpaidSales.length} satış ödendi olarak işaretlendi`,
   });
 }));
 

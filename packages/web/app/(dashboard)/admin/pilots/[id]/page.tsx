@@ -21,6 +21,7 @@ import {
   Moon,
   Trash2,
   User,
+  Users,
   TrendingUp,
   Filter,
 } from 'lucide-react'
@@ -66,8 +67,10 @@ interface Pilot {
   }
 }
 
-const statusConfig = {
+const statusConfig: Record<string, { label: string; color: string; icon: any }> = {
   AVAILABLE: { label: 'Müsait', color: 'bg-green-500', icon: CheckCircle },
+  ASSIGNED: { label: 'Müşteri Atandı', color: 'bg-orange-500', icon: Users },
+  PICKED_UP: { label: 'Müşteri Alındı', color: 'bg-purple-500', icon: Users },
   IN_FLIGHT: { label: 'Uçuşta', color: 'bg-blue-500', icon: Plane },
   ON_BREAK: { label: 'Molada', color: 'bg-yellow-500', icon: Coffee },
   OFF_DUTY: { label: 'Mesai Dışı', color: 'bg-gray-500', icon: Moon },
@@ -199,7 +202,7 @@ export default function PilotDetailPage() {
     )
   }
 
-  const status = statusConfig[pilot.status]
+  const status = statusConfig[pilot.status] || { label: pilot.status, color: 'bg-gray-500', icon: User }
   const StatusIcon = status.icon
   const displayFlights = showFiltered ? pilot.filteredFlights : pilot.todayFlights
   const displayStats = showFiltered ? pilot.filteredStats : pilot.todayStats
