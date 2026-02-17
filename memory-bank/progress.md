@@ -97,7 +97,11 @@
 - [x] Logout FCM token cleanup (pilot page + sidebar → cleanupFcmToken)
 - [x] Invalid token auto-delete (sendNativeNotification hata yakalama)
 - [x] NotificationsPage localStorage serialize fix (templateIconMap)
-- [ ] iOS uygulama build (ileride)
+- [x] iOS uygulama projesi oluşturuldu, cihazda çalıştırıldı (Capacitor + Firebase FCM)
+- [x] iOS LaunchScreen storyboard kaldırıldı (Xcode 26 uyumsuzluğu → UILaunchScreen dict)
+- [x] iOS SplashScreen plugin kaldırıldı (runtime storyboard crash)
+- [x] iOS kamera/mikrofon/galeri izinleri eklendi
+- [x] iOS IPA çıkarma hazır (Archive → Ad Hoc → Export)
 - [ ] Admin cron job bildirimleri (ileride)
 
 ### DevOps & Automation (2025-02-10)
@@ -156,6 +160,23 @@
 - [x] Dönem Karşılaştırma (/admin/reports/compare) - İki dönem karşılaştırması
 - [x] Sistem İzleme (/admin/reports/system) - Disk, DB, memory kullanımı
 - [x] Bekleyen Ödemeler Modal - Personel detayında pop-up panel
+
+### iOS Native App (2026-02-16)
+- [x] Capacitor iOS projesi sıfırdan oluşturuldu (npx cap add ios)
+- [x] Firebase iOS SDK entegrasyonu (Package.swift — FirebaseCore + FirebaseMessaging)
+- [x] AppDelegate.swift — FCM push notification desteği (APNs token, foreground banner)
+- [x] GoogleService-Info.plist kopyalandı
+- [x] 1024x1024 universal app icon (Xcode 15+ tek dosya modu)
+- [x] Info.plist — UIBackgroundModes (remote-notification, fetch), UIDeviceFamily (1+2), FirebaseMessagingAutoInitEnabled
+- [x] App.entitlements — aps-environment (development)
+- [x] capacitor.config.ts — ios ayarları (contentInset, backgroundColor, iosScheme)
+- [x] LaunchScreen.storyboard — mavi arka plan (#2563eb)
+- [x] fix-ios-firebase.js — cap sync sonrası Firebase koruması
+- [x] iPhone + iPad desteği (UIDeviceFamily 1,2)
+- [ ] Xcode'da Signing & Capabilities yapılandırması (manuel)
+- [ ] Push Notifications capability ekleme (manuel)
+- [ ] Cihaza yükleme ve test (manuel)
+- [ ] IPA çıkarma — Ad Hoc dağıtım (manuel)
 
 ### UI/UX
 - [x] Responsive sidebar (collapse özelliği)

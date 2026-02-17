@@ -7,16 +7,17 @@ const config: CapacitorConfig = {
   server: {
     url: 'https://skytrackyp.com',
     cleartext: true,
-    androidScheme: 'https'
+    androidScheme: 'https',
+    iosScheme: 'https'
+  },
+  ios: {
+    contentInset: 'automatic',
+    allowsLinkPreview: false,
+    backgroundColor: '#2563eb'
   },
   plugins: {
     PushNotifications: {
       presentationOptions: ['badge', 'sound', 'alert']
-    },
-    SplashScreen: {
-      launchShowDuration: 2000,
-      backgroundColor: '#2563eb',
-      showSpinner: false
     },
     StatusBar: {
       style: 'dark',

@@ -1,51 +1,63 @@
 # Active Context - SkyTrack
 
-## Son Çalışma Oturumu: 2026-02-14 (Oturum 6)
+## Son Çalışma Oturumu: 2026-02-16 (Oturum 7)
 
 ### Yapılan İşler
 
-1. **Multi-Currency (Döviz) Sistemi — Tam Uygulama** ✅
-   - 5 para birimi desteği (EUR, USD, GBP, RUB, TRY)
-   - TCMB XML API → Frankfurter API → .env fallback zinciri
-   - Split payment (max 5 satır), para birimi-ödeme yöntemi kısıtlamaları
+1. **iOS Native App — Sıfırdan Oluşturuldu ve Çalıştırıldı** ✅
+   - Eski ios/ klasörü silindi, `npx cap add ios` + `npx cap sync ios`
+   - Capacitor 8.1.0, 4 plugin (App, LocalNotifications, PushNotifications, StatusBar)
+   - SplashScreen plugin kaldırıldı (Xcode 26 storyboard uyumsuzluğu)
 
-2. **Kritik Kur Hesaplama Hatası Düzeltildi** ✅
-   - Cross-rate formülü `X_TRY / EUR_TRY` → `EUR_TRY / X_TRY` olarak düzeltildi
-   - 300€ = $252.97 (YANLIŞ) → $355.77 (DOĞRU) gibi tüm döviz karşılıkları düzeltildi
+2. **Firebase iOS SDK Entegrasyonu** ✅
+   - Package.swift: `firebase-ios-sdk` (11.0+) — FirebaseCore + FirebaseMessaging
+   - AppDelegate.swift: FCM delegate, APNs token, foreground banner
+   - `import FirebaseCore` + `import FirebaseMessaging` (SPM formatı)
 
-3. **POS Sayfası Yeniden Tasarımı** ✅
-   - Compact buton tabanlı ödeme sistemi (PaymentEntry)
-   - Döviz kurları barı: Türkçe etiketler (Euro/Dolar/Sterlin/Ruble), TL karşılıkları
-   - Renkli "Güncelle" butonu, kurların yanında
-   - Kur Hesapla aracı: otomatik hesaplama, bold etiket, geniş select kutuları (min-w-[80px])
-   - Sepet toplam: 2 sütunlu grid, okunabilir format
-   - Döviz butonları: sadece semboller renkli (€ mavi, $ yeşil, £ mor, ₽ kırmızı, ₺ turuncu)
+3. **LaunchScreen Çözümü** ✅
+   - Xcode 26 storyboard açamıyor → storyboard tamamen kaldırıldı
+   - Info.plist'te `UILaunchScreen` boş dict kullanılıyor (storyboard gerektirmez)
+   - SplashScreen plugin kaldırıldı (runtime'da storyboard arıyordu)
+   - project.pbxproj'dan tüm LaunchScreen referansları temizlendi
 
-4. **Ürün Fiyatları Güncellendi** ✅
-   - Makul EUR fiyatları: Kola €2, Çay €1.50, Kahve €2.50, Tost €3, Tişört €10 vb.
+4. **Kamera ve Medya İzinleri** ✅
+   - NSCameraUsageDescription — QR kod tarama ve fotoğraf çekimi
+   - NSPhotoLibraryUsageDescription — Medya dosyalarına erişim
+   - NSMicrophoneUsageDescription — Video kaydı
 
-5. **"Medya" → "Foto/Video" Kategori Değişikliği** ✅
-   - Backend: seed.ts, products.ts, reports.ts
-   - Frontend: pos, customers/[id], products (list, new, edit)
+5. **Diğer Yapılandırmalar** ✅
+   - GoogleService-Info.plist kopyalandı
+   - 1024x1024 universal app icon (Xcode 15+ tek dosya modu)
+   - App.entitlements: aps-environment development
+   - capacitor.config.ts: server.url = https://skytrackyp.com
+   - fix-ios-firebase.js: cap sync sonrası Firebase koruması
+   - iPhone + iPad desteği (TARGETED_DEVICE_FAMILY = "1,2")
+
+### Önemli Teknik Notlar
+
+- **Xcode 26 + storyboard = UYUMSUZ** — LaunchScreen.storyboard kullanılamaz
+- **SplashScreen plugin = CRASH** — Runtime'da storyboard arar, plugin kaldırılmalı
+- **`npx cap sync ios` her çalıştığında** Package.swift sıfırlanır → `node scripts/fix-ios-firebase.js` çalıştırılmalı
+- **`npm run cap-sync-ios`** komutu ikisini birlikte çalıştırır
 
 ### Değiştirilen/Oluşturulan Dosyalar
 
 | Dosya | İşlem |
 |-------|-------|
-| `packages/api/src/services/currencyService.ts` | Cross-rate hesaplama düzeltmesi |
-| `packages/api/prisma/seed.ts` | EUR fiyatlar güncellendi, Foto/Video kategorisi |
-| `packages/api/src/routes/products.ts` | CATEGORIES: Foto/Video |
-| `packages/api/src/routes/reports.ts` | Foto/Video filtre ve etiket |
-| `packages/web/app/(dashboard)/pos/page.tsx` | Kur barı, converter, compact ödeme UI |
-| `packages/web/app/(dashboard)/admin/customers/[id]/page.tsx` | Foto/Video kategorisi |
-| `packages/web/app/(dashboard)/admin/products/page.tsx` | CATEGORIES: Foto/Video |
-| `packages/web/app/(dashboard)/admin/products/new/page.tsx` | CATEGORIES: Foto/Video |
-| `packages/web/app/(dashboard)/admin/products/[id]/edit/page.tsx` | CATEGORIES: Foto/Video |
+| `packages/web/ios/` | Sıfırdan oluşturuldu |
+| `packages/web/ios/App/CapApp-SPM/Package.swift` | Firebase SDK eklendi |
+| `packages/web/ios/App/App/AppDelegate.swift` | FCM push notification |
+| `packages/web/ios/App/App/GoogleService-Info.plist` | Firebase config |
+| `packages/web/ios/App/App/Info.plist` | UILaunchScreen, kamera izinleri, BackgroundModes |
+| `packages/web/ios/App/App/App.entitlements` | APNs development |
+| `packages/web/ios/App/App.xcodeproj/project.pbxproj` | LaunchScreen temizlendi |
+| `packages/web/capacitor.config.ts` | skytrackyp.com, SplashScreen kaldırıldı |
+| `packages/web/package.json` | SplashScreen kaldırıldı, cap-sync-ios eklendi |
+| `packages/web/scripts/generate-single-icon.js` | İkon oluşturma |
+| `packages/web/scripts/fix-ios-firebase.js` | Firebase koruma |
 
 ### Sonraki Adımlar
 
-1. Rapor sayfalarında EUR/TRY gösterimi iyileştirme
-2. Pilot performans raporu detaylandırma
-3. PDF Türkçe font desteği
-4. Production deployment yapılandırması (PM2)
-5. iOS uygulama build (ileride)
+1. IPA çıkarma — Archive → Ad Hoc → Export
+2. Pilotlara dağıtım (UDID kayıt + Ad Hoc profile)
+3. App Store yükleme (ileride)
