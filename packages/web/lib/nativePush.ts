@@ -43,37 +43,58 @@ function getAuthToken(): string | null {
 }
 
 export async function initNativePush() {
-  if (!isNativePlatform()) return;
+  console.log('=== initNativePush START ===');
+  console.log('Platform:', Capacitor.getPlatform());
+  console.log('Is native:', isNativePlatform());
+
+  if (!isNativePlatform()) {
+    console.log('Not native platform, skipping push init');
+    return;
+  }
+
+  const authToken = getAuthToken();
+  if (!authToken) {
+    console.log('No auth token, skipping push init');
+    return;
+  }
 
   try {
+    // İzin iste
     const permission = await PushNotifications.requestPermissions();
+    console.log('Push permission result:', JSON.stringify(permission));
+
     if (permission.receive !== 'granted') {
-      console.log('Push notification permission not granted');
+      console.warn('Push permission denied');
       return;
     }
 
+    // Register çağır
     await PushNotifications.register();
+    console.log('PushNotifications.register() called');
 
-    // Token alındığında
+    // Registration listener - Capacitor plugin token döndüğünde
     PushNotifications.addListener('registration', async (token) => {
-      console.log('FCM Token:', token.value);
-      const authToken = getAuthToken();
-      if (authToken) {
-        await handleTokenRefresh(token.value, authToken);
+      console.log('=== REGISTRATION EVENT ===');
+      console.log('FCM Token from registration:', token.value);
+      const currentAuth = getAuthToken();
+      if (currentAuth) {
+        await sendTokenToBackend(token.value, currentAuth);
       }
     });
 
+    // Registration error
     PushNotifications.addListener('registrationError', (error) => {
-      console.error('FCM registration error:', error);
+      console.error('Push registration error:', JSON.stringify(error));
     });
 
-    // Uygulama foreground'a geldiğinde token kontrol et
-    App.addListener('appStateChange', async ({ isActive }) => {
-      if (isActive) {
-        const authToken = getAuthToken();
-        if (authToken) {
-          await checkAndRefreshToken(authToken);
-        }
+    // AppDelegate'den gelen FCM token event'ini dinle (iOS fallback)
+    window.addEventListener('fcmToken', async (event: any) => {
+      const token = event.detail;
+      console.log('=== FCM TOKEN FROM NATIVE EVENT ===');
+      console.log('Token:', token.substring(0, 30) + '...');
+      const currentAuth = getAuthToken();
+      if (currentAuth) {
+        await sendTokenToBackend(token, currentAuth);
       }
     });
 
@@ -115,48 +136,88 @@ export async function initNativePush() {
           }
       }
     });
+
+    // App state listener (foreground'a geldiğinde token yenile)
+    App.addListener('appStateChange', async ({ isActive }) => {
+      if (isActive) {
+        const currentAuth = getAuthToken();
+        if (currentAuth) {
+          await checkAndRefreshToken(currentAuth);
+        }
+      }
+    });
+
+    // 5 saniye sonra token kontrolü - registration event gelmemiş olabilir
+    setTimeout(async () => {
+      const existingToken = localStorage.getItem(LAST_TOKEN_KEY);
+      if (!existingToken) {
+        console.log('No token registered after 5s, retrying register...');
+        try {
+          await PushNotifications.register();
+        } catch (e) {
+          console.log('Retry register error:', e);
+        }
+      } else {
+        console.log('Token already registered:', existingToken.substring(0, 30) + '...');
+      }
+    }, 5000);
+
+    console.log('=== initNativePush COMPLETE ===');
+
   } catch (error) {
-    console.error('Native push init error:', error);
+    console.error('initNativePush error:', error);
   }
 }
 
-async function handleTokenRefresh(newToken: string, authToken: string) {
+async function sendTokenToBackend(fcmToken: string, authToken: string) {
+  console.log('=== sendTokenToBackend ===');
+  console.log('Token:', fcmToken.substring(0, 30) + '...');
+
   const oldToken = localStorage.getItem(LAST_TOKEN_KEY);
   const baseUrl = getApiBaseUrl();
+  const platform = Capacitor.getPlatform();
 
   try {
-    // Token değiştiyse eski token'ı sil
-    if (oldToken && oldToken !== newToken) {
+    // Eski token farklıysa sil
+    if (oldToken && oldToken !== fcmToken) {
+      console.log('Old token exists, deleting...');
       await fetch(`${baseUrl}/api/fcm/unregister`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${authToken}`,
+          'Authorization': `Bearer ${authToken}`
         },
-        body: JSON.stringify({ token: oldToken }),
-      }).catch(console.error);
+        body: JSON.stringify({ token: oldToken })
+      }).catch(err => console.error('Delete old token error:', err));
     }
 
-    // Yeni token'ı kaydet
-    await fetch(`${baseUrl}/api/fcm/register`, {
+    // Yeni token kaydet
+    console.log('Registering new token to:', baseUrl);
+    const response = await fetch(`${baseUrl}/api/fcm/register`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${authToken}`,
+        'Authorization': `Bearer ${authToken}`
       },
       body: JSON.stringify({
-        token: newToken,
-        platform: Capacitor.getPlatform(),
-        device: `${Capacitor.getPlatform()} - SkyTrack Yp`,
-      }),
+        token: fcmToken,
+        platform: platform,
+        device: `${platform} - SkyTrack Yp`
+      })
     });
 
-    // Local'e kaydet
-    localStorage.setItem(LAST_TOKEN_KEY, newToken);
-    localStorage.setItem(LAST_REFRESH_KEY, new Date().toISOString());
-    console.log('FCM token registered/refreshed');
+    const data = await response.json();
+    console.log('Register response:', JSON.stringify(data));
+
+    if (response.ok) {
+      localStorage.setItem(LAST_TOKEN_KEY, fcmToken);
+      localStorage.setItem(LAST_REFRESH_KEY, new Date().toISOString());
+      console.log('✅ FCM token registered successfully');
+    } else {
+      console.error('❌ FCM register failed:', data);
+    }
   } catch (error) {
-    console.error('FCM token refresh error:', error);
+    console.error('sendTokenToBackend error:', error);
   }
 }
 
@@ -189,9 +250,9 @@ async function checkAndRefreshToken(authToken: string) {
         }),
       });
       localStorage.setItem(LAST_REFRESH_KEY, now.toISOString());
-      console.log('FCM token refresh check completed');
+      console.log('Token refreshed');
     } catch (error) {
-      console.error('FCM token refresh check error:', error);
+      console.error('Token refresh error:', error);
     }
   }
 }

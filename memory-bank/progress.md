@@ -102,6 +102,8 @@
 - [x] iOS SplashScreen plugin kaldırıldı (runtime storyboard crash)
 - [x] iOS kamera/mikrofon/galeri izinleri eklendi
 - [x] iOS IPA çıkarma hazır (Archive → Ad Hoc → Export)
+- [x] iOS FCM token → backend kayıt düzeltmesi (AppDelegate → WebView JS bridge + native event fallback)
+- [x] Dashboard layout'a initNativePush eklendi (önceden sadece pilot sayfasındaydı)
 - [ ] Admin cron job bildirimleri (ileride)
 
 ### DevOps & Automation (2025-02-10)

@@ -55,6 +55,24 @@ export default function DashboardLayout({
     setIsLoading(false)
   }, [router])
 
+  // Native push init (iOS/Android)
+  useEffect(() => {
+    async function setupPush() {
+      try {
+        const { isNativePlatform, initNativePush } = await import('@/lib/nativePush');
+        if (isNativePlatform()) {
+          console.log('Native platform detected in dashboard layout, setting up push...');
+          await initNativePush();
+        }
+      } catch (error) {
+        console.error('Push setup error:', error);
+      }
+    }
+    if (!isLoading) {
+      setupPush();
+    }
+  }, [isLoading])
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">

@@ -1,63 +1,35 @@
 # Active Context - SkyTrack
 
-## Son Çalışma Oturumu: 2026-02-16 (Oturum 7)
+## Son Çalışma Oturumu: 2026-02-17 (Oturum 8)
 
 ### Yapılan İşler
 
-1. **iOS Native App — Sıfırdan Oluşturuldu ve Çalıştırıldı** ✅
-   - Eski ios/ klasörü silindi, `npx cap add ios` + `npx cap sync ios`
-   - Capacitor 8.1.0, 4 plugin (App, LocalNotifications, PushNotifications, StatusBar)
-   - SplashScreen plugin kaldırıldı (Xcode 26 storyboard uyumsuzluğu)
+1. **iOS FCM Token → Backend Kayıt Düzeltmesi** ✅
+   - Sorun: FCM token AppDelegate'de oluşuyor ama Capacitor plugin'in "registration" event'i tetiklenmiyordu
+   - Neden: Firebase swizzling APNs token'ı kendisi yönetiyor, Capacitor plugin'ine iletmiyordu
+   - Çözüm 1: AppDelegate.swift → FCM token'ı WebView'a `evaluateJavaScript` ile CustomEvent olarak gönder
+   - Çözüm 2: nativePush.ts → `window.addEventListener('fcmToken')` ile native event dinleme (fallback)
+   - Çözüm 3: 5 saniye sonra token yoksa `PushNotifications.register()` tekrar dene
+   - Çözüm 4: Dashboard layout.tsx'e `initNativePush()` çağrısı eklendi (önceden sadece pilot sayfasında vardı)
 
-2. **Firebase iOS SDK Entegrasyonu** ✅
-   - Package.swift: `firebase-ios-sdk` (11.0+) — FirebaseCore + FirebaseMessaging
-   - AppDelegate.swift: FCM delegate, APNs token, foreground banner
-   - `import FirebaseCore` + `import FirebaseMessaging` (SPM formatı)
-
-3. **LaunchScreen Çözümü** ✅
-   - Xcode 26 storyboard açamıyor → storyboard tamamen kaldırıldı
-   - Info.plist'te `UILaunchScreen` boş dict kullanılıyor (storyboard gerektirmez)
-   - SplashScreen plugin kaldırıldı (runtime'da storyboard arıyordu)
-   - project.pbxproj'dan tüm LaunchScreen referansları temizlendi
-
-4. **Kamera ve Medya İzinleri** ✅
-   - NSCameraUsageDescription — QR kod tarama ve fotoğraf çekimi
-   - NSPhotoLibraryUsageDescription — Medya dosyalarına erişim
-   - NSMicrophoneUsageDescription — Video kaydı
-
-5. **Diğer Yapılandırmalar** ✅
-   - GoogleService-Info.plist kopyalandı
-   - 1024x1024 universal app icon (Xcode 15+ tek dosya modu)
-   - App.entitlements: aps-environment development
-   - capacitor.config.ts: server.url = https://skytrackyp.com
-   - fix-ios-firebase.js: cap sync sonrası Firebase koruması
-   - iPhone + iPad desteği (TARGETED_DEVICE_FAMILY = "1,2")
-
-### Önemli Teknik Notlar
-
-- **Xcode 26 + storyboard = UYUMSUZ** — LaunchScreen.storyboard kullanılamaz
-- **SplashScreen plugin = CRASH** — Runtime'da storyboard arar, plugin kaldırılmalı
-- **`npx cap sync ios` her çalıştığında** Package.swift sıfırlanır → `node scripts/fix-ios-firebase.js` çalıştırılmalı
-- **`npm run cap-sync-ios`** komutu ikisini birlikte çalıştırır
-
-### Değiştirilen/Oluşturulan Dosyalar
+### Değiştirilen Dosyalar
 
 | Dosya | İşlem |
 |-------|-------|
-| `packages/web/ios/` | Sıfırdan oluşturuldu |
-| `packages/web/ios/App/CapApp-SPM/Package.swift` | Firebase SDK eklendi |
-| `packages/web/ios/App/App/AppDelegate.swift` | FCM push notification |
-| `packages/web/ios/App/App/GoogleService-Info.plist` | Firebase config |
-| `packages/web/ios/App/App/Info.plist` | UILaunchScreen, kamera izinleri, BackgroundModes |
-| `packages/web/ios/App/App/App.entitlements` | APNs development |
-| `packages/web/ios/App/App.xcodeproj/project.pbxproj` | LaunchScreen temizlendi |
-| `packages/web/capacitor.config.ts` | skytrackyp.com, SplashScreen kaldırıldı |
-| `packages/web/package.json` | SplashScreen kaldırıldı, cap-sync-ios eklendi |
-| `packages/web/scripts/generate-single-icon.js` | İkon oluşturma |
-| `packages/web/scripts/fix-ios-firebase.js` | Firebase koruma |
+| `packages/web/lib/nativePush.ts` | Detaylı loglama, native fcmToken event dinleme, 5s retry, sendTokenToBackend ayrı fonksiyon |
+| `packages/web/ios/App/App/AppDelegate.swift` | FCM token'ı CAPBridgeViewController üzerinden WebView'a JS ile gönder |
+| `packages/web/app/(dashboard)/layout.tsx` | initNativePush() çağrısı eklendi (admin/ofis/medya paneli için) |
+
+### Önemli Teknik Notlar
+
+- **iOS FCM Token Akışı:** AppDelegate (Firebase) → evaluateJavaScript → CustomEvent('fcmToken') → nativePush.ts → backend /api/fcm/register
+- **Çift Yol:** Capacitor registration event (Android'de çalışır) + Native JS event (iOS fallback)
+- **initNativePush artık 2 yerde:** pilot/page.tsx + (dashboard)/layout.tsx
+- **API Base URL:** skytrackyp.com → api.skytrackyp.com (getApiBaseUrl fonksiyonu)
 
 ### Sonraki Adımlar
 
-1. IPA çıkarma — Archive → Ad Hoc → Export
-2. Pilotlara dağıtım (UDID kayıt + Ad Hoc profile)
-3. App Store yükleme (ileride)
+1. iPad'de test: login → Xcode console'da "✅ FCM token registered successfully" görünmeli
+2. Admin bildirimler sayfasında iOS cihaz görünmeli
+3. Test bildirimi gönder
+4. IPA çıkarma ve pilotlara dağıtım
