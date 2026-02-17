@@ -146,7 +146,7 @@ export default function PilotPanel() {
     setLoading(false)
 
     // Initialize native push notifications (Capacitor/FCM)
-    initNativePush().catch(console.error)
+    initNativePush(token || undefined).catch(console.error)
 
     // Fallback polling every 10 seconds (Socket.IO handles real-time updates)
     const interval = setInterval(() => {

@@ -44,6 +44,24 @@ export async function sendNativeNotification(fcmToken: string, payload: Notifica
         body: payload.body,
       },
       data: payload.data || {},
+      // iOS APNs ayarları
+      apns: {
+        payload: {
+          aps: {
+            alert: {
+              title: payload.title,
+              body: payload.body,
+            },
+            badge: 1,
+            sound: 'default',
+            'content-available': 1,
+          },
+        },
+        headers: {
+          'apns-priority': '10',
+          'apns-push-type': 'alert',
+        },
+      },
       android: {
         priority: 'high',
         notification: {
@@ -59,6 +77,8 @@ export async function sendNativeNotification(fcmToken: string, payload: Notifica
   } catch (error: any) {
     const errorCode = error?.code || error?.errorInfo?.code || '';
     console.error('FCM error:', error.message);
+    console.error('FCM error code:', errorCode);
+    console.error('FCM error details:', JSON.stringify(error?.errorInfo || error?.response?.data || {}, null, 2));
 
     // Geçersiz veya süresi dolmuş token → otomatik sil
     if (
@@ -108,20 +128,12 @@ export async function sendNativeToAllPilots(payload: NotificationPayload) {
     where: { user: { role: 'PILOT' }, isActive: true },
   });
 
-  const tokenStrings = tokens.map(t => t.token);
-  if (tokenStrings.length === 0) return;
+  if (tokens.length === 0) return;
 
-  try {
-    await admin.messaging().sendEachForMulticast({
-      tokens: tokenStrings,
-      notification: { title: payload.title, body: payload.body },
-      data: payload.data || {},
-      android: { priority: 'high' },
-    });
-    console.log(`FCM broadcast sent to ${tokenStrings.length} pilot devices`);
-  } catch (error) {
-    console.error('FCM broadcast error:', error);
+  for (const t of tokens) {
+    await sendNativeNotification(t.token, payload);
   }
+  console.log(`FCM sent to ${tokens.length} pilot devices`);
 }
 
 // Tüm kullanıcılara gönder
@@ -132,20 +144,12 @@ export async function sendNativeBroadcast(payload: NotificationPayload) {
     where: { isActive: true },
   });
 
-  const tokenStrings = tokens.map(t => t.token);
-  if (tokenStrings.length === 0) return;
+  if (tokens.length === 0) return;
 
-  try {
-    await admin.messaging().sendEachForMulticast({
-      tokens: tokenStrings,
-      notification: { title: payload.title, body: payload.body },
-      data: payload.data || {},
-      android: { priority: 'high' },
-    });
-    console.log(`FCM broadcast sent to ${tokenStrings.length} devices`);
-  } catch (error) {
-    console.error('FCM broadcast error:', error);
+  for (const t of tokens) {
+    await sendNativeNotification(t.token, payload);
   }
+  console.log(`FCM broadcast sent to ${tokens.length} devices`);
 }
 
 // Get notification config for a type (enabled + custom title/body)

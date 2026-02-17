@@ -55,23 +55,30 @@ export default function DashboardLayout({
     setIsLoading(false)
   }, [router])
 
-  // Native push init (iOS/Android)
+  // Native push init (iOS/Android) - 3s delay for WebView ready
   useEffect(() => {
-    async function setupPush() {
+    const pushTimer = setTimeout(async () => {
       try {
-        const { isNativePlatform, initNativePush } = await import('@/lib/nativePush');
-        if (isNativePlatform()) {
-          console.log('Native platform detected in dashboard layout, setting up push...');
-          await initNativePush();
+        const { Capacitor } = await import('@capacitor/core');
+        if (!Capacitor.isNativePlatform()) return;
+
+        console.log('[LAYOUT] setting up native push');
+        const { initNativePush } = await import('@/lib/nativePush');
+
+        const authToken = localStorage.getItem('token');
+        if (authToken) {
+          console.log('[LAYOUT] found auth token, initializing push');
+          await initNativePush(authToken);
+        } else {
+          console.log('[LAYOUT] no auth token found for push');
         }
-      } catch (error) {
-        console.error('Push setup error:', error);
+      } catch (err) {
+        console.error('[LAYOUT] push init error:', err);
       }
-    }
-    if (!isLoading) {
-      setupPush();
-    }
-  }, [isLoading])
+    }, 3000);
+
+    return () => clearTimeout(pushTimer);
+  }, [])
 
   if (isLoading) {
     return (

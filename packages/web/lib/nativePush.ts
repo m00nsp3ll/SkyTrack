@@ -1,15 +1,15 @@
 import { Capacitor } from '@capacitor/core';
-import { PushNotifications, PushNotificationSchema } from '@capacitor/push-notifications';
-import { App } from '@capacitor/app';
+import { PushNotifications } from '@capacitor/push-notifications';
 
-const LAST_TOKEN_KEY = 'skytrack_fcm_token';
-const LAST_REFRESH_KEY = 'skytrack_fcm_last_refresh';
+const TOKEN_KEY = 'skytrack_fcm_token';
+let initialized = false;
 
-// In-app notification callback (set by InAppNotificationBanner component)
-let onInAppNotification: ((notification: PushNotificationSchema) => void) | null = null;
+// InAppNotificationBanner uyumluluğu
+type InAppNotificationHandler = (notification: any) => void;
+let inAppHandler: InAppNotificationHandler | null = null;
 
-export function setInAppNotificationHandler(handler: (notification: PushNotificationSchema) => void) {
-  onInAppNotification = handler;
+export function setInAppNotificationHandler(handler: InAppNotificationHandler | null) {
+  inAppHandler = handler;
 }
 
 export function isNativePlatform() {
@@ -20,96 +20,79 @@ export function isNativePlatform() {
   }
 }
 
-function getApiBaseUrl(): string {
-  if (typeof window === 'undefined') return 'https://api.skytrackyp.com';
-  const hostname = window.location.hostname;
-
-  if (hostname === 'skytrackyp.com' || hostname === 'www.skytrackyp.com') {
-    return 'https://api.skytrackyp.com';
+export async function initNativePush(authToken?: string) {
+  if (initialized) {
+    console.log('[PUSH] already initialized, skip');
+    return;
   }
-  if (hostname.includes('trycloudflare.com')) {
-    return `https://${hostname.replace(/^[^.]+/, 'api')}`;
-  }
-  // Capacitor apps run on localhost but need real API
-  if (hostname === 'localhost' && isNativePlatform()) {
-    return 'https://api.skytrackyp.com';
-  }
-  return `https://${hostname}:3001`;
-}
+  initialized = true;
 
-function getAuthToken(): string | null {
-  if (typeof window === 'undefined') return null;
-  return localStorage.getItem('token');
-}
+  const platform = Capacitor.getPlatform();
+  console.log('[PUSH] initNativePush v3 - platform:', platform);
 
-export async function initNativePush() {
-  console.log('=== initNativePush START ===');
-  console.log('Platform:', Capacitor.getPlatform());
-  console.log('Is native:', isNativePlatform());
+  if (!Capacitor.isNativePlatform()) return;
 
-  if (!isNativePlatform()) {
-    console.log('Not native platform, skipping push init');
+  // Auth token: parametre veya localStorage'dan
+  const token = authToken || (typeof window !== 'undefined' ? localStorage.getItem('token') : null);
+  if (!token) {
+    console.log('[PUSH] no auth token found, skip');
+    initialized = false;
     return;
   }
 
-  const authToken = getAuthToken();
-  if (!authToken) {
-    console.log('No auth token, skipping push init');
-    return;
-  }
-
-  try {
-    // İzin iste
-    const permission = await PushNotifications.requestPermissions();
-    console.log('Push permission result:', JSON.stringify(permission));
-
-    if (permission.receive !== 'granted') {
-      console.warn('Push permission denied');
-      return;
+  // A: AppDelegate'den native event dinle
+  window.addEventListener('nativeFCMToken', async (e: any) => {
+    console.log('[PUSH] nativeFCMToken event received');
+    if (e.detail && !(window as any)._fcmTokenDone) {
+      await registerToken(e.detail, platform, token);
     }
+  });
 
-    // Register çağır
-    await PushNotifications.register();
-    console.log('PushNotifications.register() called');
+  // Eski event adını da dinle (AppDelegate'de 'fcmToken' kullanılıyor olabilir)
+  window.addEventListener('fcmToken', async (e: any) => {
+    console.log('[PUSH] fcmToken event received (legacy)');
+    if (e.detail && !(window as any)._fcmTokenDone) {
+      await registerToken(e.detail, platform, token);
+    }
+  });
 
-    // Registration listener - Capacitor plugin token döndüğünde
-    PushNotifications.addListener('registration', async (token) => {
-      console.log('=== REGISTRATION EVENT ===');
-      console.log('FCM Token from registration:', token.value);
-      const currentAuth = getAuthToken();
-      if (currentAuth) {
-        await sendTokenToBackend(token.value, currentAuth);
+  // B: Zaten inject edilmiş token var mı?
+  if ((window as any)._nativeFCMToken && !(window as any)._fcmTokenDone) {
+    console.log('[PUSH] found existing _nativeFCMToken');
+    await registerToken((window as any)._nativeFCMToken, platform, token);
+  }
+
+  // C: Capacitor plugin
+  try {
+    const perm = await PushNotifications.requestPermissions();
+    console.log('[PUSH] permission:', perm.receive);
+    if (perm.receive === 'granted') {
+      await PushNotifications.register();
+      PushNotifications.addListener('registration', async (t) => {
+        console.log('[PUSH] capacitor registration event, token:', t.value?.substring(0, 30));
+        if (t.value && !(window as any)._fcmTokenDone) {
+          await registerToken(t.value, platform, token);
+        }
+      });
+      PushNotifications.addListener('registrationError', (err) => {
+        console.error('[PUSH] registrationError:', err);
+      });
+    }
+  } catch (e) {
+    console.error('[PUSH] capacitor error:', e);
+  }
+
+  // D: Bildirim dinleyicileri
+  try {
+    PushNotifications.addListener('pushNotificationReceived', (n) => {
+      console.log('[PUSH] notification received:', n.title, n.body);
+      // In-app banner göster
+      if (inAppHandler) {
+        inAppHandler(n);
       }
     });
-
-    // Registration error
-    PushNotifications.addListener('registrationError', (error) => {
-      console.error('Push registration error:', JSON.stringify(error));
-    });
-
-    // AppDelegate'den gelen FCM token event'ini dinle (iOS fallback)
-    window.addEventListener('fcmToken', async (event: any) => {
-      const token = event.detail;
-      console.log('=== FCM TOKEN FROM NATIVE EVENT ===');
-      console.log('Token:', token.substring(0, 30) + '...');
-      const currentAuth = getAuthToken();
-      if (currentAuth) {
-        await sendTokenToBackend(token, currentAuth);
-      }
-    });
-
-    // Bildirim geldiğinde (uygulama açıkken)
-    PushNotifications.addListener('pushNotificationReceived', (notification) => {
-      console.log('[FCM] Push received:', notification);
-      if (onInAppNotification) {
-        onInAppNotification(notification);
-      }
-    });
-
-    // Bildirime tıklandığında
-    PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
-      console.log('[FCM] Notification clicked:', action);
-      const data = action.notification.data;
+    PushNotifications.addListener('pushNotificationActionPerformed', (a) => {
+      const data = a.notification.data;
       const notificationType = data?.type as string;
 
       switch (notificationType) {
@@ -121,148 +104,94 @@ export async function initNativePush() {
         case 'pilot_limit_reached':
           window.location.href = '/pilot';
           break;
-
         case 'broadcast':
         case 'admin_alert':
           window.location.href = '/admin';
           break;
-
         default:
-          const url = data?.url as string;
-          if (url) {
-            window.location.href = url;
+          if (data?.url) {
+            window.location.href = data.url;
           } else {
             window.location.href = '/';
           }
       }
     });
+  } catch (e) {}
 
-    // App state listener (foreground'a geldiğinde token yenile)
-    App.addListener('appStateChange', async ({ isActive }) => {
-      if (isActive) {
-        const currentAuth = getAuthToken();
-        if (currentAuth) {
-          await checkAndRefreshToken(currentAuth);
-        }
-      }
-    });
-
-    // 5 saniye sonra token kontrolü - registration event gelmemiş olabilir
+  // E: Retry - 4s, 8s, 14s, 22s, 35s
+  [4000, 8000, 14000, 22000, 35000].forEach(delay => {
     setTimeout(async () => {
-      const existingToken = localStorage.getItem(LAST_TOKEN_KEY);
-      if (!existingToken) {
-        console.log('No token registered after 5s, retrying register...');
-        try {
-          await PushNotifications.register();
-        } catch (e) {
-          console.log('Retry register error:', e);
-        }
-      } else {
-        console.log('Token already registered:', existingToken.substring(0, 30) + '...');
+      const tk = (window as any)._nativeFCMToken;
+      if (!(window as any)._fcmTokenDone && tk) {
+        console.log(`[PUSH] retry at ${delay/1000}s`);
+        await registerToken(tk, platform, token);
       }
-    }, 5000);
+    }, delay);
+  });
 
-    console.log('=== initNativePush COMPLETE ===');
-
-  } catch (error) {
-    console.error('initNativePush error:', error);
-  }
+  console.log('[PUSH] initNativePush v3 setup complete');
 }
 
-async function sendTokenToBackend(fcmToken: string, authToken: string) {
-  console.log('=== sendTokenToBackend ===');
-  console.log('Token:', fcmToken.substring(0, 30) + '...');
+function getApiBaseUrl(): string {
+  if (typeof window === 'undefined') return 'https://api.skytrackyp.com';
+  const hostname = window.location.hostname;
 
-  const oldToken = localStorage.getItem(LAST_TOKEN_KEY);
+  if (hostname === 'skytrackyp.com' || hostname === 'www.skytrackyp.com') {
+    return 'https://api.skytrackyp.com';
+  }
+  if (hostname === 'localhost' && isNativePlatform()) {
+    return 'https://api.skytrackyp.com';
+  }
+  return `https://${hostname}:3001`;
+}
+
+async function registerToken(fcmToken: string, platform: string, authToken: string) {
+  if ((window as any)._fcmTokenDone) return;
+
+  console.log('[PUSH] >>> REGISTERING TOKEN <<<');
+  console.log('[PUSH] token:', fcmToken.substring(0, 30));
+
   const baseUrl = getApiBaseUrl();
-  const platform = Capacitor.getPlatform();
+  console.log('[PUSH] API base:', baseUrl);
 
   try {
-    // Eski token farklıysa sil
+    const oldToken = localStorage.getItem(TOKEN_KEY);
     if (oldToken && oldToken !== fcmToken) {
-      console.log('Old token exists, deleting...');
-      await fetch(`${baseUrl}/api/fcm/unregister`, {
+      fetch(`${baseUrl}/api/fcm/unregister`, {
         method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${authToken}`
-        },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
         body: JSON.stringify({ token: oldToken })
-      }).catch(err => console.error('Delete old token error:', err));
+      }).catch(() => {});
     }
 
-    // Yeni token kaydet
-    console.log('Registering new token to:', baseUrl);
-    const response = await fetch(`${baseUrl}/api/fcm/register`, {
+    const res = await fetch(`${baseUrl}/api/fcm/register`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${authToken}`
-      },
-      body: JSON.stringify({
-        token: fcmToken,
-        platform: platform,
-        device: `${platform} - SkyTrack Yp`
-      })
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+      body: JSON.stringify({ token: fcmToken, platform, device: `${platform} - SkyTrack Yp` })
     });
 
-    const data = await response.json();
-    console.log('Register response:', JSON.stringify(data));
+    console.log('[PUSH] register response status:', res.status);
 
-    if (response.ok) {
-      localStorage.setItem(LAST_TOKEN_KEY, fcmToken);
-      localStorage.setItem(LAST_REFRESH_KEY, new Date().toISOString());
-      console.log('✅ FCM token registered successfully');
+    if (res.ok) {
+      const data = await res.json();
+      console.log('[PUSH] TOKEN REGISTERED:', JSON.stringify(data));
+      localStorage.setItem(TOKEN_KEY, fcmToken);
+      (window as any)._fcmTokenDone = true;
     } else {
-      console.error('❌ FCM register failed:', data);
+      const errText = await res.text();
+      console.error('[PUSH] register failed:', res.status, errText);
     }
-  } catch (error) {
-    console.error('sendTokenToBackend error:', error);
+  } catch (err) {
+    console.error('[PUSH] register error:', err);
   }
 }
 
-async function checkAndRefreshToken(authToken: string) {
-  const lastRefresh = localStorage.getItem(LAST_REFRESH_KEY);
-  const now = new Date();
-
-  // Son yenilemeden 24 saat geçmediyse gerek yok
-  if (lastRefresh) {
-    const diff = now.getTime() - new Date(lastRefresh).getTime();
-    const hoursPassed = diff / (1000 * 60 * 60);
-    if (hoursPassed < 24) return;
-  }
-
-  // Token'ı yeniden kaydet (backend updatedAt günceller)
-  const currentToken = localStorage.getItem(LAST_TOKEN_KEY);
-  if (currentToken) {
-    const baseUrl = getApiBaseUrl();
-    try {
-      await fetch(`${baseUrl}/api/fcm/refresh`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${authToken}`,
-        },
-        body: JSON.stringify({
-          token: currentToken,
-          platform: Capacitor.getPlatform(),
-          device: `${Capacitor.getPlatform()} - SkyTrack Yp`,
-        }),
-      });
-      localStorage.setItem(LAST_REFRESH_KEY, now.toISOString());
-      console.log('Token refreshed');
-    } catch (error) {
-      console.error('Token refresh error:', error);
-    }
-  }
-}
-
-// Logout'ta FCM token'ı temizle
-export async function cleanupFcmToken() {
+// Logout'ta FCM token'ı temizle — eski adıyla da export et
+export async function cleanupPushOnLogout() {
   if (!isNativePlatform()) return;
 
-  const fcmToken = localStorage.getItem(LAST_TOKEN_KEY);
-  const authToken = getAuthToken();
+  const fcmToken = localStorage.getItem(TOKEN_KEY);
+  const authToken = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
 
   if (fcmToken && authToken) {
     const baseUrl = getApiBaseUrl();
@@ -276,10 +205,15 @@ export async function cleanupFcmToken() {
         body: JSON.stringify({ token: fcmToken }),
       });
     } catch (error) {
-      console.error('FCM token cleanup error:', error);
+      console.error('[PUSH] cleanup error:', error);
     }
   }
 
-  localStorage.removeItem(LAST_TOKEN_KEY);
-  localStorage.removeItem(LAST_REFRESH_KEY);
+  localStorage.removeItem(TOKEN_KEY);
+  (window as any)._fcmTokenDone = false;
+  (window as any)._nativeFCMToken = null;
+  initialized = false;
 }
+
+// Backward compatibility alias
+export const cleanupFcmToken = cleanupPushOnLogout;

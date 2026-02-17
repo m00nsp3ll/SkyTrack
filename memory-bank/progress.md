@@ -104,6 +104,11 @@
 - [x] iOS IPA çıkarma hazır (Archive → Ad Hoc → Export)
 - [x] iOS FCM token → backend kayıt düzeltmesi (AppDelegate → WebView JS bridge + native event fallback)
 - [x] Dashboard layout'a initNativePush eklendi (önceden sadece pilot sayfasındaydı)
+- [x] nativePush.ts v3: setInAppNotificationHandler, initialized flag, retry mekanizması
+- [x] Firebase bildirim servisine APNs bloğu eklendi (iOS bildirim desteği)
+- [x] sendEachForMulticast → tek tek sendNativeNotification (iOS uyumluluğu)
+- [x] APNs key yenilendi (Sandbox & Production) — iOS push çalışıyor ✅
+- [x] iPhone + iPad'e bildirim başarıyla gönderildi
 - [ ] Admin cron job bildirimleri (ileride)
 
 ### DevOps & Automation (2025-02-10)
