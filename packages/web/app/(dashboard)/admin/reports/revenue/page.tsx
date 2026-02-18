@@ -86,7 +86,7 @@ export default function RevenueReport() {
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('tr-TR', {
       style: 'currency',
-      currency: 'TRY',
+      currency: 'EUR',
       minimumFractionDigits: 0,
     }).format(value)
   }
@@ -164,7 +164,7 @@ export default function RevenueReport() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Medya Geliri
+              Foto/Video Geliri
             </CardTitle>
             <Camera className="h-4 w-4 text-purple-600" />
           </CardHeader>
@@ -426,7 +426,7 @@ export default function RevenueReport() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Camera className="h-5 w-5 text-purple-600" />
-                  <span className="font-medium">Medya Satışları</span>
+                  <span className="font-medium">Foto/Video Satışları</span>
                 </div>
                 <span className="text-xl font-bold">
                   {formatCurrency(data?.summary.mediaRevenue || 0)}

@@ -438,28 +438,59 @@ async function main() {
   const completedCustomers = customers.filter(c => c.status === 'COMPLETED');
   let salesCount = 0;
 
-  // Media sales for some completed customers
+  // Media sales for some completed customers — with PaymentDetail
   const mediaSaleCount = Math.min(15, completedCustomers.length);
   for (let i = 0; i < mediaSaleCount; i++) {
     const customer = completedCustomers[i];
     const isPaid = i < 10; // first 10 paid, rest unpaid
 
-    await prisma.sale.create({
+    // Farklı para birimleri ile ödeme
+    const mediaCurrencies: Array<{ currency: 'EUR' | 'USD' | 'GBP' | 'TRY' | 'RUB'; rate: number; symbol: string }> = [
+      { currency: 'EUR', rate: 1, symbol: '€' },
+      { currency: 'USD', rate: 1.094, symbol: '$' },
+      { currency: 'GBP', rate: 0.865, symbol: '£' },
+      { currency: 'TRY', rate: 38.50, symbol: '₺' },
+      { currency: 'RUB', rate: 106.95, symbol: '₽' },
+    ];
+    const curr = mediaCurrencies[i % mediaCurrencies.length];
+    const eurPrice = 25;
+    const localAmount = parseFloat((eurPrice * curr.rate).toFixed(2));
+    const payMethod: 'CASH' | 'CREDIT_CARD' | 'TRANSFER' = i % 3 === 0 ? 'CASH' : i % 3 === 1 ? 'CREDIT_CARD' : 'CASH';
+
+    const sale = await prisma.sale.create({
       data: {
         customerId: customer.id,
         soldById: adminUser.id,
         itemName: 'Fotoğraf/Video Paketi',
         itemType: 'Foto/Video',
         quantity: 1,
-        unitPrice: 25,
-        totalPrice: 25,
-        totalAmountEUR: 25,
-        totalAmountTRY: 25 * 38.50,
-        primaryCurrency: 'EUR',
+        unitPrice: eurPrice,
+        totalPrice: localAmount,
+        totalAmountEUR: eurPrice,
+        totalAmountTRY: eurPrice * 38.50,
+        primaryCurrency: curr.currency,
+        isSplitPayment: false,
         paymentStatus: isPaid ? 'PAID' : 'UNPAID',
-        paymentMethod: Math.random() > 0.5 ? 'CASH' : 'CREDIT_CARD',
+        paymentMethod: isPaid ? payMethod : null,
       },
     });
+
+    // PaymentDetail kaydı — kasada gerçek para birimi
+    if (isPaid) {
+      await prisma.paymentDetail.create({
+        data: {
+          saleId: sale.id,
+          currency: curr.currency,
+          amount: localAmount,
+          amountInEUR: eurPrice,
+          amountInTRY: eurPrice * 38.50,
+          exchangeRate: curr.rate,
+          exchangeSource: 'SEED',
+          paymentMethod: payMethod,
+        },
+      });
+    }
+
     salesCount++;
 
     if (isPaid) {
@@ -470,25 +501,358 @@ async function main() {
     }
   }
 
-  // POS sales (EUR prices)
+  // POS sales — farklı para birimleri ve split payment dahil
   const posProducts = [
-    { name: 'Kola', type: 'İçecek', price: 1.00 },
-    { name: 'Su', type: 'İçecek', price: 0.50 },
-    { name: 'Çay', type: 'İçecek', price: 0.70 },
-    { name: 'Tost', type: 'Yiyecek', price: 1.50 },
-    { name: 'Gözleme', type: 'Yiyecek', price: 2.00 },
-    { name: 'Magnet', type: 'Hediyelik', price: 2.00 },
+    { name: 'Kola', type: 'İçecek', price: 2.00 },
+    { name: 'Su', type: 'İçecek', price: 1.00 },
+    { name: 'Çay', type: 'İçecek', price: 1.50 },
+    { name: 'Tost', type: 'Yiyecek', price: 3.00 },
+    { name: 'Gözleme', type: 'Yiyecek', price: 4.00 },
+    { name: 'Magnet', type: 'Hediyelik', price: 3.00 },
+    { name: 'Tişört', type: 'Hediyelik', price: 10.00 },
+    { name: 'Şapka', type: 'Hediyelik', price: 7.00 },
   ];
 
   const paymentMethods: Array<'CASH' | 'CREDIT_CARD' | 'TRANSFER'> = ['CASH', 'CREDIT_CARD', 'TRANSFER'];
-  const currencies: Array<'EUR' | 'USD' | 'TRY'> = ['EUR', 'USD', 'TRY'];
 
-  for (let i = 0; i < 20; i++) {
-    const product = posProducts[Math.floor(Math.random() * posProducts.length)];
-    const qty = Math.floor(Math.random() * 3) + 1;
+  // Senaryo 1: EUR nakit ödemeler (8 adet)
+  for (let i = 0; i < 8; i++) {
+    const product = posProducts[i % posProducts.length];
+    const qty = Math.floor(Math.random() * 2) + 1;
     const customer = completedCustomers[Math.floor(Math.random() * completedCustomers.length)];
-    const totalPrice = product.price * qty;
-    const currency = currencies[Math.floor(Math.random() * currencies.length)];
+    const totalEUR = product.price * qty;
+
+    const sale = await prisma.sale.create({
+      data: {
+        customerId: customer.id,
+        soldById: adminUser.id,
+        itemName: product.name,
+        itemType: product.type,
+        quantity: qty,
+        unitPrice: product.price,
+        totalPrice: totalEUR,
+        totalAmountEUR: totalEUR,
+        totalAmountTRY: totalEUR * 38.50,
+        primaryCurrency: 'EUR',
+        paymentStatus: 'PAID',
+        paymentMethod: 'CASH',
+      },
+    });
+    await prisma.paymentDetail.create({
+      data: {
+        saleId: sale.id,
+        currency: 'EUR',
+        amount: totalEUR,
+        amountInEUR: totalEUR,
+        amountInTRY: totalEUR * 38.50,
+        exchangeRate: 1,
+        exchangeSource: 'SEED',
+        paymentMethod: 'CASH',
+      },
+    });
+    salesCount++;
+  }
+
+  // Senaryo 2: USD nakit ödemeler (5 adet)
+  for (let i = 0; i < 5; i++) {
+    const product = posProducts[Math.floor(Math.random() * posProducts.length)];
+    const qty = 1;
+    const customer = completedCustomers[Math.floor(Math.random() * completedCustomers.length)];
+    const totalEUR = product.price * qty;
+    const totalUSD = parseFloat((totalEUR * 1.094).toFixed(2));
+
+    const sale = await prisma.sale.create({
+      data: {
+        customerId: customer.id,
+        soldById: adminUser.id,
+        itemName: product.name,
+        itemType: product.type,
+        quantity: qty,
+        unitPrice: product.price,
+        totalPrice: totalUSD,
+        totalAmountEUR: totalEUR,
+        totalAmountTRY: totalEUR * 38.50,
+        primaryCurrency: 'USD',
+        paymentStatus: 'PAID',
+        paymentMethod: 'CASH',
+      },
+    });
+    await prisma.paymentDetail.create({
+      data: {
+        saleId: sale.id,
+        currency: 'USD',
+        amount: totalUSD,
+        amountInEUR: totalEUR,
+        amountInTRY: totalEUR * 38.50,
+        exchangeRate: 1.094,
+        exchangeSource: 'SEED',
+        paymentMethod: 'CASH',
+      },
+    });
+    salesCount++;
+  }
+
+  // Senaryo 3: GBP nakit ödemeler (3 adet)
+  for (let i = 0; i < 3; i++) {
+    const product = posProducts[Math.floor(Math.random() * posProducts.length)];
+    const qty = 1;
+    const customer = completedCustomers[Math.floor(Math.random() * completedCustomers.length)];
+    const totalEUR = product.price * qty;
+    const totalGBP = parseFloat((totalEUR * 0.865).toFixed(2));
+
+    const sale = await prisma.sale.create({
+      data: {
+        customerId: customer.id,
+        soldById: adminUser.id,
+        itemName: product.name,
+        itemType: product.type,
+        quantity: qty,
+        unitPrice: product.price,
+        totalPrice: totalGBP,
+        totalAmountEUR: totalEUR,
+        totalAmountTRY: totalEUR * 38.50,
+        primaryCurrency: 'GBP',
+        paymentStatus: 'PAID',
+        paymentMethod: 'CASH',
+      },
+    });
+    await prisma.paymentDetail.create({
+      data: {
+        saleId: sale.id,
+        currency: 'GBP',
+        amount: totalGBP,
+        amountInEUR: totalEUR,
+        amountInTRY: totalEUR * 38.50,
+        exchangeRate: 0.865,
+        exchangeSource: 'SEED',
+        paymentMethod: 'CASH',
+      },
+    });
+    salesCount++;
+  }
+
+  // Senaryo 4: RUB nakit ödemeler (2 adet)
+  for (let i = 0; i < 2; i++) {
+    const product = posProducts[Math.floor(Math.random() * posProducts.length)];
+    const qty = 1;
+    const customer = completedCustomers[Math.floor(Math.random() * completedCustomers.length)];
+    const totalEUR = product.price * qty;
+    const totalRUB = parseFloat((totalEUR * 106.95).toFixed(2));
+
+    const sale = await prisma.sale.create({
+      data: {
+        customerId: customer.id,
+        soldById: adminUser.id,
+        itemName: product.name,
+        itemType: product.type,
+        quantity: qty,
+        unitPrice: product.price,
+        totalPrice: totalRUB,
+        totalAmountEUR: totalEUR,
+        totalAmountTRY: totalEUR * 38.50,
+        primaryCurrency: 'RUB',
+        paymentStatus: 'PAID',
+        paymentMethod: 'CASH',
+      },
+    });
+    await prisma.paymentDetail.create({
+      data: {
+        saleId: sale.id,
+        currency: 'RUB',
+        amount: totalRUB,
+        amountInEUR: totalEUR,
+        amountInTRY: totalEUR * 38.50,
+        exchangeRate: 106.95,
+        exchangeSource: 'SEED',
+        paymentMethod: 'CASH',
+      },
+    });
+    salesCount++;
+  }
+
+  // Senaryo 5: TRY kredi kartı ödemeler (6 adet)
+  for (let i = 0; i < 6; i++) {
+    const product = posProducts[Math.floor(Math.random() * posProducts.length)];
+    const qty = Math.floor(Math.random() * 2) + 1;
+    const customer = completedCustomers[Math.floor(Math.random() * completedCustomers.length)];
+    const totalEUR = product.price * qty;
+    const totalTRY = parseFloat((totalEUR * 38.50).toFixed(2));
+
+    const sale = await prisma.sale.create({
+      data: {
+        customerId: customer.id,
+        soldById: adminUser.id,
+        itemName: product.name,
+        itemType: product.type,
+        quantity: qty,
+        unitPrice: product.price,
+        totalPrice: totalTRY,
+        totalAmountEUR: totalEUR,
+        totalAmountTRY: totalTRY,
+        primaryCurrency: 'TRY',
+        paymentStatus: 'PAID',
+        paymentMethod: 'CREDIT_CARD',
+      },
+    });
+    await prisma.paymentDetail.create({
+      data: {
+        saleId: sale.id,
+        currency: 'TRY',
+        amount: totalTRY,
+        amountInEUR: totalEUR,
+        amountInTRY: totalTRY,
+        exchangeRate: 38.50,
+        exchangeSource: 'SEED',
+        paymentMethod: 'CREDIT_CARD',
+      },
+    });
+    salesCount++;
+  }
+
+  // Senaryo 6: EUR kredi kartı ödemeler (4 adet)
+  for (let i = 0; i < 4; i++) {
+    const product = posProducts[Math.floor(Math.random() * posProducts.length)];
+    const qty = 1;
+    const customer = completedCustomers[Math.floor(Math.random() * completedCustomers.length)];
+    const totalEUR = product.price * qty;
+
+    const sale = await prisma.sale.create({
+      data: {
+        customerId: customer.id,
+        soldById: adminUser.id,
+        itemName: product.name,
+        itemType: product.type,
+        quantity: qty,
+        unitPrice: product.price,
+        totalPrice: totalEUR,
+        totalAmountEUR: totalEUR,
+        totalAmountTRY: totalEUR * 38.50,
+        primaryCurrency: 'EUR',
+        paymentStatus: 'PAID',
+        paymentMethod: 'CREDIT_CARD',
+      },
+    });
+    await prisma.paymentDetail.create({
+      data: {
+        saleId: sale.id,
+        currency: 'EUR',
+        amount: totalEUR,
+        amountInEUR: totalEUR,
+        amountInTRY: totalEUR * 38.50,
+        exchangeRate: 1,
+        exchangeSource: 'SEED',
+        paymentMethod: 'CREDIT_CARD',
+      },
+    });
+    salesCount++;
+  }
+
+  // Senaryo 7: TRY havale ödemeler (3 adet)
+  for (let i = 0; i < 3; i++) {
+    const product = posProducts[Math.floor(Math.random() * posProducts.length)];
+    const qty = 1;
+    const customer = completedCustomers[Math.floor(Math.random() * completedCustomers.length)];
+    const totalEUR = product.price * qty;
+    const totalTRY = parseFloat((totalEUR * 38.50).toFixed(2));
+
+    const sale = await prisma.sale.create({
+      data: {
+        customerId: customer.id,
+        soldById: adminUser.id,
+        itemName: product.name,
+        itemType: product.type,
+        quantity: qty,
+        unitPrice: product.price,
+        totalPrice: totalTRY,
+        totalAmountEUR: totalEUR,
+        totalAmountTRY: totalTRY,
+        primaryCurrency: 'TRY',
+        paymentStatus: 'PAID',
+        paymentMethod: 'TRANSFER',
+      },
+    });
+    await prisma.paymentDetail.create({
+      data: {
+        saleId: sale.id,
+        currency: 'TRY',
+        amount: totalTRY,
+        amountInEUR: totalEUR,
+        amountInTRY: totalTRY,
+        exchangeRate: 38.50,
+        exchangeSource: 'SEED',
+        paymentMethod: 'TRANSFER',
+      },
+    });
+    salesCount++;
+  }
+
+  // Senaryo 8: Split payment — EUR nakit + TRY kart (2 adet)
+  for (let i = 0; i < 2; i++) {
+    const customer = completedCustomers[Math.floor(Math.random() * completedCustomers.length)];
+    const totalEUR = 10.00; // Tişört
+    const eurCashPart = 5.00;
+    const tryCashPart = parseFloat((5.00 * 38.50).toFixed(2)); // kalan 5 EUR'luk TRY kart
+
+    const sale = await prisma.sale.create({
+      data: {
+        customerId: customer.id,
+        soldById: adminUser.id,
+        itemName: 'Tişört',
+        itemType: 'Hediyelik',
+        quantity: 1,
+        unitPrice: 10.00,
+        totalPrice: 10.00,
+        totalAmountEUR: totalEUR,
+        totalAmountTRY: totalEUR * 38.50,
+        primaryCurrency: 'EUR',
+        isSplitPayment: true,
+        paymentStatus: 'PAID',
+        paymentMethod: 'CASH',
+      },
+    });
+    // EUR nakit kısmı
+    await prisma.paymentDetail.create({
+      data: {
+        saleId: sale.id,
+        currency: 'EUR',
+        amount: eurCashPart,
+        amountInEUR: eurCashPart,
+        amountInTRY: eurCashPart * 38.50,
+        exchangeRate: 1,
+        exchangeSource: 'SEED',
+        paymentMethod: 'CASH',
+      },
+    });
+    // TRY kart kısmı
+    await prisma.paymentDetail.create({
+      data: {
+        saleId: sale.id,
+        currency: 'TRY',
+        amount: tryCashPart,
+        amountInEUR: 5.00,
+        amountInTRY: tryCashPart,
+        exchangeRate: 38.50,
+        exchangeSource: 'SEED',
+        paymentMethod: 'CREDIT_CARD',
+      },
+    });
+    salesCount++;
+  }
+
+  // Senaryo 9: Veresiye (ödenmemiş) — farklı para birimleri (4 adet)
+  const unpaidCurrData: Array<{ currency: 'EUR' | 'USD' | 'TRY'; rate: number }> = [
+    { currency: 'EUR', rate: 1 },
+    { currency: 'USD', rate: 1.094 },
+    { currency: 'TRY', rate: 38.50 },
+    { currency: 'EUR', rate: 1 },
+  ];
+  for (let i = 0; i < 4; i++) {
+    const product = posProducts[Math.floor(Math.random() * posProducts.length)];
+    const qty = 1;
+    const customer = completedCustomers[Math.floor(Math.random() * completedCustomers.length)];
+    const totalEUR = product.price * qty;
+    const curr = unpaidCurrData[i];
+    const localAmount = parseFloat((totalEUR * curr.rate).toFixed(2));
 
     await prisma.sale.create({
       data: {
@@ -498,12 +862,12 @@ async function main() {
         itemType: product.type,
         quantity: qty,
         unitPrice: product.price,
-        totalPrice,
-        totalAmountEUR: totalPrice,
-        totalAmountTRY: totalPrice * 38.50,
-        primaryCurrency: currency,
-        paymentStatus: Math.random() < 0.8 ? 'PAID' : 'UNPAID',
-        paymentMethod: paymentMethods[Math.floor(Math.random() * paymentMethods.length)],
+        totalPrice: localAmount,
+        totalAmountEUR: totalEUR,
+        totalAmountTRY: totalEUR * 38.50,
+        primaryCurrency: curr.currency,
+        paymentStatus: 'UNPAID',
+        paymentMethod: null,
       },
     });
     salesCount++;

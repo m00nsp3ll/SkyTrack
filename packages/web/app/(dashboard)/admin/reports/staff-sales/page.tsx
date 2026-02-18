@@ -91,7 +91,7 @@ export default function StaffSalesPage() {
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('tr-TR', {
       style: 'currency',
-      currency: 'TRY',
+      currency: 'EUR',
       minimumFractionDigits: 0,
     }).format(value)
   }
@@ -366,56 +366,63 @@ export default function StaffSalesPage() {
                           <div className="p-4">
                             {categorySales.length > 0 ? (
                               <div className="space-y-2 max-h-96 overflow-y-auto">
-                                {categorySales.map((sale) => (
-                                  <div key={sale.id} className="flex items-center justify-between bg-white p-3 rounded-lg border hover:border-primary/50 transition-colors">
-                                    <div className="flex-1 min-w-0">
-                                      <div className="flex items-center gap-3 mb-1">
-                                        {sale.customer ? (
-                                          <Link
-                                            href={`/admin/customers/${sale.customer.displayId}`}
-                                            className="font-semibold text-primary hover:underline flex items-center gap-1.5"
-                                          >
-                                            <User className="h-4 w-4" />
-                                            {sale.customer.displayId}
-                                          </Link>
-                                        ) : (
-                                          <span className="text-muted-foreground font-medium">Müşterisiz Satış</span>
-                                        )}
-                                        <span className="text-sm text-muted-foreground">→</span>
-                                        <span className="text-sm font-medium truncate">
-                                          {sale.itemName}
-                                        </span>
+                                {categorySales.map((sale) => {
+                                  const content = (
+                                    <div className={`flex items-center justify-between bg-white p-3 rounded-lg border hover:border-primary/50 transition-colors ${sale.customer ? 'cursor-pointer hover:shadow-md' : ''}`}>
+                                      <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-3 mb-1">
+                                          {sale.customer ? (
+                                            <span className="font-semibold text-primary flex items-center gap-1.5">
+                                              <User className="h-4 w-4" />
+                                              {sale.customer.displayId}
+                                            </span>
+                                          ) : (
+                                            <span className="text-muted-foreground font-medium">Müşterisiz Satış</span>
+                                          )}
+                                          <span className="text-sm text-muted-foreground">→</span>
+                                          <span className="text-sm font-medium truncate">
+                                            {sale.itemName}
+                                          </span>
+                                        </div>
+                                        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                                          <span className="flex items-center gap-1">
+                                            <Calendar className="h-3 w-3" />
+                                            {new Date(sale.createdAt).toLocaleString('tr-TR', {
+                                              day: '2-digit',
+                                              month: '2-digit',
+                                              hour: '2-digit',
+                                              minute: '2-digit',
+                                            })}
+                                          </span>
+                                          <span>•</span>
+                                          <span>{sale.quantity} adet</span>
+                                          <span>•</span>
+                                          <span className={`px-2 py-0.5 rounded ${
+                                            sale.paymentStatus === 'PAID'
+                                              ? 'bg-green-100 text-green-700'
+                                              : 'bg-yellow-100 text-yellow-700'
+                                          }`}>
+                                            {sale.paymentStatus === 'PAID' ? 'Ödendi' : 'Bekliyor'}
+                                          </span>
+                                        </div>
                                       </div>
-                                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                                        <span className="flex items-center gap-1">
-                                          <Calendar className="h-3 w-3" />
-                                          {new Date(sale.createdAt).toLocaleString('tr-TR', {
-                                            day: '2-digit',
-                                            month: '2-digit',
-                                            hour: '2-digit',
-                                            minute: '2-digit',
-                                          })}
-                                        </span>
-                                        <span>•</span>
-                                        <span>{sale.quantity} adet</span>
-                                        <span>•</span>
-                                        <span className={`px-2 py-0.5 rounded ${
-                                          sale.paymentStatus === 'PAID'
-                                            ? 'bg-green-100 text-green-700'
-                                            : 'bg-yellow-100 text-yellow-700'
-                                        }`}>
-                                          {sale.paymentStatus === 'PAID' ? 'Ödendi' : 'Bekliyor'}
-                                        </span>
+                                      <div className="text-right ml-4">
+                                        <div className="text-lg font-bold text-primary">{formatCurrency(sale.totalPrice)}</div>
+                                        <div className="text-xs text-muted-foreground">
+                                          Birim: {formatCurrency(sale.unitPrice)}
+                                        </div>
                                       </div>
                                     </div>
-                                    <div className="text-right ml-4">
-                                      <div className="text-lg font-bold text-primary">{formatCurrency(sale.totalPrice)}</div>
-                                      <div className="text-xs text-muted-foreground">
-                                        Birim: {formatCurrency(sale.unitPrice)}
-                                      </div>
-                                    </div>
-                                  </div>
-                                ))}
+                                  )
+
+                                  return sale.customer ? (
+                                    <Link key={sale.id} href={`/admin/customers/${sale.customer.displayId}`}>
+                                      {content}
+                                    </Link>
+                                  ) : (
+                                    <div key={sale.id}>{content}</div>
+                                  )
+                                })}
                               </div>
                             ) : (
                               <p className="text-center text-muted-foreground py-8">Bu kategoride satış bulunamadı</p>

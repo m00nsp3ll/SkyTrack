@@ -77,6 +77,7 @@ interface RecentData {
     id: string
     itemName: string
     totalPrice: number
+    totalAmountEUR?: number
     paymentStatus: string
     createdAt: string
     customer: { displayId: string; firstName: string } | null
@@ -274,7 +275,7 @@ export default function AdminDashboard() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Medya
+              Foto/Video
             </CardTitle>
             <Camera className="h-4 w-4 text-purple-600" />
           </CardHeader>
@@ -316,7 +317,7 @@ export default function AdminDashboard() {
               </p>
               <div className="flex items-center gap-4 mt-2 text-sm">
                 <span className="text-green-600">
-                  Medya: {formatCurrency(cards?.mediaRevenue || 0)}
+                  Foto/Video: {formatCurrency(cards?.mediaRevenue || 0)}
                 </span>
                 <span className="text-green-600">
                   POS: {formatCurrency(cards?.posRevenue || 0)}
@@ -656,7 +657,7 @@ export default function AdminDashboard() {
                     </div>
                     <div className="text-right">
                       <p className="font-medium text-sm">
-                        {formatCurrency(sale.totalPrice)}
+                        {formatCurrency(sale.totalAmountEUR || sale.totalPrice)}
                       </p>
                       <Badge
                         variant="secondary"

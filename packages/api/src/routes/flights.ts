@@ -27,12 +27,6 @@ async function createMediaFolder(flight: any, customer: any, pilot: any): Promis
     // Create directory recursively
     await fs.mkdir(folderPath, { recursive: true });
 
-    // Create thumbnail subdirectory
-    await fs.mkdir(path.join(folderPath, 'thumbnail'), { recursive: true });
-
-    // Create .gitkeep file
-    await fs.writeFile(path.join(folderPath, '.gitkeep'), '');
-
     // Create or update MediaFolder record
     await prisma.mediaFolder.upsert({
       where: { flightId: flight.id },

@@ -252,10 +252,10 @@ router.get('/customer/:customerId', authenticate, asyncHandler(async (req: AuthR
     orderBy: { createdAt: 'desc' },
   });
 
-  // Calculate totals
-  const totalSpent = sales.reduce((sum, s) => sum + s.totalPrice, 0);
-  const totalPaid = sales.filter(s => s.paymentStatus === 'PAID').reduce((sum, s) => sum + s.totalPrice, 0);
-  const totalUnpaid = sales.filter(s => s.paymentStatus === 'UNPAID').reduce((sum, s) => sum + s.totalPrice, 0);
+  // Calculate totals — EUR bazlı
+  const totalSpent = sales.reduce((sum, s) => sum + (s.totalAmountEUR || s.totalPrice), 0);
+  const totalPaid = sales.filter(s => s.paymentStatus === 'PAID').reduce((sum, s) => sum + (s.totalAmountEUR || s.totalPrice), 0);
+  const totalUnpaid = sales.filter(s => s.paymentStatus === 'UNPAID').reduce((sum, s) => sum + (s.totalAmountEUR || s.totalPrice), 0);
 
   res.json({
     success: true,
@@ -379,14 +379,13 @@ router.get('/daily-report', authenticate, asyncHandler(async (req: AuthRequest, 
     },
   });
 
-  // Calculate totals
-  const totalSales = sales.reduce((sum, s) => sum + s.totalPrice, 0);
+  // Calculate totals — EUR bazlı
   const totalSalesEUR = sales.reduce((sum, s) => sum + (s.totalAmountEUR || s.totalPrice), 0);
   const totalSalesTRY = sales.reduce((sum, s) => sum + (s.totalAmountTRY || 0), 0);
-  const cashSales = sales.filter(s => s.paymentMethod === 'CASH' && s.paymentStatus === 'PAID').reduce((sum, s) => sum + s.totalPrice, 0);
-  const cardSales = sales.filter(s => s.paymentMethod === 'CREDIT_CARD' && s.paymentStatus === 'PAID').reduce((sum, s) => sum + s.totalPrice, 0);
-  const transferSales = sales.filter(s => s.paymentMethod === 'TRANSFER' && s.paymentStatus === 'PAID').reduce((sum, s) => sum + s.totalPrice, 0);
-  const unpaidSales = sales.filter(s => s.paymentStatus === 'UNPAID').reduce((sum, s) => sum + s.totalPrice, 0);
+  const cashSales = sales.filter(s => s.paymentMethod === 'CASH' && s.paymentStatus === 'PAID').reduce((sum, s) => sum + (s.totalAmountEUR || s.totalPrice), 0);
+  const cardSales = sales.filter(s => s.paymentMethod === 'CREDIT_CARD' && s.paymentStatus === 'PAID').reduce((sum, s) => sum + (s.totalAmountEUR || s.totalPrice), 0);
+  const transferSales = sales.filter(s => s.paymentMethod === 'TRANSFER' && s.paymentStatus === 'PAID').reduce((sum, s) => sum + (s.totalAmountEUR || s.totalPrice), 0);
+  const unpaidSales = sales.filter(s => s.paymentStatus === 'UNPAID').reduce((sum, s) => sum + (s.totalAmountEUR || s.totalPrice), 0);
   const mediaSales = mediaFolders.reduce((sum, m) => sum + (m.paymentAmount || 0), 0);
 
   // Currency breakdown from payment details
@@ -402,14 +401,25 @@ router.get('/daily-report', authenticate, asyncHandler(async (req: AuthRequest, 
     currencyBreakdown[detail.currency].totalTRY += detail.amountInTRY;
   }
 
-  // Category breakdown
+  // Cash register: currency x payment method matrix
+  // Kasada gerçekte hangi para biriminden, hangi yöntemle ne kadar var
+  const cashRegister: Record<string, Record<string, number>> = {};
+  for (const detail of allPaymentDetails) {
+    if (!cashRegister[detail.currency]) {
+      cashRegister[detail.currency] = { CASH: 0, CREDIT_CARD: 0, TRANSFER: 0 };
+    }
+    cashRegister[detail.currency][detail.paymentMethod] =
+      (cashRegister[detail.currency][detail.paymentMethod] || 0) + detail.amount;
+  }
+
+  // Category breakdown — EUR bazlı
   const categories: Record<string, { count: number; total: number }> = {};
   for (const sale of sales) {
     if (!categories[sale.itemType]) {
       categories[sale.itemType] = { count: 0, total: 0 };
     }
     categories[sale.itemType].count += sale.quantity;
-    categories[sale.itemType].total += sale.totalPrice;
+    categories[sale.itemType].total += (sale.totalAmountEUR || sale.totalPrice);
   }
 
   // Payment method breakdown
@@ -420,13 +430,13 @@ router.get('/daily-report', authenticate, asyncHandler(async (req: AuthRequest, 
     UNPAID: unpaidSales,
   };
 
-  // Hourly distribution
+  // Hourly distribution — EUR bazlı
   const hourly: Record<number, number> = {};
   for (let i = 6; i <= 22; i++) hourly[i] = 0;
   for (const sale of sales) {
     const hour = sale.createdAt.getHours();
     if (hourly[hour] !== undefined) {
-      hourly[hour] += sale.totalPrice;
+      hourly[hour] += (sale.totalAmountEUR || sale.totalPrice);
     }
   }
 
@@ -435,7 +445,7 @@ router.get('/daily-report', authenticate, asyncHandler(async (req: AuthRequest, 
     data: {
       date: filterDate.toISOString().split('T')[0],
       summary: {
-        totalSales,
+        totalSales: totalSalesEUR,
         totalSalesEUR,
         totalSalesTRY,
         cashSales,
@@ -449,6 +459,7 @@ router.get('/daily-report', authenticate, asyncHandler(async (req: AuthRequest, 
       categories,
       paymentMethods,
       currencyBreakdown,
+      cashRegister,
       hourly: Object.entries(hourly).map(([hour, amount]) => ({
         hour: parseInt(hour),
         amount,

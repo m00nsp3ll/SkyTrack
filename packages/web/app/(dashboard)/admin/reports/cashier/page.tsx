@@ -73,7 +73,7 @@ export default function CashierReportPage() {
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('tr-TR', {
       style: 'currency',
-      currency: 'TRY',
+      currency: 'EUR',
       minimumFractionDigits: 0,
     }).format(value)
   }

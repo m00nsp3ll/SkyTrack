@@ -22,6 +22,7 @@ interface Sale {
   itemName: string
   quantity: number
   totalPrice: number
+  totalAmountEUR?: number
   createdAt: string
   soldBy: {
     id: string
@@ -39,10 +40,11 @@ interface CustomerGroup {
   }
   sales: Sale[]
   total: number
+  totalEUR?: number
 }
 
 export default function UnpaidSalesPage() {
-  const [data, setData] = useState<{ customers: CustomerGroup[]; totalUnpaid: number; unpaidCount: number } | null>(null)
+  const [data, setData] = useState<{ customers: CustomerGroup[]; totalUnpaid: number; totalUnpaidEUR?: number; unpaidCount: number } | null>(null)
   const [loading, setLoading] = useState(true)
   const [expandedCustomers, setExpandedCustomers] = useState<Set<string>>(new Set())
   const [processing, setProcessing] = useState<string | null>(null)
@@ -126,7 +128,7 @@ export default function UnpaidSalesPage() {
         <div className="grid grid-cols-2 gap-4">
           <Card className="bg-red-50 border-red-200">
             <CardContent className="p-4 text-center">
-              <p className="text-3xl font-bold text-red-600">{data.totalUnpaid.toFixed(2)} ₺</p>
+              <p className="text-3xl font-bold text-red-600">€{(data.totalUnpaidEUR || data.totalUnpaid).toFixed(2)}</p>
               <p className="text-sm text-red-600">Toplam Borç</p>
             </CardContent>
           </Card>
@@ -187,7 +189,7 @@ export default function UnpaidSalesPage() {
                       </div>
                       <div className="flex items-center gap-4">
                         <div className="text-right">
-                          <p className="text-lg font-bold text-red-600">{group.total.toFixed(2)} ₺</p>
+                          <p className="text-lg font-bold text-red-600">€{(group.totalEUR || group.total).toFixed(2)}</p>
                           <p className="text-xs text-muted-foreground">{group.sales.length} kalem</p>
                         </div>
                         {group.customer.id && (
@@ -245,7 +247,7 @@ export default function UnpaidSalesPage() {
                               </div>
                             </div>
                             <div className="flex items-center gap-3">
-                              <span className="font-medium text-red-600">{sale.totalPrice.toFixed(2)} ₺</span>
+                              <span className="font-medium text-red-600">€{(sale.totalAmountEUR || sale.totalPrice).toFixed(2)}</span>
                               <div className="flex gap-1">
                                 <Button
                                   size="sm"

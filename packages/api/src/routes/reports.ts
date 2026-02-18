@@ -23,7 +23,6 @@ router.get('/dashboard', authenticate, asyncHandler(async (req: AuthRequest, res
     waitingFlights,
     salesToday,
     mediaFoldersToday,
-    unpaidSales,
   ] = await Promise.all([
     // Customers registered today
     prisma.customer.count({
@@ -42,38 +41,37 @@ router.get('/dashboard', authenticate, asyncHandler(async (req: AuthRequest, res
     prisma.flight.count({
       where: { status: { in: ['ASSIGNED', 'PICKED_UP'] } },
     }),
-    // Sales today
+    // Sales today (EUR bazlı)
     prisma.sale.findMany({
       where: { createdAt: { gte: today, lt: tomorrow } },
-      select: { totalPrice: true, paymentStatus: true, paymentMethod: true, itemType: true },
+      select: { totalPrice: true, totalAmountEUR: true, totalAmountTRY: true, primaryCurrency: true, paymentStatus: true, paymentMethod: true, itemType: true },
     }),
     // Media folders today
     prisma.mediaFolder.findMany({
       where: { createdAt: { gte: today, lt: tomorrow } },
       select: { paymentStatus: true, paymentAmount: true, fileCount: true },
     }),
-    // Unpaid sales
-    prisma.sale.aggregate({
-      where: { paymentStatus: 'UNPAID', createdAt: { gte: today, lt: tomorrow } },
-      _sum: { totalPrice: true },
-    }),
   ]);
 
-  // Calculate stats
+  // Calculate stats — EUR bazlı
   const completedFlights = flightsToday.filter(f => f.status === 'COMPLETED');
-  const totalRevenue = salesToday
-    .filter(s => s.paymentStatus === 'PAID')
-    .reduce((sum, s) => sum + s.totalPrice, 0);
+  const paidSales = salesToday.filter(s => s.paymentStatus === 'PAID');
+
+  const posRevenueEUR = paidSales.reduce((sum, s) => sum + (s.totalAmountEUR || s.totalPrice), 0);
+  const posRevenueTRY = paidSales.reduce((sum, s) => sum + (s.totalAmountTRY || 0), 0);
 
   const mediaRevenue = mediaFoldersToday
     .filter(m => m.paymentStatus === 'PAID')
     .reduce((sum, m) => sum + (m.paymentAmount || 0), 0);
 
-  const posRevenue = salesToday
-    .filter(s => s.paymentStatus === 'PAID')
-    .reduce((sum, s) => sum + s.totalPrice, 0);
-
   const mediaSoldCount = mediaFoldersToday.filter(m => m.paymentStatus === 'PAID').length;
+
+  const unpaidEUR = salesToday
+    .filter(s => s.paymentStatus === 'UNPAID')
+    .reduce((sum, s) => sum + (s.totalAmountEUR || s.totalPrice), 0);
+  const unpaidTRY = salesToday
+    .filter(s => s.paymentStatus === 'UNPAID')
+    .reduce((sum, s) => sum + (s.totalAmountTRY || 0), 0);
 
   res.json({
     success: true,
@@ -84,11 +82,14 @@ router.get('/dashboard', authenticate, asyncHandler(async (req: AuthRequest, res
         completedFlights: completedFlights.length,
         activeFlights,
         waitingCustomers: waitingFlights,
-        totalRevenue: totalRevenue + mediaRevenue,
+        totalRevenue: posRevenueEUR + mediaRevenue,
+        totalRevenueTRY: posRevenueTRY,
         mediaRevenue,
         mediaSoldCount,
-        posRevenue,
-        unpaidTotal: unpaidSales._sum.totalPrice || 0,
+        posRevenue: posRevenueEUR,
+        posRevenueTRY,
+        unpaidTotal: unpaidEUR,
+        unpaidTotalTRY: unpaidTRY,
       },
       timestamp: new Date().toISOString(),
     },
@@ -113,7 +114,7 @@ router.get('/dashboard/charts', authenticate, asyncHandler(async (req: AuthReque
     }),
     prisma.sale.findMany({
       where: { createdAt: { gte: today, lt: tomorrow }, paymentStatus: 'PAID' },
-      select: { totalPrice: true, paymentMethod: true, itemType: true },
+      select: { totalPrice: true, totalAmountEUR: true, paymentMethod: true, itemType: true },
     }),
   ]);
 
@@ -135,20 +136,20 @@ router.get('/dashboard/charts', authenticate, asyncHandler(async (req: AuthReque
     });
   }
 
-  // Revenue by type (Media vs POS)
-  const mediaTotal = sales.filter(s => s.itemType === 'Foto/Video').reduce((sum, s) => sum + s.totalPrice, 0);
-  const posTotal = sales.filter(s => s.itemType !== 'Foto/Video').reduce((sum, s) => sum + s.totalPrice, 0);
+  // Revenue by type (Media vs POS) — EUR bazlı
+  const mediaTotal = sales.filter(s => s.itemType === 'Foto/Video').reduce((sum, s) => sum + (s.totalAmountEUR || s.totalPrice), 0);
+  const posTotal = sales.filter(s => s.itemType !== 'Foto/Video').reduce((sum, s) => sum + (s.totalAmountEUR || s.totalPrice), 0);
 
   const revenueByType = [
     { name: 'Foto/Video', value: mediaTotal },
     { name: 'POS', value: posTotal },
   ];
 
-  // Payment method distribution
+  // Payment method distribution — EUR bazlı
   const paymentMethods = [
-    { name: 'Nakit', value: sales.filter(s => s.paymentMethod === 'CASH').reduce((sum, s) => sum + s.totalPrice, 0) },
-    { name: 'Kart', value: sales.filter(s => s.paymentMethod === 'CREDIT_CARD').reduce((sum, s) => sum + s.totalPrice, 0) },
-    { name: 'Havale', value: sales.filter(s => s.paymentMethod === 'TRANSFER').reduce((sum, s) => sum + s.totalPrice, 0) },
+    { name: 'Nakit', value: sales.filter(s => s.paymentMethod === 'CASH').reduce((sum, s) => sum + (s.totalAmountEUR || s.totalPrice), 0) },
+    { name: 'Kart', value: sales.filter(s => s.paymentMethod === 'CREDIT_CARD').reduce((sum, s) => sum + (s.totalAmountEUR || s.totalPrice), 0) },
+    { name: 'Havale', value: sales.filter(s => s.paymentMethod === 'TRANSFER').reduce((sum, s) => sum + (s.totalAmountEUR || s.totalPrice), 0) },
   ];
 
   res.json({
@@ -196,6 +197,8 @@ router.get('/dashboard/recent', authenticate, asyncHandler(async (req: AuthReque
         id: true,
         itemName: true,
         totalPrice: true,
+        totalAmountEUR: true,
+        primaryCurrency: true,
         paymentStatus: true,
         createdAt: true,
         customer: { select: { displayId: true, firstName: true } },
@@ -297,6 +300,9 @@ router.get('/revenue', authenticate, asyncHandler(async (req: AuthRequest, res: 
       where: { createdAt: { gte: fromDate, lte: toDate } },
       select: {
         totalPrice: true,
+        totalAmountEUR: true,
+        totalAmountTRY: true,
+        primaryCurrency: true,
         paymentStatus: true,
         paymentMethod: true,
         itemType: true,
@@ -317,24 +323,28 @@ router.get('/revenue', authenticate, asyncHandler(async (req: AuthRequest, res: 
   ]);
 
   const paidSales = sales.filter(s => s.paymentStatus === 'PAID');
-  const unpaidSales = sales.filter(s => s.paymentStatus === 'UNPAID');
+  const unpaidSalesList = sales.filter(s => s.paymentStatus === 'UNPAID');
   const paidMedia = mediaFolders.filter(m => m.paymentStatus === 'PAID');
 
-  const totalPOS = paidSales.reduce((sum, s) => sum + s.totalPrice, 0);
+  // EUR bazlı toplamlar
+  const totalPOS = paidSales.reduce((sum, s) => sum + (s.totalAmountEUR || s.totalPrice), 0);
+  const totalPOSTRY = paidSales.reduce((sum, s) => sum + (s.totalAmountTRY || 0), 0);
   const totalMedia = paidMedia.reduce((sum, m) => sum + (m.paymentAmount || 0), 0);
-  const totalUnpaid = unpaidSales.reduce((sum, s) => sum + s.totalPrice, 0);
+  const totalUnpaid = unpaidSalesList.reduce((sum, s) => sum + (s.totalAmountEUR || s.totalPrice), 0);
+  const totalUnpaidTRY = unpaidSalesList.reduce((sum, s) => sum + (s.totalAmountTRY || 0), 0);
   const totalRevenue = totalPOS + totalMedia;
+  const totalRevenueTRY = totalPOSTRY;
   const collectionRate = (totalRevenue + totalUnpaid) > 0
     ? ((totalRevenue / (totalRevenue + totalUnpaid)) * 100).toFixed(1)
     : '100';
 
-  // Category breakdown
+  // Category breakdown — EUR bazlı
   const categories: Record<string, number> = {};
   paidSales.forEach(s => {
-    categories[s.itemType] = (categories[s.itemType] || 0) + s.totalPrice;
+    categories[s.itemType] = (categories[s.itemType] || 0) + (s.totalAmountEUR || s.totalPrice);
   });
 
-  // Daily trend (last 30 days)
+  // Daily trend — EUR bazlı
   const dailyTrend: { date: string; pos: number; media: number }[] = [];
   const dayMs = 24 * 60 * 60 * 1000;
   for (let d = new Date(fromDate); d <= toDate; d = new Date(d.getTime() + dayMs)) {
@@ -344,7 +354,7 @@ router.get('/revenue', authenticate, asyncHandler(async (req: AuthRequest, res: 
 
     const dayPOS = paidSales
       .filter(s => s.createdAt >= dayStart && s.createdAt < dayEnd)
-      .reduce((sum, s) => sum + s.totalPrice, 0);
+      .reduce((sum, s) => sum + (s.totalAmountEUR || s.totalPrice), 0);
 
     const dayMedia = paidMedia
       .filter(m => m.createdAt >= dayStart && m.createdAt < dayEnd)
@@ -353,18 +363,18 @@ router.get('/revenue', authenticate, asyncHandler(async (req: AuthRequest, res: 
     dailyTrend.push({ date: dateStr, pos: dayPOS, media: dayMedia });
   }
 
-  // Top products
+  // Top products — EUR bazlı
   const productTotals: Record<string, number> = {};
   paidSales.forEach(s => {
     const key = s.itemType;
-    productTotals[key] = (productTotals[key] || 0) + s.totalPrice;
+    productTotals[key] = (productTotals[key] || 0) + (s.totalAmountEUR || s.totalPrice);
   });
   const topProducts = Object.entries(productTotals)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 10)
     .map(([name, total]) => ({ name, total }));
 
-  // Staff sales breakdown
+  // Staff sales breakdown — EUR bazlı
   const staffSales: Record<string, { id: string; name: string; total: number; count: number }> = {};
   paidSales.forEach(s => {
     const staffId = s.soldBy.id;
@@ -372,7 +382,7 @@ router.get('/revenue', authenticate, asyncHandler(async (req: AuthRequest, res: 
     if (!staffSales[staffId]) {
       staffSales[staffId] = { id: staffId, name: staffName, total: 0, count: 0 };
     }
-    staffSales[staffId].total += s.totalPrice;
+    staffSales[staffId].total += (s.totalAmountEUR || s.totalPrice);
     staffSales[staffId].count += 1;
   });
   const topStaff = Object.values(staffSales)
@@ -384,10 +394,13 @@ router.get('/revenue', authenticate, asyncHandler(async (req: AuthRequest, res: 
     data: {
       summary: {
         totalRevenue,
+        totalRevenueTRY,
         mediaRevenue: totalMedia,
         posRevenue: totalPOS,
+        posRevenueTRY: totalPOSTRY,
         collected: totalRevenue,
         uncollected: totalUnpaid,
+        uncollectedTRY: totalUnpaidTRY,
         collectionRate,
       },
       categories,
@@ -419,7 +432,7 @@ router.get('/customers', authenticate, asyncHandler(async (req: AuthRequest, res
     }),
     prisma.sale.findMany({
       where: { createdAt: { gte: fromDate, lte: toDate }, paymentStatus: 'PAID' },
-      select: { totalPrice: true, customerId: true },
+      select: { totalPrice: true, totalAmountEUR: true, customerId: true },
     }),
   ]);
 
@@ -440,11 +453,11 @@ router.get('/customers', authenticate, asyncHandler(async (req: AuthRequest, res
     ? Math.round(durations.reduce((a, b) => a + b, 0) / durations.length)
     : 0;
 
-  // Average spend per customer
+  // Average spend per customer — EUR bazlı
   const customerSpend: Record<string, number> = {};
   sales.forEach(s => {
     if (s.customerId) {
-      customerSpend[s.customerId] = (customerSpend[s.customerId] || 0) + s.totalPrice;
+      customerSpend[s.customerId] = (customerSpend[s.customerId] || 0) + (s.totalAmountEUR || s.totalPrice);
     }
   });
   const spendValues = Object.values(customerSpend);
@@ -530,7 +543,7 @@ router.get('/daily/:date', authenticate, asyncHandler(async (req: AuthRequest, r
     }),
     prisma.sale.findMany({
       where: { createdAt: { gte: startOfDay, lte: endOfDay } },
-      select: { totalPrice: true, paymentStatus: true, paymentMethod: true, itemType: true, itemName: true },
+      select: { totalPrice: true, totalAmountEUR: true, totalAmountTRY: true, primaryCurrency: true, paymentStatus: true, paymentMethod: true, itemType: true, itemName: true },
     }),
     prisma.mediaFolder.findMany({
       where: { createdAt: { gte: startOfDay, lte: endOfDay } },
@@ -574,14 +587,14 @@ router.get('/daily/:date', authenticate, asyncHandler(async (req: AuthRequest, r
     minDuration: durations.length > 0 ? Math.min(...durations) : 0,
   };
 
-  // Cash register summary
+  // Cash register summary — EUR bazlı
   const paidSales = sales.filter(s => s.paymentStatus === 'PAID');
   const cashSummary = {
-    cash: paidSales.filter(s => s.paymentMethod === 'CASH').reduce((sum, s) => sum + s.totalPrice, 0),
-    card: paidSales.filter(s => s.paymentMethod === 'CREDIT_CARD').reduce((sum, s) => sum + s.totalPrice, 0),
-    transfer: paidSales.filter(s => s.paymentMethod === 'TRANSFER').reduce((sum, s) => sum + s.totalPrice, 0),
-    unpaid: sales.filter(s => s.paymentStatus === 'UNPAID').reduce((sum, s) => sum + s.totalPrice, 0),
-    total: paidSales.reduce((sum, s) => sum + s.totalPrice, 0),
+    cash: paidSales.filter(s => s.paymentMethod === 'CASH').reduce((sum, s) => sum + (s.totalAmountEUR || s.totalPrice), 0),
+    card: paidSales.filter(s => s.paymentMethod === 'CREDIT_CARD').reduce((sum, s) => sum + (s.totalAmountEUR || s.totalPrice), 0),
+    transfer: paidSales.filter(s => s.paymentMethod === 'TRANSFER').reduce((sum, s) => sum + (s.totalAmountEUR || s.totalPrice), 0),
+    unpaid: sales.filter(s => s.paymentStatus === 'UNPAID').reduce((sum, s) => sum + (s.totalAmountEUR || s.totalPrice), 0),
+    total: paidSales.reduce((sum, s) => sum + (s.totalAmountEUR || s.totalPrice), 0),
   };
 
   // Media summary
@@ -593,10 +606,10 @@ router.get('/daily/:date', authenticate, asyncHandler(async (req: AuthRequest, r
     totalFiles: mediaFolders.reduce((sum, m) => sum + m.fileCount, 0),
   };
 
-  // POS summary by category
+  // POS summary by category — EUR bazlı
   const posSummary: Record<string, number> = {};
   paidSales.forEach(s => {
-    posSummary[s.itemType] = (posSummary[s.itemType] || 0) + s.totalPrice;
+    posSummary[s.itemType] = (posSummary[s.itemType] || 0) + (s.totalAmountEUR || s.totalPrice);
   });
 
   // Low stock products
@@ -634,22 +647,23 @@ router.get('/compare', authenticate, asyncHandler(async (req: AuthRequest, res: 
   const p2To = new Date(period2_to as string);
 
   const getStats = async (from: Date, to: Date) => {
-    const [customers, flights, sales] = await Promise.all([
+    const [customers, flights, salesData] = await Promise.all([
       prisma.customer.count({ where: { createdAt: { gte: from, lte: to } } }),
       prisma.flight.count({ where: { createdAt: { gte: from, lte: to }, status: 'COMPLETED' } }),
-      prisma.sale.aggregate({
+      prisma.sale.findMany({
         where: { createdAt: { gte: from, lte: to }, paymentStatus: 'PAID' },
-        _sum: { totalPrice: true },
-        _count: true,
+        select: { totalPrice: true, totalAmountEUR: true },
       }),
     ]);
+
+    const totalEUR = salesData.reduce((sum, s) => sum + (s.totalAmountEUR || s.totalPrice), 0);
 
     return {
       customers,
       flights,
-      revenue: sales._sum.totalPrice || 0,
-      transactions: sales._count,
-      avgSpend: sales._count > 0 ? (sales._sum.totalPrice || 0) / sales._count : 0,
+      revenue: totalEUR,
+      transactions: salesData.length,
+      avgSpend: salesData.length > 0 ? totalEUR / salesData.length : 0,
     };
   };
 
@@ -713,20 +727,20 @@ router.get('/staff-sales', authenticate, asyncHandler(async (req: AuthRequest, r
     }
 
     const paidSales = sales.filter(s => s.paymentStatus === 'PAID');
-    const totalRevenue = paidSales.reduce((sum, s) => sum + s.totalPrice, 0);
-    const totalUnpaid = sales.filter(s => s.paymentStatus === 'UNPAID').reduce((sum, s) => sum + s.totalPrice, 0);
+    const totalRevenue = paidSales.reduce((sum, s) => sum + (s.totalAmountEUR || s.totalPrice), 0);
+    const totalUnpaid = sales.filter(s => s.paymentStatus === 'UNPAID').reduce((sum, s) => sum + (s.totalAmountEUR || s.totalPrice), 0);
 
-    // Category breakdown
+    // Category breakdown — EUR bazlı
     const categories: Record<string, { count: number; total: number }> = {};
     paidSales.forEach(s => {
       if (!categories[s.itemType]) {
         categories[s.itemType] = { count: 0, total: 0 };
       }
       categories[s.itemType].count += s.quantity;
-      categories[s.itemType].total += s.totalPrice;
+      categories[s.itemType].total += (s.totalAmountEUR || s.totalPrice);
     });
 
-    // Daily trend
+    // Daily trend — EUR bazlı
     const dailySales: { date: string; amount: number; count: number }[] = [];
     const dayMs = 24 * 60 * 60 * 1000;
     for (let d = new Date(fromDate); d <= toDate; d = new Date(d.getTime() + dayMs)) {
@@ -737,26 +751,26 @@ router.get('/staff-sales', authenticate, asyncHandler(async (req: AuthRequest, r
       const daySales = paidSales.filter(s => s.createdAt >= dayStart && s.createdAt < dayEnd);
       dailySales.push({
         date: dateStr,
-        amount: daySales.reduce((sum, s) => sum + s.totalPrice, 0),
+        amount: daySales.reduce((sum, s) => sum + (s.totalAmountEUR || s.totalPrice), 0),
         count: daySales.length,
       });
     }
 
-    // Hourly distribution
+    // Hourly distribution — EUR bazlı
     const hourlySales: Record<number, number> = {};
     for (let h = 8; h <= 19; h++) hourlySales[h] = 0;
     paidSales.forEach(s => {
       const hour = s.createdAt.getHours();
       if (hourlySales[hour] !== undefined) {
-        hourlySales[hour] += s.totalPrice;
+        hourlySales[hour] += (s.totalAmountEUR || s.totalPrice);
       }
     });
 
-    // Payment method breakdown
+    // Payment method breakdown — EUR bazlı
     const paymentMethods = {
-      CASH: paidSales.filter(s => s.paymentMethod === 'CASH').reduce((sum, s) => sum + s.totalPrice, 0),
-      CREDIT_CARD: paidSales.filter(s => s.paymentMethod === 'CREDIT_CARD').reduce((sum, s) => sum + s.totalPrice, 0),
-      TRANSFER: paidSales.filter(s => s.paymentMethod === 'TRANSFER').reduce((sum, s) => sum + s.totalPrice, 0),
+      CASH: paidSales.filter(s => s.paymentMethod === 'CASH').reduce((sum, s) => sum + (s.totalAmountEUR || s.totalPrice), 0),
+      CREDIT_CARD: paidSales.filter(s => s.paymentMethod === 'CREDIT_CARD').reduce((sum, s) => sum + (s.totalAmountEUR || s.totalPrice), 0),
+      TRANSFER: paidSales.filter(s => s.paymentMethod === 'TRANSFER').reduce((sum, s) => sum + (s.totalAmountEUR || s.totalPrice), 0),
     };
 
     res.json({
@@ -789,6 +803,7 @@ router.get('/staff-sales', authenticate, asyncHandler(async (req: AuthRequest, r
       where: { createdAt: { gte: fromDate, lte: toDate } },
       select: {
         totalPrice: true,
+        totalAmountEUR: true,
         paymentStatus: true,
         soldBy: {
           select: { id: true, username: true, name: true },
@@ -796,6 +811,7 @@ router.get('/staff-sales', authenticate, asyncHandler(async (req: AuthRequest, r
       },
     });
 
+    // EUR bazlı toplamlar
     const staffStats: Record<string, { name: string; total: number; count: number; paid: number }> = {};
     sales.forEach(s => {
       const staffId = s.soldBy.id;
@@ -805,7 +821,7 @@ router.get('/staff-sales', authenticate, asyncHandler(async (req: AuthRequest, r
       }
       staffStats[staffId].count += 1;
       if (s.paymentStatus === 'PAID') {
-        staffStats[staffId].total += s.totalPrice;
+        staffStats[staffId].total += (s.totalAmountEUR || s.totalPrice);
         staffStats[staffId].paid += 1;
       }
     });
