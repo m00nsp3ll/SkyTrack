@@ -1,10 +1,9 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
-import { currencyApi } from '@/lib/api'
 import {
   LayoutDashboard,
   Users,
@@ -72,7 +71,7 @@ const menuGroups: MenuGroup[] = [
   {
     title: 'MEDYA',
     items: [
-      { href: '/admin/media', label: 'Medya Yönetimi', icon: Camera },
+      { href: '/admin/media', label: 'Foto/Video Raporu', icon: Camera },
       { href: '/admin/media/seller', label: 'Önizleme İstasyonu', icon: Eye },
     ],
   },
@@ -165,34 +164,10 @@ export function Sidebar({ onNavigate }: SidebarProps) {
   const pathname = usePathname()
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [filteredGroups, setFilteredGroups] = useState<MenuGroup[]>(menuGroups)
-  const [rates, setRates] = useState<{ eurTry: number; source: string; lastUpdate: string } | null>(null)
 
   useEffect(() => {
     setFilteredGroups(getFilteredMenuGroups())
   }, [])
-
-  // Fetch currency rates
-  const fetchRates = useCallback(async () => {
-    try {
-      const res = await currencyApi.getRates()
-      const data = res.data?.data
-      if (data) {
-        setRates({
-          eurTry: data.eurTry || 0,
-          source: data.source || '',
-          lastUpdate: data.lastUpdate ? new Date(data.lastUpdate).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) : '',
-        })
-      }
-    } catch {
-      // silently fail
-    }
-  }, [])
-
-  useEffect(() => {
-    fetchRates()
-    const interval = setInterval(fetchRates, 60000) // every 60s
-    return () => clearInterval(interval)
-  }, [fetchRates])
 
   const handleLogout = async () => {
     await cleanupFcmToken()
@@ -289,22 +264,6 @@ export function Sidebar({ onNavigate }: SidebarProps) {
           </div>
         ))}
       </nav>
-
-      {/* Currency Rates */}
-      {!isCollapsed && rates && rates.eurTry > 0 && (
-        <div className="px-3 py-2 border-t border-gray-200">
-          <div className="text-[10px] font-semibold text-gray-400 tracking-wider mb-1">KURLAR</div>
-          <div className="text-xs text-gray-600 space-y-0.5">
-            <div className="flex justify-between">
-              <span>EUR/TRY</span>
-              <span className="font-medium">{rates.eurTry.toFixed(2)}</span>
-            </div>
-          </div>
-          <div className="text-[10px] text-gray-400 mt-1">
-            {rates.source} {rates.lastUpdate}
-          </div>
-        </div>
-      )}
 
       {/* Logout */}
       <div className="p-2 border-t border-gray-200">

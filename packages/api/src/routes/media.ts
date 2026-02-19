@@ -15,6 +15,7 @@ import {
   getDiskStats,
   getTodayMediaStats,
   sanitizePilotName,
+  formatDateForFolder,
 } from '../services/media.js';
 
 const router = Router();
@@ -116,6 +117,594 @@ const upload = multer({
 // ==========================================
 // STATIC ROUTES (must come before :customerId)
 // ==========================================
+
+// Helper: parse date filter params
+function parseDateRange(query: any): { dateFrom: Date; dateTo: Date; prevFrom: Date; prevTo: Date } {
+  const { date = 'today', startDate: qStart, endDate: qEnd } = query;
+  const now = new Date();
+  let dateFrom: Date, dateTo: Date, prevFrom: Date, prevTo: Date;
+
+  if (qStart && qEnd) {
+    dateFrom = new Date(qStart as string); dateFrom.setHours(0, 0, 0, 0);
+    dateTo = new Date(qEnd as string); dateTo.setHours(23, 59, 59, 999);
+    const diffMs = dateTo.getTime() - dateFrom.getTime();
+    prevTo = new Date(dateFrom.getTime() - 1); prevTo.setHours(23, 59, 59, 999);
+    prevFrom = new Date(prevTo.getTime() - diffMs); prevFrom.setHours(0, 0, 0, 0);
+  } else if (date === 'week') {
+    dateFrom = new Date(now); dateFrom.setDate(dateFrom.getDate() - 7); dateFrom.setHours(0, 0, 0, 0);
+    dateTo = new Date(now); dateTo.setHours(23, 59, 59, 999);
+    prevTo = new Date(dateFrom.getTime() - 1); prevTo.setHours(23, 59, 59, 999);
+    prevFrom = new Date(prevTo); prevFrom.setDate(prevFrom.getDate() - 6); prevFrom.setHours(0, 0, 0, 0);
+  } else if (date === 'month') {
+    dateFrom = new Date(now.getFullYear(), now.getMonth(), 1);
+    dateTo = new Date(now); dateTo.setHours(23, 59, 59, 999);
+    prevFrom = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    prevTo = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
+  } else {
+    dateFrom = new Date(now); dateFrom.setHours(0, 0, 0, 0);
+    dateTo = new Date(now); dateTo.setHours(23, 59, 59, 999);
+    prevFrom = new Date(dateFrom); prevFrom.setDate(prevFrom.getDate() - 1);
+    prevTo = new Date(prevFrom); prevTo.setHours(23, 59, 59, 999);
+  }
+  return { dateFrom, dateTo, prevFrom, prevTo };
+}
+
+// GET /api/media/dashboard - Foto/Video dashboard istatistikleri (tarih filtreli)
+router.get(
+  '/dashboard',
+  authenticate,
+  asyncHandler(async (req: AuthRequest, res: any) => {
+    const { dateFrom, dateTo, prevFrom, prevTo } = parseDateRange(req.query);
+    const now = new Date();
+
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
+
+    const [periodSales, prevSales, monthSales, lastMonthSales, periodFlights, periodFolders] = await Promise.all([
+      prisma.sale.findMany({
+        where: { createdAt: { gte: dateFrom, lte: dateTo }, itemType: { in: ['Foto/Video', 'MEDIA'] } },
+        select: { totalAmountEUR: true, totalPrice: true, paymentStatus: true },
+      }),
+      prisma.sale.findMany({
+        where: { createdAt: { gte: prevFrom, lte: prevTo }, itemType: { in: ['Foto/Video', 'MEDIA'] } },
+        select: { totalAmountEUR: true, totalPrice: true, paymentStatus: true },
+      }),
+      prisma.sale.findMany({
+        where: { createdAt: { gte: monthStart, lte: dateTo }, itemType: { in: ['Foto/Video', 'MEDIA'] }, paymentStatus: 'PAID' },
+        select: { totalAmountEUR: true, totalPrice: true },
+      }),
+      prisma.sale.findMany({
+        where: { createdAt: { gte: lastMonthStart, lte: lastMonthEnd }, itemType: { in: ['Foto/Video', 'MEDIA'] }, paymentStatus: 'PAID' },
+        select: { totalAmountEUR: true, totalPrice: true },
+      }),
+      prisma.flight.count({
+        where: { createdAt: { gte: dateFrom, lte: dateTo }, status: 'COMPLETED' },
+      }),
+      prisma.mediaFolder.findMany({
+        where: { createdAt: { gte: dateFrom, lte: dateTo } },
+        select: { paymentStatus: true, deliveryStatus: true },
+      }),
+    ]);
+
+    const periodPaid = periodSales.filter(s => s.paymentStatus === 'PAID');
+    const prevPaid = prevSales.filter(s => s.paymentStatus === 'PAID');
+
+    const periodRevenue = periodPaid.reduce((sum, s) => sum + (s.totalAmountEUR || s.totalPrice), 0);
+    const prevRevenue = prevPaid.reduce((sum, s) => sum + (s.totalAmountEUR || s.totalPrice), 0);
+
+    const soldCount = periodPaid.length;
+    const prevSoldCount = prevPaid.length;
+
+    const deliveredCount = periodFolders.filter(f => f.deliveryStatus === 'DELIVERED').length;
+    const waitingCount = periodFolders.filter(f => f.paymentStatus === 'PAID' && f.deliveryStatus !== 'DELIVERED').length;
+
+    const saleRatio = periodFlights > 0 ? Math.round((soldCount / periodFlights) * 100) : 0;
+
+    const monthTotal = monthSales.reduce((sum, s) => sum + (s.totalAmountEUR || s.totalPrice), 0);
+    const lastMonthTotal = lastMonthSales.reduce((sum, s) => sum + (s.totalAmountEUR || s.totalPrice), 0);
+
+    const revenueChange = prevRevenue > 0 ? Math.round(((periodRevenue - prevRevenue) / prevRevenue) * 100) : 0;
+    const soldCountChange = prevSoldCount > 0 ? Math.round(((soldCount - prevSoldCount) / prevSoldCount) * 100) : 0;
+    const monthChange = lastMonthTotal > 0 ? Math.round(((monthTotal - lastMonthTotal) / lastMonthTotal) * 100) : 0;
+
+    res.json({
+      success: true,
+      data: {
+        todaySoldCount: soldCount,
+        todayRevenue: periodRevenue,
+        deliveredToday: deliveredCount,
+        waitingToday: waitingCount,
+        saleRatio,
+        todayFlights: periodFlights,
+        monthTotal,
+        soldCountChange,
+        revenueChange,
+        monthChange,
+      },
+    });
+  })
+);
+
+// GET /api/media/dashboard/cashbox - Kasa raporu (para birimi dağılımı)
+router.get(
+  '/dashboard/cashbox',
+  authenticate,
+  asyncHandler(async (req: AuthRequest, res: any) => {
+    const { dateFrom, dateTo } = parseDateRange(req.query);
+
+    const sales = await prisma.sale.findMany({
+      where: {
+        createdAt: { gte: dateFrom, lte: dateTo },
+        itemType: { in: ['Foto/Video', 'MEDIA'] },
+        paymentStatus: 'PAID',
+      },
+      include: { paymentDetails: true },
+    });
+
+    // Group by currency → paymentMethod
+    const cashbox: Record<string, Record<string, number>> = {};
+    let grandTotal = 0;
+
+    for (const sale of sales) {
+      if (sale.paymentDetails && sale.paymentDetails.length > 0) {
+        for (const pd of sale.paymentDetails) {
+          if (!cashbox[pd.currency]) cashbox[pd.currency] = {};
+          cashbox[pd.currency][pd.paymentMethod] = (cashbox[pd.currency][pd.paymentMethod] || 0) + pd.amount;
+        }
+      } else {
+        const cur = sale.primaryCurrency || 'EUR';
+        const method = sale.paymentMethod || 'CASH';
+        if (!cashbox[cur]) cashbox[cur] = {};
+        cashbox[cur][method] = (cashbox[cur][method] || 0) + sale.totalPrice;
+      }
+      grandTotal += (sale.totalAmountEUR || sale.totalPrice);
+    }
+
+    const currencies = Object.entries(cashbox).map(([currency, methods]) => ({
+      currency,
+      methods: Object.entries(methods).map(([method, amount]) => ({ method, amount })),
+      total: Object.values(methods).reduce((s, v) => s + v, 0),
+    }));
+
+    res.json({
+      success: true,
+      data: { currencies, grandTotalEUR: grandTotal, saleCount: sales.length },
+    });
+  })
+);
+
+// GET /api/media/dashboard/chart - Grafik verileri
+router.get(
+  '/dashboard/chart',
+  authenticate,
+  asyncHandler(async (req: AuthRequest, res: any) => {
+    const { period = '30' } = req.query;
+    const days = parseInt(period as string) || 30;
+
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+    startDate.setHours(0, 0, 0, 0);
+
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(0, 0, 0, 0);
+
+    const [sales, flights] = await Promise.all([
+      prisma.sale.findMany({
+        where: {
+          createdAt: { gte: startDate, lt: tomorrow },
+          itemType: { in: ['Foto/Video', 'MEDIA'] },
+          paymentStatus: 'PAID',
+        },
+        select: { totalAmountEUR: true, totalPrice: true, createdAt: true },
+      }),
+      prisma.flight.findMany({
+        where: {
+          createdAt: { gte: startDate, lt: tomorrow },
+          status: 'COMPLETED',
+        },
+        select: { createdAt: true },
+      }),
+    ]);
+
+    // Günlük veri
+    const dailyData: { date: string; revenue: number; sold: number; flights: number }[] = [];
+    const dayMs = 24 * 60 * 60 * 1000;
+
+    for (let d = new Date(startDate); d < tomorrow; d = new Date(d.getTime() + dayMs)) {
+      const dayStart = new Date(d);
+      const dayEnd = new Date(d.getTime() + dayMs);
+      const dateStr = d.toISOString().split('T')[0];
+
+      const daySales = sales.filter(s => s.createdAt >= dayStart && s.createdAt < dayEnd);
+      const dayFlights = flights.filter(f => f.createdAt >= dayStart && f.createdAt < dayEnd);
+
+      dailyData.push({
+        date: dateStr,
+        revenue: daySales.reduce((sum, s) => sum + (s.totalAmountEUR || s.totalPrice), 0),
+        sold: daySales.length,
+        flights: dayFlights.length,
+      });
+    }
+
+    // Toplam alan vs almayan
+    const totalFlights = flights.length;
+    const totalSold = sales.length;
+    const totalNotSold = Math.max(0, totalFlights - totalSold);
+
+    res.json({
+      success: true,
+      data: {
+        dailyData,
+        pieData: {
+          sold: totalSold,
+          notSold: totalNotSold,
+        },
+      },
+    });
+  })
+);
+
+// GET /api/media/sales - Müşteri foto/video satış listesi (tablo)
+router.get(
+  '/sales',
+  authenticate,
+  asyncHandler(async (req: AuthRequest, res: any) => {
+    const {
+      date = 'today',
+      startDate,
+      endDate,
+      payment = 'all',
+      delivery = 'all',
+      pilot: pilotId,
+      search,
+      page = '1',
+      limit = '20',
+      sortBy = 'flightTime',
+      sortOrder = 'desc',
+    } = req.query;
+
+    // Date range
+    let dateFrom: Date;
+    let dateTo: Date;
+
+    const now = new Date();
+    if (startDate && endDate) {
+      dateFrom = new Date(startDate as string);
+      dateFrom.setHours(0, 0, 0, 0);
+      dateTo = new Date(endDate as string);
+      dateTo.setHours(23, 59, 59, 999);
+    } else if (date === 'week') {
+      dateFrom = new Date(now);
+      dateFrom.setDate(dateFrom.getDate() - 7);
+      dateFrom.setHours(0, 0, 0, 0);
+      dateTo = new Date(now);
+      dateTo.setHours(23, 59, 59, 999);
+    } else if (date === 'month') {
+      dateFrom = new Date(now.getFullYear(), now.getMonth(), 1);
+      dateTo = new Date(now);
+      dateTo.setHours(23, 59, 59, 999);
+    } else {
+      // today
+      dateFrom = new Date(now);
+      dateFrom.setHours(0, 0, 0, 0);
+      dateTo = new Date(now);
+      dateTo.setHours(23, 59, 59, 999);
+    }
+
+    // Build flight query
+    const flightWhere: any = {
+      createdAt: { gte: dateFrom, lte: dateTo },
+      status: { in: ['COMPLETED', 'IN_FLIGHT'] },
+    };
+    if (pilotId) {
+      flightWhere.pilotId = pilotId as string;
+    }
+
+    const pageNum = Math.max(1, parseInt(page as string) || 1);
+    const limitNum = Math.min(100, Math.max(1, parseInt(limit as string) || 20));
+
+    // Get all flights in range
+    const allFlights = await prisma.flight.findMany({
+      where: flightWhere,
+      include: {
+        customer: {
+          select: { id: true, displayId: true, firstName: true, lastName: true, phone: true, email: true, weight: true },
+        },
+        pilot: {
+          select: { id: true, name: true },
+        },
+        mediaFolder: {
+          select: { id: true, folderPath: true, fileCount: true, paymentStatus: true, deliveryStatus: true },
+        },
+      },
+      orderBy: sortBy === 'flightTime' ? { takeoffAt: sortOrder === 'asc' ? 'asc' : 'desc' } : { createdAt: sortOrder === 'asc' ? 'asc' : 'desc' },
+    });
+
+    // Get media sales for these customers
+    const customerIds = allFlights.map(f => f.customerId);
+    const mediaSales = await prisma.sale.findMany({
+      where: {
+        customerId: { in: customerIds },
+        itemType: { in: ['Foto/Video', 'MEDIA'] },
+      },
+      include: {
+        soldBy: { select: { id: true, username: true, name: true } },
+        paymentDetails: true,
+      },
+    });
+
+    // Map sales to customers
+    const salesByCustomer = new Map<string, typeof mediaSales[0]>();
+    for (const sale of mediaSales) {
+      if (sale.customerId) {
+        salesByCustomer.set(sale.customerId, sale);
+      }
+    }
+
+    // Combine data
+    let rows = allFlights.map(flight => {
+      const sale = salesByCustomer.get(flight.customerId) || null;
+      return {
+        flightId: flight.id,
+        customer: flight.customer,
+        pilot: flight.pilot,
+        flightTime: flight.takeoffAt,
+        flightDuration: flight.durationMinutes,
+        flightStatus: flight.status,
+        mediaFolder: flight.mediaFolder,
+        sale: sale ? {
+          id: sale.id,
+          itemName: sale.itemName,
+          totalPrice: sale.totalPrice,
+          totalAmountEUR: sale.totalAmountEUR,
+          primaryCurrency: sale.primaryCurrency,
+          paymentStatus: sale.paymentStatus,
+          paymentMethod: sale.paymentMethod,
+          soldBy: sale.soldBy,
+          paymentDetails: sale.paymentDetails,
+          createdAt: sale.createdAt,
+        } : null,
+      };
+    });
+
+    // Apply filters
+    if (payment !== 'all') {
+      if (payment === 'paid') {
+        rows = rows.filter(r => r.sale?.paymentStatus === 'PAID');
+      } else if (payment === 'unpaid') {
+        rows = rows.filter(r => !r.sale || r.sale.paymentStatus === 'UNPAID');
+      }
+    }
+    if (delivery !== 'all') {
+      if (delivery === 'delivered') {
+        rows = rows.filter(r => r.mediaFolder?.deliveryStatus === 'DELIVERED');
+      } else if (delivery === 'waiting') {
+        rows = rows.filter(r => r.mediaFolder && r.mediaFolder.paymentStatus === 'PAID' && r.mediaFolder.deliveryStatus !== 'DELIVERED');
+      }
+    }
+    if (search) {
+      const s = (search as string).toLowerCase();
+      rows = rows.filter(r =>
+        r.customer.displayId.toLowerCase().includes(s) ||
+        r.customer.firstName.toLowerCase().includes(s) ||
+        r.customer.lastName.toLowerCase().includes(s) ||
+        r.pilot.name.toLowerCase().includes(s)
+      );
+    }
+
+    const totalCount = rows.length;
+    const totalPages = Math.ceil(totalCount / limitNum);
+    const paginatedRows = rows.slice((pageNum - 1) * limitNum, pageNum * limitNum);
+
+    res.json({
+      success: true,
+      data: paginatedRows,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        totalCount,
+        totalPages,
+      },
+    });
+  })
+);
+
+// GET /api/media/staff-summary - Satış personeli foto/video özeti
+router.get(
+  '/staff-summary',
+  authenticate,
+  asyncHandler(async (req: AuthRequest, res: any) => {
+    const { date = 'today', startDate, endDate } = req.query;
+
+    let dateFrom: Date;
+    let dateTo: Date;
+    const now = new Date();
+
+    if (startDate && endDate) {
+      dateFrom = new Date(startDate as string); dateFrom.setHours(0, 0, 0, 0);
+      dateTo = new Date(endDate as string); dateTo.setHours(23, 59, 59, 999);
+    } else if (date === 'week') {
+      dateFrom = new Date(now); dateFrom.setDate(dateFrom.getDate() - 7); dateFrom.setHours(0, 0, 0, 0);
+      dateTo = new Date(now); dateTo.setHours(23, 59, 59, 999);
+    } else if (date === 'month') {
+      dateFrom = new Date(now.getFullYear(), now.getMonth(), 1);
+      dateTo = new Date(now); dateTo.setHours(23, 59, 59, 999);
+    } else {
+      dateFrom = new Date(now); dateFrom.setHours(0, 0, 0, 0);
+      dateTo = new Date(now); dateTo.setHours(23, 59, 59, 999);
+    }
+
+    const sales = await prisma.sale.findMany({
+      where: {
+        createdAt: { gte: dateFrom, lte: dateTo },
+        itemType: { in: ['Foto/Video', 'MEDIA'] },
+      },
+      include: {
+        soldBy: { select: { id: true, username: true, name: true } },
+      },
+    });
+
+    const staffMap = new Map<string, { id: string; name: string; count: number; totalEUR: number; paidEUR: number; unpaidEUR: number }>();
+
+    for (const sale of sales) {
+      const staffId = sale.soldById;
+      const existing = staffMap.get(staffId) || {
+        id: staffId,
+        name: sale.soldBy.name || sale.soldBy.username,
+        count: 0,
+        totalEUR: 0,
+        paidEUR: 0,
+        unpaidEUR: 0,
+      };
+      existing.count++;
+      const eur = sale.totalAmountEUR || sale.totalPrice;
+      existing.totalEUR += eur;
+      if (sale.paymentStatus === 'PAID') existing.paidEUR += eur;
+      else existing.unpaidEUR += eur;
+      staffMap.set(staffId, existing);
+    }
+
+    res.json({
+      success: true,
+      data: Array.from(staffMap.values()).sort((a, b) => b.totalEUR - a.totalEUR),
+    });
+  })
+);
+
+// GET /api/media/pilot-summary - Pilot bazlı medya özeti
+router.get(
+  '/pilot-summary',
+  authenticate,
+  asyncHandler(async (req: AuthRequest, res: any) => {
+    const { date = 'today', startDate, endDate } = req.query;
+
+    let dateFrom: Date;
+    let dateTo: Date;
+    const now = new Date();
+
+    if (startDate && endDate) {
+      dateFrom = new Date(startDate as string); dateFrom.setHours(0, 0, 0, 0);
+      dateTo = new Date(endDate as string); dateTo.setHours(23, 59, 59, 999);
+    } else if (date === 'week') {
+      dateFrom = new Date(now); dateFrom.setDate(dateFrom.getDate() - 7); dateFrom.setHours(0, 0, 0, 0);
+      dateTo = new Date(now); dateTo.setHours(23, 59, 59, 999);
+    } else if (date === 'month') {
+      dateFrom = new Date(now.getFullYear(), now.getMonth(), 1);
+      dateTo = new Date(now); dateTo.setHours(23, 59, 59, 999);
+    } else {
+      dateFrom = new Date(now); dateFrom.setHours(0, 0, 0, 0);
+      dateTo = new Date(now); dateTo.setHours(23, 59, 59, 999);
+    }
+
+    const flights = await prisma.flight.findMany({
+      where: {
+        createdAt: { gte: dateFrom, lte: dateTo },
+        status: { in: ['COMPLETED', 'IN_FLIGHT'] },
+      },
+      include: {
+        pilot: { select: { id: true, name: true } },
+        mediaFolder: { select: { fileCount: true, paymentStatus: true, deliveryStatus: true } },
+      },
+    });
+
+    // Get all media sales for these flights' customers
+    const customerIds = flights.map(f => f.customerId);
+    const mediaSales = await prisma.sale.findMany({
+      where: {
+        customerId: { in: customerIds },
+        itemType: { in: ['Foto/Video', 'MEDIA'] },
+        paymentStatus: 'PAID',
+      },
+      select: { customerId: true },
+    });
+    const paidCustomerIds = new Set(mediaSales.map(s => s.customerId));
+
+    const pilotMap = new Map<string, { id: string; name: string; totalFlights: number; mediaSold: number; filesUploaded: number; waitingUpload: number }>();
+
+    for (const flight of flights) {
+      const pilotId = flight.pilotId;
+      const existing = pilotMap.get(pilotId) || {
+        id: pilotId,
+        name: flight.pilot.name,
+        totalFlights: 0,
+        mediaSold: 0,
+        filesUploaded: 0,
+        waitingUpload: 0,
+      };
+      existing.totalFlights++;
+      if (paidCustomerIds.has(flight.customerId)) existing.mediaSold++;
+      if (flight.mediaFolder) {
+        existing.filesUploaded += flight.mediaFolder.fileCount;
+        if (flight.mediaFolder.fileCount === 0) existing.waitingUpload++;
+      } else {
+        existing.waitingUpload++;
+      }
+      pilotMap.set(pilotId, existing);
+    }
+
+    res.json({
+      success: true,
+      data: Array.from(pilotMap.values()).sort((a, b) => b.totalFlights - a.totalFlights),
+    });
+  })
+);
+
+// POST /api/media/pilot/:pilotId/open-folder - Open pilot's date folder in Finder
+router.post(
+  '/pilot/:pilotId/open-folder',
+  authenticate,
+  asyncHandler(async (req: AuthRequest, res: any) => {
+    const { pilotId } = req.params;
+    const { date } = req.body;
+
+    const pilot = await prisma.pilot.findUnique({ where: { id: pilotId } });
+    if (!pilot) {
+      throw new AppError('Pilot bulunamadı', 404, 'PILOT_NOT_FOUND');
+    }
+
+    const targetDate = date || new Date().toISOString().split('T')[0];
+    const safePilotName = sanitizePilotName(pilot.name);
+    const folderDate = formatDateForFolder(targetDate);
+    const folderPath = path.join(MEDIA_BASE_PATH, folderDate, safePilotName);
+    const absolutePath = path.resolve(process.cwd(), folderPath);
+
+    // Try to find the folder, create if not exists
+    try {
+      await fs.access(absolutePath);
+    } catch {
+      // Pilot folder doesn't exist — try parent date folder
+      const dateFolderPath = path.resolve(process.cwd(), path.join(MEDIA_BASE_PATH, folderDate));
+      try {
+        await fs.access(dateFolderPath);
+        // Date folder exists but pilot folder doesn't — open date folder
+        const platform = process.platform;
+        const command = platform === 'darwin' ? `open "${dateFolderPath}"` : platform === 'win32' ? `explorer "${dateFolderPath}"` : `xdg-open "${dateFolderPath}"`;
+        exec(command, (error) => {
+          if (error) {
+            return res.status(500).json({ success: false, error: { message: 'Klasör açılamadı' } });
+          }
+          res.json({ success: true, message: 'Tarih klasörü açıldı (pilot klasörü henüz yok)', data: { path: dateFolderPath } });
+        });
+        return;
+      } catch {
+        // Date folder also doesn't exist — create pilot folder and open it
+        await fs.mkdir(absolutePath, { recursive: true });
+      }
+    }
+
+    const platform = process.platform;
+    const command = platform === 'darwin' ? `open "${absolutePath}"` : platform === 'win32' ? `explorer "${absolutePath}"` : `xdg-open "${absolutePath}"`;
+
+    exec(command, (error) => {
+      if (error) {
+        return res.status(500).json({ success: false, error: { message: 'Klasör açılamadı' } });
+      }
+      res.json({ success: true, message: 'Klasör açıldı', data: { path: absolutePath } });
+    });
+  })
+);
 
 // GET /api/media/stats/today - Today's media stats
 router.get(
@@ -227,7 +816,7 @@ router.get(
         itemName: true,
         totalPrice: true,
         totalAmountEUR: true,
-        currency: true,
+        primaryCurrency: true,
         paymentMethod: true,
         paymentStatus: true,
         createdAt: true,

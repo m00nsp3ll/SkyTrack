@@ -128,6 +128,20 @@
 - [x] Müşteri indirme sayfası
 - [x] ZIP indirme özelliği
 
+### Foto & Video Takip Paneli (2026-02-19)
+- [x] Dashboard istatistik kartları (6 kart, değişim yüzdeleri)
+- [x] Günlük gelir bar chart (Recharts, son 30 gün)
+- [x] Alan vs almayan pie chart (yeşil/sarı)
+- [x] Müşteri foto/video tablosu (9 sütun, filtreler, pagination)
+- [x] Satış personeli özet tablosu
+- [x] Pilot bazlı medya özet tablosu (klasör açma)
+- [x] Müşteri detay modalı (uçuş, satış, medya bilgileri)
+- [x] Kasa raporu modalı (para birimi dağılımı, yeşil buton)
+- [x] Teslim durumu toggle (DELIVERED/READY)
+- [x] 6 API endpoint (dashboard, chart, cashbox, sales, staff-summary, pilot-summary)
+- [x] Recursive medya dosya tarama (GoPro alt klasörleri dahil)
+- [x] Pilot klasör açma hata toleransı (klasör yoksa oluştur)
+
 ### POS / Satış
 - [x] Ürün yönetimi
 - [x] Satış işlemleri

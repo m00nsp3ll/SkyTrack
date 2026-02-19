@@ -97,6 +97,14 @@ function sanitizePilotName(name: string): string {
     .replace(/\s+/g, '_');
 }
 
+// Helper: Format date as DD-MM-YYYY for folder names
+function formatDateForFolder(date: Date): string {
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = date.getFullYear();
+  return `${day}-${month}-${year}`;
+}
+
 // Helper: Generate username from pilot name
 function pilotUsername(name: string, index: number): string {
   const parts = name.toLowerCase().split(/\s+/);
@@ -280,7 +288,7 @@ async function main() {
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const dateStr = today.toISOString().split('T')[0];
+  const dateStr = formatDateForFolder(today);
 
   // Track queue as array of pilot indices - simulates real rotation
   // Harun(0) ve Bedirhan(1) kuyrukta 1. ve 2. sıraya konacak, simülasyona dahil edilmiyor
@@ -347,7 +355,7 @@ async function main() {
 
     // Create media folder
     const pilotFolderName = sanitizePilotName(pilot.name);
-    const folderPath = `media/${dateStr}/${pilotFolderName}/${sortiNumber}_sorti/${customer.displayId}`;
+    const folderPath = `media/${dateStr}/${pilotFolderName}/${sortiNumber}.Sorti/${customer.displayId}`;
     fs.mkdirSync(folderPath, { recursive: true });
     await prisma.mediaFolder.create({
       data: {

@@ -35,11 +35,21 @@ export function sanitizePilotName(name: string): string {
     .replace(/\s+/g, '_');
 }
 
+// Convert date to DD-MM-YYYY format for folder names
+export function formatDateForFolder(date: string | Date): string {
+  const d = typeof date === 'string' ? new Date(date) : date;
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const year = d.getFullYear();
+  return `${day}-${month}-${year}`;
+}
+
 // Get media folder path for a customer
-// Structure: media/YYYY-MM-DD/Pilot_Name/X_sorti/DisplayId/
+// Structure: media/DD-MM-YYYY/Pilot_Name/X.Sorti/DisplayId/
 export function getMediaFolderPath(date: string, pilotName: string, sortiNumber: number, customerDisplayId: string): string {
   const safePilotName = sanitizePilotName(pilotName);
-  return path.join(MEDIA_BASE_PATH, date, safePilotName, `${sortiNumber}_sorti`, customerDisplayId);
+  const folderDate = formatDateForFolder(date);
+  return path.join(MEDIA_BASE_PATH, folderDate, safePilotName, `${sortiNumber}.Sorti`, customerDisplayId);
 }
 
 // Ensure folder structure exists (flat folder - files go directly here)
@@ -53,7 +63,27 @@ export function getFileType(mimeType: string): 'photo' | 'video' {
   return 'photo';
 }
 
-// Scan folder for media files (flat folder, no thumbnails)
+// Recursively collect media files from a directory and all subdirectories
+async function collectMediaFilesRecursive(dirPath: string): Promise<string[]> {
+  const results: string[] = [];
+  try {
+    const entries = await fs.readdir(dirPath, { withFileTypes: true });
+    for (const entry of entries) {
+      const fullPath = path.join(dirPath, entry.name);
+      if (entry.isDirectory()) {
+        const subFiles = await collectMediaFilesRecursive(fullPath);
+        results.push(...subFiles);
+      } else if (entry.isFile() && isMediaFile(entry.name)) {
+        results.push(fullPath);
+      }
+    }
+  } catch {
+    // Directory doesn't exist or can't be read
+  }
+  return results;
+}
+
+// Scan folder for media files (recursive - includes subdirectories like GoPro folders)
 export async function scanAndProcessFolder(
   folderPath: string,
   customerId: string,
@@ -62,20 +92,12 @@ export async function scanAndProcessFolder(
   // Ensure folder exists
   await ensureFolderStructure(folderPath);
 
-  let processed = 0;
   const errors: string[] = [];
+  let processed = 0;
 
   try {
-    const files = await fs.readdir(folderPath);
-
-    for (const file of files) {
-      const filePath = path.join(folderPath, file);
-      const stat = await fs.stat(filePath);
-
-      if (stat.isFile() && isMediaFile(file)) {
-        processed++;
-      }
-    }
+    const filePaths = await collectMediaFilesRecursive(folderPath);
+    processed = filePaths.length;
   } catch (err) {
     errors.push(`Failed to read folder: ${(err as Error).message}`);
   }
@@ -111,17 +133,15 @@ function getMimeType(filename: string): string {
   return mimeTypes[ext] || 'application/octet-stream';
 }
 
-// List all media files for a customer (flat folder, no thumbnails)
+// List all media files for a customer (recursive - includes subdirectories like GoPro folders)
 export async function listMediaFiles(folderPath: string): Promise<MediaFile[]> {
   const files: MediaFile[] = [];
 
   try {
-    const fileList = await fs.readdir(folderPath);
+    const filePaths = await collectMediaFilesRecursive(folderPath);
 
-    for (const filename of fileList) {
-      if (!isMediaFile(filename)) continue;
-
-      const filePath = path.join(folderPath, filename);
+    for (const filePath of filePaths) {
+      const filename = path.basename(filePath);
       const stat = await fs.stat(filePath);
       const mimeType = getMimeType(filename);
 

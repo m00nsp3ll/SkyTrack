@@ -175,6 +175,47 @@ export const mediaApi = {
   // Get storage stats
   getStorage: () => api.get('/media/storage'),
 
+  // Dashboard stats
+  getDashboard: (params?: { date?: string; startDate?: string; endDate?: string }) =>
+    api.get('/media/dashboard', { params }),
+
+  // Dashboard chart data
+  getDashboardChart: (period?: number) => api.get('/media/dashboard/chart', { params: { period } }),
+
+  // Dashboard cashbox (currency breakdown)
+  getCashbox: (params?: { date?: string; startDate?: string; endDate?: string }) =>
+    api.get('/media/dashboard/cashbox', { params }),
+
+  // Open customer folder in Finder
+  openFolder: (customerId: string) => api.post(`/media/${customerId}/open-folder`),
+
+  // Open pilot folder in Finder
+  openPilotFolder: (pilotId: string, date?: string) =>
+    api.post(`/media/pilot/${pilotId}/open-folder`, { date }),
+
+  // Media sales table
+  getSales: (params?: {
+    date?: string
+    startDate?: string
+    endDate?: string
+    payment?: string
+    delivery?: string
+    pilot?: string
+    search?: string
+    page?: number
+    limit?: number
+    sortBy?: string
+    sortOrder?: string
+  }) => api.get('/media/sales', { params }),
+
+  // Staff summary
+  getStaffSummary: (params?: { date?: string; startDate?: string; endDate?: string }) =>
+    api.get('/media/staff-summary', { params }),
+
+  // Pilot summary
+  getPilotSummary: (params?: { date?: string; startDate?: string; endDate?: string }) =>
+    api.get('/media/pilot-summary', { params }),
+
   // List all media folders with pagination
   getFolders: (params?: {
     date?: string

@@ -1,47 +1,47 @@
 # Active Context - SkyTrack
 
-## Son Çalışma Oturumu: 2026-02-19 (Oturum 12)
+## Son Çalışma Oturumu: 2026-02-20 (Oturum 14)
 
 ### Yapılan İşler
 
-1. **Foto/Video Geliri — Tüm Raporlarda Düzeltme** ✅
-   - Kök neden: Medya satışları `itemType: 'MEDIA'` olarak kaydediliyordu, raporlar `'Foto/Video'` arıyordu
-   - `mediaRevenue` hesaplaması: `mediaFolder.paymentAmount` (hep 0) yerine `sale` tablosundan hesaplanıyor
-   - Tüm raporlarda (dashboard, kasa, gelir, vezne, operasyon) eski `MEDIA` → `Foto/Video` normalize edildi
-   - `media.ts` payment endpoint'inde `paymentAmount` artık kaydediliyor
+1. **Foto/Video Raporu UI İyileştirmeleri** ✅
+   - Kasa raporu 3-sütun layout'tan modal'a taşındı (yeşil buton ile açılır)
+   - Grafikler 2-sütun layout (3/5 bar chart + 2/5 pie chart, h-72)
+   - Pie chart renkleri: Alan=yeşil (#22c55e), Almayan=sarı (#f59e0b)
+   - Kasa Raporu butonu sayfa başlığının yanına taşındı (yeşil renk)
 
-2. **Müşteri Satış Geçmişi — Para Birimi ve Ödeme Yöntemi** ✅
-   - `customers.ts` API'sinde `paymentDetails: true` include eklendi
-   - Frontend'de `PaymentDetail` interface eklendi
-   - Satış geçmişi tablosunda her ödeme detayı ayrı gösteriliyor (para birimi + yöntem)
+2. **Header'da Tüm Kurlar** ✅
+   - Sidebar'daki kur bölümü kaldırıldı
+   - Header'a tüm kurlar eklendi: ₺ (TRY), $ (USD), £ (GBP), ₽ (RUB)
+   - Kompakt pill badge'ler, 60 sn otomatik güncelleme
+   - `getAllRates()` API'den tüm kurlar çekiliyor
 
-3. **Seed Data Güncelleme — Harun Personeli** ✅
-   - Yeni kullanıcı: `harun / harun123` (OFFICE_STAFF)
-   - 22 satış kaydı (8 POS, 3 USD, 3 TRY kart, 5 Foto/Video, 1 split, 2 veresiye)
-   - Sunum için çeşitli para birimi ve ödeme yöntemi senaryoları
+3. **Medya Klasör Yapısı - Recursive Tarama** ✅
+   - `listMediaFiles()` ve `scanAndProcessFolder()` recursive yapıldı
+   - Yeni `collectMediaFilesRecursive()` helper fonksiyonu
+   - GoPro klasörleri (100GOPRO, vb.) artık taranıyor
+   - Alt klasörlerdeki tüm medya dosyaları sayılıyor ve listeleniyor
 
-4. **Ödenmemiş Satışlar — Buton Temizliği** ✅
-   - Dropdown'daki nakit/kart butonları kaldırıldı, sadece yeşil "Ödeme Al" butonu kalıyor
+4. **Pilot Klasör Açma Hata Düzeltmesi** ✅
+   - Klasör bulunamadığında hard error yerine otomatik oluşturma
+   - Tarih klasörü varsa pilot klasörü yoksa → tarih klasörünü açar
+   - Her iki klasör de yoksa → oluşturup açar
+
+5. **Seed Data Güncelleme** ✅
+   - 38 pilot, 42 kullanıcı, 17 ürün, 35 müşteri, 35 uçuş, 74 satış
+   - Klasör yapısı: `media/DD-MM-YYYY/Pilot_Name/X.Sorti/DisplayId/`
+   - Seed sorunsuz çalışıyor (`npm run db:seed`)
 
 ### Değiştirilen Dosyalar
 
 | Dosya | İşlem |
 |-------|-------|
-| `packages/api/src/routes/reports.ts` | 6 yerde MEDIA→Foto/Video normalize, mediaRevenue sale tablosundan |
-| `packages/api/src/routes/sales.ts` | mediaSales sale tablosundan, kategori normalize |
-| `packages/api/src/routes/media.ts` | paymentAmount kaydı, itemType Foto/Video |
-| `packages/api/src/routes/customers.ts` | paymentDetails include eklendi |
-| `packages/web/.../customers/[id]/page.tsx` | PaymentDetail gösterimi, itemType Foto/Video |
-| `packages/web/.../sales/unpaid/page.tsx` | Nakit/kart butonları kaldırıldı |
-| `packages/api/prisma/seed.ts` | Harun personeli + 22 satış eklendi |
-| `scripts/seed-demo.sh` | Harun giriş bilgisi eklendi |
-
-### Önemli Teknik Notlar
-
-- **Kategori Normalizasyon:** Tüm rapor endpoint'lerinde `s.itemType === 'MEDIA' ? 'Foto/Video' : s.itemType` kullanılıyor
-- **Eski Kayıtlar:** DB'de hâlâ `MEDIA` olarak duranlar runtime'da normalize ediliyor
-- **Yeni Kayıtlar:** `itemType: 'Foto/Video'` olarak kaydediliyor
-- **Harun kullanıcısı:** `harun / harun123` — sunum için satış yapan ikinci personel
+| `packages/web/app/(dashboard)/admin/media/page.tsx` | Kasa raporu modal, 2-sütun grafikler, pie renkleri, yeşil buton |
+| `packages/web/components/layout/Header.tsx` | Tüm kurlar (TRY, USD, GBP, RUB) pill badge'ler |
+| `packages/web/components/layout/Sidebar.tsx` | Kur bölümü kaldırıldı |
+| `packages/api/src/services/media.ts` | Recursive dosya tarama (collectMediaFilesRecursive) |
+| `packages/api/src/routes/media.ts` | Pilot klasör açma hata düzeltmesi |
+| `packages/api/prisma/seed.ts` | Güncel seed data |
 
 ### Sonraki Adımlar
 
