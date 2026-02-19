@@ -203,6 +203,9 @@ router.get(
           select: {
             id: true,
             status: true,
+            takeoffAt: true,
+            landingAt: true,
+            durationMinutes: true,
           },
         },
       },
@@ -210,15 +213,45 @@ router.get(
 
     const hasMore = folders.length > take;
     const data = hasMore ? folders.slice(0, -1) : folders;
+
+    // Fetch media sales for each customer
+    const customerIds = data.map(f => f.customerId);
+    const mediaSales = await prisma.sale.findMany({
+      where: {
+        customerId: { in: customerIds },
+        itemType: 'Foto/Video',
+      },
+      select: {
+        id: true,
+        customerId: true,
+        itemName: true,
+        totalPrice: true,
+        totalAmountEUR: true,
+        currency: true,
+        paymentMethod: true,
+        paymentStatus: true,
+        createdAt: true,
+        soldBy: {
+          select: { id: true, username: true },
+        },
+      },
+    });
+
+    // Attach sale to each folder
+    const dataWithSales = data.map(folder => ({
+      ...folder,
+      mediaSale: mediaSales.find(s => s.customerId === folder.customerId) || null,
+    }));
+
     const nextCursor = hasMore ? data[data.length - 1]?.id : null;
 
     res.json({
       success: true,
-      data,
+      data: dataWithSales,
       pagination: {
         hasMore,
         nextCursor,
-        count: data.length,
+        count: dataWithSales.length,
       },
     });
   })
@@ -672,6 +705,7 @@ router.patch(
       where: { id: mediaFolder.id },
       data: {
         paymentStatus: status,
+        paymentAmount: status === 'PAID' && amount ? amount : mediaFolder.paymentAmount,
         deliveryStatus: status === 'PAID' ? 'READY' : mediaFolder.deliveryStatus,
       },
     });

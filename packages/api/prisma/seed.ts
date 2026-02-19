@@ -43,8 +43,10 @@ const lastNames = [
   'Özcan', 'Güneş', 'Aktaş', 'Yavuz', 'Aksoy', 'Karaca', 'Bulut', 'Tekin', 'Başar', 'Sezer'
 ];
 
-// Real pilot list (37 pilots)
+// Real pilot list — Harun 1. sıra, Bedirhan 2. sıra
 const pilotNames = [
+  'HARUN SİVASLI',
+  'BEDİRHAN ÇELİK',
   'MİRZA TAYLAN',
   'TUNAHAN OĞUZ',
   'HASAN HÜSEYİN IŞIK',
@@ -63,7 +65,6 @@ const pilotNames = [
   'HAMİT ŞEK',
   'HARUN KARATEKE',
   'MUHSİN KARATEKE',
-  'BEDİRHAN ÇELİK',
   'YİĞİT O. GÜNEŞTEN',
   'ONUR BURAK AVCI',
   'SEDAT NARKUZ',
@@ -148,12 +149,21 @@ async function main() {
   console.log(`👨‍✈️ Creating ${pilotNames.length} pilots...`);
 
   const pilots: any[] = [];
+
+  // Harun ve Bedirhan — özel bilgilerle
+  const specialPilots = [
+    { name: 'HARUN SİVASLI', phone: '05073455838', email: 'harunsivasli@gmail.com' },
+    { name: 'BEDİRHAN ÇELİK', phone: '+905537214251', email: null },
+  ];
+
   for (let i = 0; i < pilotNames.length; i++) {
     const name = pilotNames[i];
+    const special = specialPilots.find(s => s.name === name);
     const pilot = await prisma.pilot.create({
       data: {
         name: name,
-        phone: `053${String(i + 10).padStart(2, '0')}${String(1000000 + i * 11111).slice(0, 7)}`,
+        phone: special?.phone ?? `053${String(i + 10).padStart(2, '0')}${String(1000000 + i * 11111).slice(0, 7)}`,
+        email: special?.email ?? null,
         queuePosition: i + 1,
         isActive: true,
         status: 'AVAILABLE',
@@ -174,35 +184,58 @@ async function main() {
   const pilotHash = await bcrypt.hash('pilot123', 10);
   const ofisHash = await bcrypt.hash('ofis123', 10);
   const medyaHash = await bcrypt.hash('medya123', 10);
+  const harunHash = await bcrypt.hash('12345', 10);
+  const bedoHash = await bcrypt.hash('12345', 10);
+  const harunStaffHash = await bcrypt.hash('harun123', 10);
 
   // Admin
   await prisma.user.create({
-    data: { username: 'admin', passwordHash: adminHash, role: 'ADMIN' },
+    data: { username: 'admin', passwordHash: adminHash, role: 'ADMIN', name: 'Admin' },
   });
 
   // Office staff
   await prisma.user.create({
-    data: { username: 'ofis', passwordHash: ofisHash, role: 'OFFICE_STAFF' },
+    data: { username: 'ofis', passwordHash: ofisHash, role: 'OFFICE_STAFF', name: 'Ofis' },
   });
 
   // Media seller
   await prisma.user.create({
-    data: { username: 'medya', passwordHash: medyaHash, role: 'MEDIA_SELLER' },
+    data: { username: 'medya', passwordHash: medyaHash, role: 'MEDIA_SELLER', name: 'Medya' },
   });
 
-  // Pilot users (37)
+  // Harun - satış personeli
+  const harunStaffUser = await prisma.user.create({
+    data: { username: 'harun', passwordHash: harunStaffHash, role: 'OFFICE_STAFF', name: 'Harun' },
+  });
+
+  // Pilot users — Harun ve Bedirhan özel hesaplarla, diğerleri pilot1..N
   for (let i = 0; i < pilots.length; i++) {
+    const name = pilotNames[i];
+    let username: string;
+    let hash: string;
+
+    if (name === 'HARUN SİVASLI') {
+      username = 'Harun';
+      hash = harunHash;
+    } else if (name === 'BEDİRHAN ÇELİK') {
+      username = 'Bedo';
+      hash = bedoHash;
+    } else {
+      username = `pilot${i + 1}`;
+      hash = pilotHash;
+    }
+
     await prisma.user.create({
       data: {
-        username: `pilot${i + 1}`,
-        passwordHash: pilotHash,
+        username,
+        passwordHash: hash,
         role: 'PILOT',
         pilotId: pilots[i].id,
       },
     });
   }
-  const totalUsers = 3 + pilots.length;
-  console.log(`   ✅ Created ${totalUsers} users (1 admin, 1 office, 1 media, ${pilots.length} pilots)`);
+  const totalUsers = 4 + pilots.length;
+  console.log(`   ✅ Created ${totalUsers} users (1 admin, 1 office, 1 media, 1 harun, ${pilots.length} pilots)`);
 
   // =====================
   // 3. CREATE PRODUCTS (17)
@@ -250,9 +283,11 @@ async function main() {
   const dateStr = today.toISOString().split('T')[0];
 
   // Track queue as array of pilot indices - simulates real rotation
-  // Use first 15 pilots for simulation (rest are available/waiting)
+  // Harun(0) ve Bedirhan(1) kuyrukta 1. ve 2. sıraya konacak, simülasyona dahil edilmiyor
+  // Simülasyon pilot index 2'den (MİRZA TAYLAN) başlıyor
   const activePilotCount = 15;
-  const queue = Array.from({ length: activePilotCount }, (_, i) => i);
+  const queueStartIdx = 2; // Harun ve Bedirhan atlanıyor
+  const queue = Array.from({ length: activePilotCount }, (_, i) => i + queueStartIdx); // [2..16]
   const pilotFlightCounts: number[] = new Array(pilotNames.length).fill(0);
 
   // Helper: assign next customer to first pilot in queue, move pilot to end
@@ -330,31 +365,32 @@ async function main() {
     return { pilot, customer, pilotIdx };
   }
 
-  // --- Round 1: 15 customers, first 15 pilots each get 1 (all completed) ---
-  console.log('   Round 1: İlk 15 pilota 1 müşteri (tamamlandı)...');
+  // --- Round 1: 15 customers, pilots[2..16] each get 1 (all completed) ---
+  console.log('   Round 1: 15 pilota 1 müşteri (tamamlandı)...');
   for (let i = 0; i < activePilotCount; i++) {
     await assignCustomer('COMPLETED', 8 + Math.floor(i * 0.3));
   }
 
-  // --- Round 2: 10 more customers (pilots 0-9 get 2nd flight, all completed) ---
+  // --- Round 2: 10 more customers (pilots[2..11] get 2nd flight, all completed) ---
   console.log('   Round 2: İlk 10 pilota 2. müşteri (tamamlandı)...');
   for (let i = 0; i < 10; i++) {
     await assignCustomer('COMPLETED', 10 + Math.floor(i * 0.3));
   }
 
-  // --- Pilot 0 (MİRZA TAYLAN) gets 5 more to reach limit (7 total) ---
-  console.log(`   ${pilotNames[0]} limit dolduruluyor (7/7)...`);
+  // --- TUNAHAN OĞUZ (pilots[3]) gets 5 more to reach limit (7 total) ---
+  const tunahanIdx = 3; // TUNAHAN OĞUZ
+  console.log(`   ${pilotNames[tunahanIdx]} limit dolduruluyor (7/7)...`);
   for (let i = 0; i < 5; i++) {
-    const idx = queue.indexOf(0);
+    const idx = queue.indexOf(tunahanIdx);
     queue.splice(idx, 1);
-    queue.unshift(0);
+    queue.unshift(tunahanIdx);
     await assignCustomer('COMPLETED', 12 + i);
   }
 
   // --- 5 more active customers: 2 in-flight, 2 assigned, 1 in-flight ---
   console.log('   Aktif müşteriler oluşturuluyor...');
-  // Remove pilot 0 from queue (limit reached)
-  const limitPilotIdx = queue.indexOf(0);
+  // Remove TUNAHAN from queue (limit reached)
+  const limitPilotIdx = queue.indexOf(tunahanIdx);
   if (limitPilotIdx !== -1) {
     queue.splice(limitPilotIdx, 1);
   }
@@ -372,60 +408,32 @@ async function main() {
   // =====================
   console.log('📊 Updating pilot statistics and queue positions...');
 
-  // Update active pilots in queue
-  for (let i = 0; i < queue.length; i++) {
-    const pilotIdx = queue[i];
-    const pilot = pilots[pilotIdx];
+  // Tüm pilotları güncelle: uçuş sayısı + durum + sıra
+  for (let i = 0; i < pilots.length; i++) {
+    const pilot = pilots[i];
 
-    const totalFlights = await prisma.flight.count({
-      where: { pilotId: pilot.id },
-    });
-    const inFlightCount = await prisma.flight.count({
-      where: { pilotId: pilot.id, status: 'IN_FLIGHT' },
-    });
-    const assignedCount = await prisma.flight.count({
-      where: { pilotId: pilot.id, status: 'ASSIGNED' },
-    });
+    const totalFlights = await prisma.flight.count({ where: { pilotId: pilot.id } });
+    const inFlightCount = await prisma.flight.count({ where: { pilotId: pilot.id, status: 'IN_FLIGHT' } });
+    const assignedCount = await prisma.flight.count({ where: { pilotId: pilot.id, status: 'ASSIGNED' } });
 
-    let pilotStatus: 'AVAILABLE' | 'ASSIGNED' | 'IN_FLIGHT' = 'AVAILABLE';
-    if (inFlightCount > 0) pilotStatus = 'IN_FLIGHT';
-    else if (assignedCount > 0) pilotStatus = 'ASSIGNED';
+    let status: string = 'AVAILABLE';
+    if (totalFlights >= 7) status = 'OFF_DUTY';
+    else if (inFlightCount > 0) status = 'IN_FLIGHT';
+    else if (assignedCount > 0) status = 'ASSIGNED';
 
     await prisma.pilot.update({
       where: { id: pilot.id },
       data: {
         dailyFlightCount: totalFlights,
-        status: pilotStatus,
+        status,
         queuePosition: i + 1,
       },
     });
   }
 
-  // Limit reached pilot gets last active position
-  const limitPilot = pilots[0];
-  const limitFlights = await prisma.flight.count({
-    where: { pilotId: limitPilot.id },
-  });
-  await prisma.pilot.update({
-    where: { id: limitPilot.id },
-    data: {
-      dailyFlightCount: limitFlights,
-      status: 'AVAILABLE',
-      queuePosition: queue.length + 1,
-    },
-  });
-
-  // Update remaining pilots (16-36) who didn't fly today
-  for (let i = activePilotCount; i < pilots.length; i++) {
-    await prisma.pilot.update({
-      where: { id: pilots[i].id },
-      data: {
-        queuePosition: queue.length + 2 + (i - activePilotCount),
-        status: 'AVAILABLE',
-        dailyFlightCount: 0,
-      },
-    });
-  }
+  // Harun (idx 0) — seed'de 0 uçuş, sıra 1, AVAILABLE (simülasyona sokulmadı)
+  // Bedirhan (idx 1) — seed'de 0 uçuş, sıra 2, AVAILABLE (simülasyona sokulmadı)
+  // TUNAHAN OĞUZ (idx 3) — simülasyonla 7/7, OFF_DUTY (otomatik yukarıda işlendi)
 
   // =====================
   // 6. CREATE SALES
@@ -873,6 +881,266 @@ async function main() {
     salesCount++;
   }
 
+  // =====================
+  // HARUN'UN SATIŞLARI
+  // =====================
+  console.log('💼 Harun\'un satışları oluşturuluyor...');
+
+  // Harun — POS satışları (EUR nakit)
+  const harunPosProducts = [
+    { name: 'Kola', type: 'İçecek', price: 2.00, qty: 3 },
+    { name: 'Çay', type: 'İçecek', price: 1.50, qty: 5 },
+    { name: 'Tost', type: 'Yiyecek', price: 3.00, qty: 2 },
+    { name: 'Gözleme', type: 'Yiyecek', price: 4.00, qty: 2 },
+    { name: 'Su', type: 'İçecek', price: 1.00, qty: 4 },
+    { name: 'Magnet', type: 'Hediyelik', price: 3.00, qty: 3 },
+    { name: 'Tişört', type: 'Hediyelik', price: 10.00, qty: 1 },
+    { name: 'Şapka', type: 'Hediyelik', price: 7.00, qty: 2 },
+  ];
+
+  for (const item of harunPosProducts) {
+    const customer = completedCustomers[Math.floor(Math.random() * completedCustomers.length)];
+    const totalEUR = item.price * item.qty;
+    const method: 'CASH' | 'CREDIT_CARD' = Math.random() > 0.4 ? 'CASH' : 'CREDIT_CARD';
+
+    const sale = await prisma.sale.create({
+      data: {
+        customerId: customer.id,
+        soldById: harunStaffUser.id,
+        itemName: item.name,
+        itemType: item.type,
+        quantity: item.qty,
+        unitPrice: item.price,
+        totalPrice: totalEUR,
+        totalAmountEUR: totalEUR,
+        totalAmountTRY: totalEUR * 38.50,
+        primaryCurrency: 'EUR',
+        paymentStatus: 'PAID',
+        paymentMethod: method,
+      },
+    });
+    await prisma.paymentDetail.create({
+      data: {
+        saleId: sale.id,
+        currency: 'EUR',
+        amount: totalEUR,
+        amountInEUR: totalEUR,
+        amountInTRY: totalEUR * 38.50,
+        exchangeRate: 1,
+        exchangeSource: 'SEED',
+        paymentMethod: method,
+      },
+    });
+    salesCount++;
+  }
+
+  // Harun — USD satışları (3 adet)
+  for (let i = 0; i < 3; i++) {
+    const product = posProducts[Math.floor(Math.random() * posProducts.length)];
+    const qty = Math.floor(Math.random() * 2) + 1;
+    const customer = completedCustomers[Math.floor(Math.random() * completedCustomers.length)];
+    const totalEUR = product.price * qty;
+    const totalUSD = parseFloat((totalEUR * 1.094).toFixed(2));
+
+    const sale = await prisma.sale.create({
+      data: {
+        customerId: customer.id,
+        soldById: harunStaffUser.id,
+        itemName: product.name,
+        itemType: product.type,
+        quantity: qty,
+        unitPrice: product.price,
+        totalPrice: totalUSD,
+        totalAmountEUR: totalEUR,
+        totalAmountTRY: totalEUR * 38.50,
+        primaryCurrency: 'USD',
+        paymentStatus: 'PAID',
+        paymentMethod: 'CASH',
+      },
+    });
+    await prisma.paymentDetail.create({
+      data: {
+        saleId: sale.id,
+        currency: 'USD',
+        amount: totalUSD,
+        amountInEUR: totalEUR,
+        amountInTRY: totalEUR * 38.50,
+        exchangeRate: 1.094,
+        exchangeSource: 'SEED',
+        paymentMethod: 'CASH',
+      },
+    });
+    salesCount++;
+  }
+
+  // Harun — TRY kredi kartı satışları (3 adet)
+  for (let i = 0; i < 3; i++) {
+    const product = posProducts[Math.floor(Math.random() * posProducts.length)];
+    const qty = Math.floor(Math.random() * 2) + 1;
+    const customer = completedCustomers[Math.floor(Math.random() * completedCustomers.length)];
+    const totalEUR = product.price * qty;
+    const totalTRY = parseFloat((totalEUR * 38.50).toFixed(2));
+
+    const sale = await prisma.sale.create({
+      data: {
+        customerId: customer.id,
+        soldById: harunStaffUser.id,
+        itemName: product.name,
+        itemType: product.type,
+        quantity: qty,
+        unitPrice: product.price,
+        totalPrice: totalTRY,
+        totalAmountEUR: totalEUR,
+        totalAmountTRY: totalTRY,
+        primaryCurrency: 'TRY',
+        paymentStatus: 'PAID',
+        paymentMethod: 'CREDIT_CARD',
+      },
+    });
+    await prisma.paymentDetail.create({
+      data: {
+        saleId: sale.id,
+        currency: 'TRY',
+        amount: totalTRY,
+        amountInEUR: totalEUR,
+        amountInTRY: totalTRY,
+        exchangeRate: 38.50,
+        exchangeSource: 'SEED',
+        paymentMethod: 'CREDIT_CARD',
+      },
+    });
+    salesCount++;
+  }
+
+  // Harun — Foto/Video satışları (5 adet, farklı para birimleri)
+  const harunMediaCurrencies: Array<{ currency: 'EUR' | 'USD' | 'GBP' | 'TRY'; rate: number; method: 'CASH' | 'CREDIT_CARD' }> = [
+    { currency: 'EUR', rate: 1, method: 'CASH' },
+    { currency: 'USD', rate: 1.094, method: 'CASH' },
+    { currency: 'TRY', rate: 38.50, method: 'CREDIT_CARD' },
+    { currency: 'GBP', rate: 0.865, method: 'CASH' },
+    { currency: 'EUR', rate: 1, method: 'CREDIT_CARD' },
+  ];
+
+  for (let i = 0; i < harunMediaCurrencies.length; i++) {
+    const customer = completedCustomers[mediaSaleCount + i < completedCustomers.length ? mediaSaleCount + i : Math.floor(Math.random() * completedCustomers.length)];
+    const curr = harunMediaCurrencies[i];
+    const eurPrice = 25;
+    const localAmount = parseFloat((eurPrice * curr.rate).toFixed(2));
+
+    const sale = await prisma.sale.create({
+      data: {
+        customerId: customer.id,
+        soldById: harunStaffUser.id,
+        itemName: 'Fotoğraf/Video Paketi',
+        itemType: 'Foto/Video',
+        quantity: 1,
+        unitPrice: eurPrice,
+        totalPrice: localAmount,
+        totalAmountEUR: eurPrice,
+        totalAmountTRY: eurPrice * 38.50,
+        primaryCurrency: curr.currency,
+        isSplitPayment: false,
+        paymentStatus: 'PAID',
+        paymentMethod: curr.method,
+      },
+    });
+    await prisma.paymentDetail.create({
+      data: {
+        saleId: sale.id,
+        currency: curr.currency,
+        amount: localAmount,
+        amountInEUR: eurPrice,
+        amountInTRY: eurPrice * 38.50,
+        exchangeRate: curr.rate,
+        exchangeSource: 'SEED',
+        paymentMethod: curr.method,
+      },
+    });
+    salesCount++;
+
+    // Medya klasörünü de ödendi yap
+    await prisma.mediaFolder.updateMany({
+      where: { customerId: customer.id },
+      data: { paymentStatus: 'PAID', paymentAmount: eurPrice, deliveryStatus: 'DELIVERED' },
+    });
+  }
+
+  // Harun — Split payment (EUR nakit + TRY kart)
+  {
+    const customer = completedCustomers[Math.floor(Math.random() * completedCustomers.length)];
+    const totalEUR = 10.00;
+
+    const sale = await prisma.sale.create({
+      data: {
+        customerId: customer.id,
+        soldById: harunStaffUser.id,
+        itemName: 'Tişört',
+        itemType: 'Hediyelik',
+        quantity: 1,
+        unitPrice: 10.00,
+        totalPrice: 10.00,
+        totalAmountEUR: totalEUR,
+        totalAmountTRY: totalEUR * 38.50,
+        primaryCurrency: 'EUR',
+        isSplitPayment: true,
+        paymentStatus: 'PAID',
+        paymentMethod: 'CASH',
+      },
+    });
+    await prisma.paymentDetail.create({
+      data: {
+        saleId: sale.id,
+        currency: 'EUR',
+        amount: 5.00,
+        amountInEUR: 5.00,
+        amountInTRY: 5.00 * 38.50,
+        exchangeRate: 1,
+        exchangeSource: 'SEED',
+        paymentMethod: 'CASH',
+      },
+    });
+    await prisma.paymentDetail.create({
+      data: {
+        saleId: sale.id,
+        currency: 'TRY',
+        amount: 192.50,
+        amountInEUR: 5.00,
+        amountInTRY: 192.50,
+        exchangeRate: 38.50,
+        exchangeSource: 'SEED',
+        paymentMethod: 'CREDIT_CARD',
+      },
+    });
+    salesCount++;
+  }
+
+  // Harun — Veresiye (ödenmemiş, 2 adet)
+  for (let i = 0; i < 2; i++) {
+    const product = posProducts[Math.floor(Math.random() * posProducts.length)];
+    const customer = completedCustomers[Math.floor(Math.random() * completedCustomers.length)];
+    const totalEUR = product.price;
+
+    await prisma.sale.create({
+      data: {
+        customerId: customer.id,
+        soldById: harunStaffUser.id,
+        itemName: product.name,
+        itemType: product.type,
+        quantity: 1,
+        unitPrice: product.price,
+        totalPrice: totalEUR,
+        totalAmountEUR: totalEUR,
+        totalAmountTRY: totalEUR * 38.50,
+        primaryCurrency: 'EUR',
+        paymentStatus: 'UNPAID',
+        paymentMethod: null,
+      },
+    });
+    salesCount++;
+  }
+
+  console.log(`   ✅ Harun: 22 satış (8 POS, 3 USD, 3 TRY kart, 5 Foto/Video, 1 split, 2 veresiye)`);
+
   console.log(`   ✅ Created ${salesCount} sales records`);
 
   // =====================
@@ -995,16 +1263,17 @@ async function main() {
   console.log('   ADMIN:     admin / admin123');
   console.log('   OFFICE:    ofis / ofis123');
   console.log('   MEDIA:     medya / medya123');
+  console.log('   HARUN:     harun / harun123');
   console.log(`   PILOTS:    pilot1 / pilot123  →  pilot${pilots.length} / pilot123`);
   console.log('───────────────────────────────────────────────────────────────');
   console.log('');
   console.log('📊 DATA SUMMARY:');
-  console.log(`   • ${pilots.length} Pilots (1 limit dolu: ${pilotNames[0]})`);
-  console.log(`   • ${totalUsers} Users`);
+  console.log(`   • ${pilots.length} Pilots (1 limit dolu: ${pilotNames[tunahanIdx]})`);
+  console.log(`   • ${totalUsers} Users (admin, ofis, medya, harun + ${pilots.length} pilot)`);
   console.log(`   • 17 Products`);
   console.log(`   • ${customers.length} Customers`);
   console.log(`   • ${flights.length} Flights`);
-  console.log(`   • ${salesCount} Sales`);
+  console.log(`   • ${salesCount} Sales (admin + harun satışları)`);
   console.log('');
   console.log('🔄 PILOT SIRASI (queuePosition):');
   console.log('───────────────────────────────────────────────────────────────');

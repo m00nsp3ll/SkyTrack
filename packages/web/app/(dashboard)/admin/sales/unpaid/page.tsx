@@ -248,28 +248,6 @@ export default function UnpaidSalesPage() {
                             </div>
                             <div className="flex items-center gap-3">
                               <span className="font-medium text-red-600">€{(sale.totalAmountEUR || sale.totalPrice).toFixed(2)}</span>
-                              <div className="flex gap-1">
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() => handlePaySingle(sale.id, 'CASH')}
-                                  disabled={processing === sale.id}
-                                >
-                                  {processing === sale.id ? (
-                                    <RefreshCw className="h-3 w-3 animate-spin" />
-                                  ) : (
-                                    <Banknote className="h-3 w-3" />
-                                  )}
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() => handlePaySingle(sale.id, 'CREDIT_CARD')}
-                                  disabled={processing === sale.id}
-                                >
-                                  <CreditCard className="h-3 w-3" />
-                                </Button>
-                              </div>
                             </div>
                           </div>
                         ))}

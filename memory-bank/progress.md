@@ -132,10 +132,11 @@
 - [x] Ürün yönetimi
 - [x] Satış işlemleri
 - [x] Ödeme yöntemleri (Nakit, Kart, Havale, Veresiye)
-- [x] Müşteri bazlı satış geçmişi
+- [x] Müşteri bazlı satış geçmişi (para birimi + ödeme yöntemi detaylı gösterim)
 - [x] Borç tahsilat sistemi
 - [x] Personel satış takip sistemi (soldBy kaydı)
 - [x] Ödenmemiş satışlar sayfası - personel/saat bilgisi (/admin/sales/unpaid)
+- [x] Ödenmemiş satışlarda sadece "Ödeme Al" butonu (nakit/kart butonları kaldırıldı)
 
 ### Multi-Currency (Döviz) Sistemi (2026-02-14)
 - [x] TCMB XML API entegrasyonu (kur çekme, cross-rate hesaplama)
@@ -167,6 +168,8 @@
 - [x] Dönem Karşılaştırma (/admin/reports/compare) - İki dönem karşılaştırması
 - [x] Sistem İzleme (/admin/reports/system) - Disk, DB, memory kullanımı
 - [x] Bekleyen Ödemeler Modal - Personel detayında pop-up panel
+- [x] Foto/Video geliri tüm raporlarda doğru hesaplanıyor (MEDIA→Foto/Video normalize)
+- [x] Kategori dağılımında eski MEDIA kayıtları Foto/Video olarak gösteriliyor
 
 ### iOS Native App (2026-02-16)
 - [x] Capacitor iOS projesi sıfırdan oluşturuldu (npx cap add ios)

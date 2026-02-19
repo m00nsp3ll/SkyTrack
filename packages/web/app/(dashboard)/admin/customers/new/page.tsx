@@ -77,6 +77,9 @@ export default function NewCustomerPage() {
   const [showWaiverModal, setShowWaiverModal] = useState(false)
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 })
 
+  const [countryCode, setCountryCode] = useState('+90')
+  const [countrySearch, setCountrySearch] = useState('')
+  const [showCountryDropdown, setShowCountryDropdown] = useState(false)
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -85,6 +88,191 @@ export default function NewCustomerPage() {
     emergencyContact: '',
     weight: '',
   })
+
+  const ALL_COUNTRIES = [
+    { code: '+90', flag: '🇹🇷', name: 'Türkiye' },
+    { code: '+93', flag: '🇦🇫', name: 'Afganistan' },
+    { code: '+355', flag: '🇦🇱', name: 'Arnavutluk' },
+    { code: '+213', flag: '🇩🇿', name: 'Cezayir' },
+    { code: '+376', flag: '🇦🇩', name: 'Andorra' },
+    { code: '+244', flag: '🇦🇴', name: 'Angola' },
+    { code: '+54', flag: '🇦🇷', name: 'Arjantin' },
+    { code: '+374', flag: '🇦🇲', name: 'Ermenistan' },
+    { code: '+61', flag: '🇦🇺', name: 'Avustralya' },
+    { code: '+43', flag: '🇦🇹', name: 'Avusturya' },
+    { code: '+994', flag: '🇦🇿', name: 'Azerbaycan' },
+    { code: '+1-242', flag: '🇧🇸', name: 'Bahamalar' },
+    { code: '+973', flag: '🇧🇭', name: 'Bahreyn' },
+    { code: '+880', flag: '🇧🇩', name: 'Bangladeş' },
+    { code: '+375', flag: '🇧🇾', name: 'Beyaz Rusya' },
+    { code: '+32', flag: '🇧🇪', name: 'Belçika' },
+    { code: '+501', flag: '🇧🇿', name: 'Belize' },
+    { code: '+229', flag: '🇧🇯', name: 'Benin' },
+    { code: '+975', flag: '🇧🇹', name: 'Bhutan' },
+    { code: '+591', flag: '🇧🇴', name: 'Bolivya' },
+    { code: '+387', flag: '🇧🇦', name: 'Bosna Hersek' },
+    { code: '+267', flag: '🇧🇼', name: 'Botsvana' },
+    { code: '+55', flag: '🇧🇷', name: 'Brezilya' },
+    { code: '+673', flag: '🇧🇳', name: 'Brunei' },
+    { code: '+359', flag: '🇧🇬', name: 'Bulgaristan' },
+    { code: '+226', flag: '🇧🇫', name: 'Burkina Faso' },
+    { code: '+257', flag: '🇧🇮', name: 'Burundi' },
+    { code: '+855', flag: '🇰🇭', name: 'Kamboçya' },
+    { code: '+237', flag: '🇨🇲', name: 'Kamerun' },
+    { code: '+1', flag: '🇨🇦', name: 'Kanada' },
+    { code: '+238', flag: '🇨🇻', name: 'Yeşil Burun' },
+    { code: '+236', flag: '🇨🇫', name: 'Orta Afrika' },
+    { code: '+235', flag: '🇹🇩', name: 'Çad' },
+    { code: '+56', flag: '🇨🇱', name: 'Şili' },
+    { code: '+86', flag: '🇨🇳', name: 'Çin' },
+    { code: '+57', flag: '🇨🇴', name: 'Kolombiya' },
+    { code: '+269', flag: '🇰🇲', name: 'Komorlar' },
+    { code: '+243', flag: '🇨🇩', name: 'Kongo (DR)' },
+    { code: '+242', flag: '🇨🇬', name: 'Kongo' },
+    { code: '+506', flag: '🇨🇷', name: 'Kosta Rika' },
+    { code: '+385', flag: '🇭🇷', name: 'Hırvatistan' },
+    { code: '+53', flag: '🇨🇺', name: 'Küba' },
+    { code: '+357', flag: '🇨🇾', name: 'Kıbrıs' },
+    { code: '+420', flag: '🇨🇿', name: 'Çekya' },
+    { code: '+45', flag: '🇩🇰', name: 'Danimarka' },
+    { code: '+253', flag: '🇩🇯', name: 'Cibuti' },
+    { code: '+1-809', flag: '🇩🇴', name: 'Dominik Cum.' },
+    { code: '+593', flag: '🇪🇨', name: 'Ekvador' },
+    { code: '+20', flag: '🇪🇬', name: 'Mısır' },
+    { code: '+503', flag: '🇸🇻', name: 'El Salvador' },
+    { code: '+240', flag: '🇬🇶', name: 'Ekvator Ginesi' },
+    { code: '+291', flag: '🇪🇷', name: 'Eritre' },
+    { code: '+372', flag: '🇪🇪', name: 'Estonya' },
+    { code: '+268', flag: '🇸🇿', name: 'Esvatini' },
+    { code: '+251', flag: '🇪🇹', name: 'Etiyopya' },
+    { code: '+679', flag: '🇫🇯', name: 'Fiji' },
+    { code: '+358', flag: '🇫🇮', name: 'Finlandiya' },
+    { code: '+33', flag: '🇫🇷', name: 'Fransa' },
+    { code: '+241', flag: '🇬🇦', name: 'Gabon' },
+    { code: '+220', flag: '🇬🇲', name: 'Gambiya' },
+    { code: '+995', flag: '🇬🇪', name: 'Gürcistan' },
+    { code: '+49', flag: '🇩🇪', name: 'Almanya' },
+    { code: '+233', flag: '🇬🇭', name: 'Gana' },
+    { code: '+30', flag: '🇬🇷', name: 'Yunanistan' },
+    { code: '+502', flag: '🇬🇹', name: 'Guatemala' },
+    { code: '+224', flag: '🇬🇳', name: 'Gine' },
+    { code: '+245', flag: '🇬🇼', name: 'Gine-Bissau' },
+    { code: '+592', flag: '🇬🇾', name: 'Guyana' },
+    { code: '+509', flag: '🇭🇹', name: 'Haiti' },
+    { code: '+504', flag: '🇭🇳', name: 'Honduras' },
+    { code: '+36', flag: '🇭🇺', name: 'Macaristan' },
+    { code: '+354', flag: '🇮🇸', name: 'İzlanda' },
+    { code: '+91', flag: '🇮🇳', name: 'Hindistan' },
+    { code: '+62', flag: '🇮🇩', name: 'Endonezya' },
+    { code: '+98', flag: '🇮🇷', name: 'İran' },
+    { code: '+964', flag: '🇮🇶', name: 'Irak' },
+    { code: '+353', flag: '🇮🇪', name: 'İrlanda' },
+    { code: '+972', flag: '🇮🇱', name: 'İsrail' },
+    { code: '+39', flag: '🇮🇹', name: 'İtalya' },
+    { code: '+1-876', flag: '🇯🇲', name: 'Jamaika' },
+    { code: '+81', flag: '🇯🇵', name: 'Japonya' },
+    { code: '+962', flag: '🇯🇴', name: 'Ürdün' },
+    { code: '+7', flag: '🇰🇿', name: 'Kazakistan' },
+    { code: '+254', flag: '🇰🇪', name: 'Kenya' },
+    { code: '+686', flag: '🇰🇮', name: 'Kiribati' },
+    { code: '+850', flag: '🇰🇵', name: 'Kuzey Kore' },
+    { code: '+82', flag: '🇰🇷', name: 'Güney Kore' },
+    { code: '+965', flag: '🇰🇼', name: 'Kuveyt' },
+    { code: '+996', flag: '🇰🇬', name: 'Kırgızistan' },
+    { code: '+856', flag: '🇱🇦', name: 'Laos' },
+    { code: '+371', flag: '🇱🇻', name: 'Letonya' },
+    { code: '+961', flag: '🇱🇧', name: 'Lübnan' },
+    { code: '+266', flag: '🇱🇸', name: 'Lesoto' },
+    { code: '+231', flag: '🇱🇷', name: 'Liberya' },
+    { code: '+218', flag: '🇱🇾', name: 'Libya' },
+    { code: '+423', flag: '🇱🇮', name: 'Lihtenştayn' },
+    { code: '+370', flag: '🇱🇹', name: 'Litvanya' },
+    { code: '+352', flag: '🇱🇺', name: 'Lüksemburg' },
+    { code: '+261', flag: '🇲🇬', name: 'Madagaskar' },
+    { code: '+265', flag: '🇲🇼', name: 'Malavi' },
+    { code: '+60', flag: '🇲🇾', name: 'Malezya' },
+    { code: '+960', flag: '🇲🇻', name: 'Maldivler' },
+    { code: '+223', flag: '🇲🇱', name: 'Mali' },
+    { code: '+356', flag: '🇲🇹', name: 'Malta' },
+    { code: '+222', flag: '🇲🇷', name: 'Moritanya' },
+    { code: '+230', flag: '🇲🇺', name: 'Mauritius' },
+    { code: '+52', flag: '🇲🇽', name: 'Meksika' },
+    { code: '+373', flag: '🇲🇩', name: 'Moldova' },
+    { code: '+377', flag: '🇲🇨', name: 'Monako' },
+    { code: '+976', flag: '🇲🇳', name: 'Moğolistan' },
+    { code: '+382', flag: '🇲🇪', name: 'Karadağ' },
+    { code: '+212', flag: '🇲🇦', name: 'Fas' },
+    { code: '+258', flag: '🇲🇿', name: 'Mozambik' },
+    { code: '+95', flag: '🇲🇲', name: 'Myanmar' },
+    { code: '+264', flag: '🇳🇦', name: 'Namibya' },
+    { code: '+977', flag: '🇳🇵', name: 'Nepal' },
+    { code: '+31', flag: '🇳🇱', name: 'Hollanda' },
+    { code: '+64', flag: '🇳🇿', name: 'Yeni Zelanda' },
+    { code: '+505', flag: '🇳🇮', name: 'Nikaragua' },
+    { code: '+227', flag: '🇳🇪', name: 'Nijer' },
+    { code: '+234', flag: '🇳🇬', name: 'Nijerya' },
+    { code: '+389', flag: '🇲🇰', name: 'Kuzey Makedonya' },
+    { code: '+47', flag: '🇳🇴', name: 'Norveç' },
+    { code: '+968', flag: '🇴🇲', name: 'Umman' },
+    { code: '+92', flag: '🇵🇰', name: 'Pakistan' },
+    { code: '+507', flag: '🇵🇦', name: 'Panama' },
+    { code: '+675', flag: '🇵🇬', name: 'Papua Yeni Gine' },
+    { code: '+595', flag: '🇵🇾', name: 'Paraguay' },
+    { code: '+51', flag: '🇵🇪', name: 'Peru' },
+    { code: '+63', flag: '🇵🇭', name: 'Filipinler' },
+    { code: '+48', flag: '🇵🇱', name: 'Polonya' },
+    { code: '+351', flag: '🇵🇹', name: 'Portekiz' },
+    { code: '+974', flag: '🇶🇦', name: 'Katar' },
+    { code: '+40', flag: '🇷🇴', name: 'Romanya' },
+    { code: '+7', flag: '🇷🇺', name: 'Rusya' },
+    { code: '+250', flag: '🇷🇼', name: 'Ruanda' },
+    { code: '+966', flag: '🇸🇦', name: 'Suudi Arabistan' },
+    { code: '+221', flag: '🇸🇳', name: 'Senegal' },
+    { code: '+381', flag: '🇷🇸', name: 'Sırbistan' },
+    { code: '+232', flag: '🇸🇱', name: 'Sierra Leone' },
+    { code: '+65', flag: '🇸🇬', name: 'Singapur' },
+    { code: '+421', flag: '🇸🇰', name: 'Slovakya' },
+    { code: '+386', flag: '🇸🇮', name: 'Slovenya' },
+    { code: '+252', flag: '🇸🇴', name: 'Somali' },
+    { code: '+27', flag: '🇿🇦', name: 'Güney Afrika' },
+    { code: '+211', flag: '🇸🇸', name: 'Güney Sudan' },
+    { code: '+34', flag: '🇪🇸', name: 'İspanya' },
+    { code: '+94', flag: '🇱🇰', name: 'Sri Lanka' },
+    { code: '+249', flag: '🇸🇩', name: 'Sudan' },
+    { code: '+597', flag: '🇸🇷', name: 'Surinam' },
+    { code: '+46', flag: '🇸🇪', name: 'İsveç' },
+    { code: '+41', flag: '🇨🇭', name: 'İsviçre' },
+    { code: '+963', flag: '🇸🇾', name: 'Suriye' },
+    { code: '+886', flag: '🇹🇼', name: 'Tayvan' },
+    { code: '+992', flag: '🇹🇯', name: 'Tacikistan' },
+    { code: '+255', flag: '🇹🇿', name: 'Tanzanya' },
+    { code: '+66', flag: '🇹🇭', name: 'Tayland' },
+    { code: '+228', flag: '🇹🇬', name: 'Togo' },
+    { code: '+676', flag: '🇹🇴', name: 'Tonga' },
+    { code: '+1-868', flag: '🇹🇹', name: 'Trinidad ve Tobago' },
+    { code: '+216', flag: '🇹🇳', name: 'Tunus' },
+    { code: '+993', flag: '🇹🇲', name: 'Türkmenistan' },
+    { code: '+256', flag: '🇺🇬', name: 'Uganda' },
+    { code: '+380', flag: '🇺🇦', name: 'Ukrayna' },
+    { code: '+971', flag: '🇦🇪', name: 'Birleşik Arap Emirlikleri' },
+    { code: '+44', flag: '🇬🇧', name: 'İngiltere' },
+    { code: '+1', flag: '🇺🇸', name: 'ABD' },
+    { code: '+598', flag: '🇺🇾', name: 'Uruguay' },
+    { code: '+998', flag: '🇺🇿', name: 'Özbekistan' },
+    { code: '+678', flag: '🇻🇺', name: 'Vanuatu' },
+    { code: '+58', flag: '🇻🇪', name: 'Venezuela' },
+    { code: '+84', flag: '🇻🇳', name: 'Vietnam' },
+    { code: '+967', flag: '🇾🇪', name: 'Yemen' },
+    { code: '+260', flag: '🇿🇲', name: 'Zambiya' },
+    { code: '+263', flag: '🇿🇼', name: 'Zimbabve' },
+  ]
+
+  const selectedCountry = ALL_COUNTRIES.find(c => c.code === countryCode && c.name === (ALL_COUNTRIES.find(x => x.code === countryCode)?.name)) || ALL_COUNTRIES[0]
+
+  const filteredCountries = ALL_COUNTRIES.filter(c =>
+    c.name.toLowerCase().includes(countrySearch.toLowerCase()) ||
+    c.code.includes(countrySearch)
+  )
 
   // Handle canvas resize for fullscreen modal
   useEffect(() => {
@@ -160,6 +348,7 @@ export default function NewCustomerPage() {
     try {
       const response = await api.post('/customers', {
         ...formData,
+        phone: `${countryCode}${formData.phone}`,
         waiverSigned: true,
         signatureData,
       })
@@ -374,6 +563,8 @@ Bu belgeyi imzalayarak asagidaki hususlari kabul ve beyan ederim:
   const resetForm = () => {
     setResult(null)
     setSignatureData(null)
+    setCountryCode('+90')
+    setCountrySearch('')
     setFormData({
       firstName: '',
       lastName: '',
@@ -617,19 +808,67 @@ Bu belgeyi imzalayarak asagidaki hususlari kabul ve beyan ederim:
 
             <div className="space-y-2">
               <Label htmlFor="phone">Telefon *</Label>
-              <Input
-                id="phone"
-                name="phone"
-                type="tel"
-                value={formData.phone}
-                onChange={handleChange}
-                placeholder="05XX XXX XX XX"
-                required
-              />
+              <div className="flex gap-2">
+                {/* Searchable country code picker */}
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setShowCountryDropdown(v => !v)}
+                    className="flex h-10 items-center gap-1 rounded-md border border-input bg-background px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 whitespace-nowrap"
+                  >
+                    {ALL_COUNTRIES.find(c => c.code === countryCode)?.flag} {countryCode}
+                    <span className="ml-1 text-muted-foreground">▾</span>
+                  </button>
+                  {showCountryDropdown && (
+                    <div className="absolute z-50 mt-1 w-72 rounded-md border bg-white shadow-lg">
+                      <div className="p-2 border-b">
+                        <input
+                          autoFocus
+                          type="text"
+                          value={countrySearch}
+                          onChange={e => setCountrySearch(e.target.value)}
+                          placeholder="Ülke adı veya kod..."
+                          className="w-full rounded border border-input px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                        />
+                      </div>
+                      <ul className="max-h-56 overflow-y-auto">
+                        {filteredCountries.map((c, i) => (
+                          <li
+                            key={`${c.code}-${i}`}
+                            onClick={() => {
+                              setCountryCode(c.code)
+                              setShowCountryDropdown(false)
+                              setCountrySearch('')
+                            }}
+                            className="flex items-center gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-gray-100"
+                          >
+                            <span>{c.flag}</span>
+                            <span className="flex-1">{c.name}</span>
+                            <span className="text-muted-foreground">{c.code}</span>
+                          </li>
+                        ))}
+                        {filteredCountries.length === 0 && (
+                          <li className="px-3 py-2 text-sm text-muted-foreground">Sonuç bulunamadı</li>
+                        )}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+                <Input
+                  id="phone"
+                  name="phone"
+                  type="tel"
+                  value={formData.phone}
+                  onChange={handleChange}
+                  placeholder="5XX XXX XX XX"
+                  required
+                  className="flex-1"
+                />
+              </div>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="email">E-posta (Opsiyonel)</Label>
+              <Label htmlFor="email">E-posta *</Label>
               <Input
                 id="email"
                 name="email"
@@ -637,6 +876,7 @@ Bu belgeyi imzalayarak asagidaki hususlari kabul ve beyan ederim:
                 value={formData.email}
                 onChange={handleChange}
                 placeholder="ornek@email.com"
+                required
               />
             </div>
 
@@ -647,12 +887,12 @@ Bu belgeyi imzalayarak asagidaki hususlari kabul ve beyan ederim:
                 name="emergencyContact"
                 value={formData.emergencyContact}
                 onChange={handleChange}
-                placeholder="İsim ve telefon numarası"
+                placeholder="İsim"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="weight">Kilo (kg)</Label>
+              <Label htmlFor="weight">Kilo (kg) *</Label>
               <Input
                 id="weight"
                 name="weight"
@@ -662,6 +902,7 @@ Bu belgeyi imzalayarak asagidaki hususlari kabul ve beyan ederim:
                 value={formData.weight}
                 onChange={handleChange}
                 placeholder="Örn: 70"
+                required
               />
               <p className="text-xs text-muted-foreground">
                 Uçuş güvenliği için gereklidir (20-150 kg)
@@ -712,17 +953,14 @@ Bu belgeyi imzalayarak asagidaki hususlari kabul ve beyan ederim:
                 </div>
               </div>
             ) : (
-              <Button
+              <button
                 type="button"
-                variant="outline"
-                className="w-full h-24 border-dashed border-2"
                 onClick={openWaiverModal}
+                className="w-full h-24 rounded-lg border-2 border-green-500 bg-green-50 hover:bg-green-100 transition-colors flex flex-col items-center justify-center gap-2"
               >
-                <div className="flex flex-col items-center gap-2">
-                  <PenLine className="w-8 h-8 text-muted-foreground" />
-                  <span className="text-lg">Risk Formunu Görüntüle ve İmzala</span>
-                </div>
-              </Button>
+                <PenLine className="w-8 h-8 text-green-600" />
+                <span className="text-lg font-semibold text-green-700">Risk Formunu Görüntüle ve İmzala</span>
+              </button>
             )}
           </CardContent>
         </Card>

@@ -60,9 +60,10 @@ router.get('/dashboard', authenticate, asyncHandler(async (req: AuthRequest, res
   const posRevenueEUR = paidSales.reduce((sum, s) => sum + (s.totalAmountEUR || s.totalPrice), 0);
   const posRevenueTRY = paidSales.reduce((sum, s) => sum + (s.totalAmountTRY || 0), 0);
 
-  const mediaRevenue = mediaFoldersToday
-    .filter(m => m.paymentStatus === 'PAID')
-    .reduce((sum, m) => sum + (m.paymentAmount || 0), 0);
+  // Foto/Video geliri: sale tablosundan hesapla (eski 'MEDIA' kayıtları dahil)
+  const mediaRevenue = paidSales
+    .filter(s => s.itemType === 'Foto/Video' || s.itemType === 'MEDIA')
+    .reduce((sum, s) => sum + (s.totalAmountEUR || s.totalPrice), 0);
 
   const mediaSoldCount = mediaFoldersToday.filter(m => m.paymentStatus === 'PAID').length;
 
@@ -136,9 +137,9 @@ router.get('/dashboard/charts', authenticate, asyncHandler(async (req: AuthReque
     });
   }
 
-  // Revenue by type (Media vs POS) — EUR bazlı
-  const mediaTotal = sales.filter(s => s.itemType === 'Foto/Video').reduce((sum, s) => sum + (s.totalAmountEUR || s.totalPrice), 0);
-  const posTotal = sales.filter(s => s.itemType !== 'Foto/Video').reduce((sum, s) => sum + (s.totalAmountEUR || s.totalPrice), 0);
+  // Revenue by type (Media vs POS) — EUR bazlı (eski 'MEDIA' kayıtları dahil)
+  const mediaTotal = sales.filter(s => s.itemType === 'Foto/Video' || s.itemType === 'MEDIA').reduce((sum, s) => sum + (s.totalAmountEUR || s.totalPrice), 0);
+  const posTotal = sales.filter(s => s.itemType !== 'Foto/Video' && s.itemType !== 'MEDIA').reduce((sum, s) => sum + (s.totalAmountEUR || s.totalPrice), 0);
 
   const revenueByType = [
     { name: 'Foto/Video', value: mediaTotal },
@@ -329,7 +330,10 @@ router.get('/revenue', authenticate, asyncHandler(async (req: AuthRequest, res: 
   // EUR bazlı toplamlar
   const totalPOS = paidSales.reduce((sum, s) => sum + (s.totalAmountEUR || s.totalPrice), 0);
   const totalPOSTRY = paidSales.reduce((sum, s) => sum + (s.totalAmountTRY || 0), 0);
-  const totalMedia = paidMedia.reduce((sum, m) => sum + (m.paymentAmount || 0), 0);
+  // Foto/Video geliri: sale tablosundan hesapla (eski 'MEDIA' kayıtları dahil)
+  const totalMedia = paidSales
+    .filter(s => s.itemType === 'Foto/Video' || s.itemType === 'MEDIA')
+    .reduce((sum, s) => sum + (s.totalAmountEUR || s.totalPrice), 0);
   const totalUnpaid = unpaidSalesList.reduce((sum, s) => sum + (s.totalAmountEUR || s.totalPrice), 0);
   const totalUnpaidTRY = unpaidSalesList.reduce((sum, s) => sum + (s.totalAmountTRY || 0), 0);
   const totalRevenue = totalPOS + totalMedia;
@@ -338,10 +342,11 @@ router.get('/revenue', authenticate, asyncHandler(async (req: AuthRequest, res: 
     ? ((totalRevenue / (totalRevenue + totalUnpaid)) * 100).toFixed(1)
     : '100';
 
-  // Category breakdown — EUR bazlı
+  // Category breakdown — EUR bazlı (eski 'MEDIA' kayıtlarını 'Foto/Video' olarak normalize et)
   const categories: Record<string, number> = {};
   paidSales.forEach(s => {
-    categories[s.itemType] = (categories[s.itemType] || 0) + (s.totalAmountEUR || s.totalPrice);
+    const categoryName = s.itemType === 'MEDIA' ? 'Foto/Video' : s.itemType;
+    categories[categoryName] = (categories[categoryName] || 0) + (s.totalAmountEUR || s.totalPrice);
   });
 
   // Daily trend — EUR bazlı
@@ -356,17 +361,18 @@ router.get('/revenue', authenticate, asyncHandler(async (req: AuthRequest, res: 
       .filter(s => s.createdAt >= dayStart && s.createdAt < dayEnd)
       .reduce((sum, s) => sum + (s.totalAmountEUR || s.totalPrice), 0);
 
-    const dayMedia = paidMedia
-      .filter(m => m.createdAt >= dayStart && m.createdAt < dayEnd)
-      .reduce((sum, m) => sum + (m.paymentAmount || 0), 0);
+    // Foto/Video geliri: sale tablosundan (eski 'MEDIA' kayıtları dahil)
+    const dayMedia = paidSales
+      .filter(s => s.createdAt >= dayStart && s.createdAt < dayEnd && (s.itemType === 'Foto/Video' || s.itemType === 'MEDIA'))
+      .reduce((sum, s) => sum + (s.totalAmountEUR || s.totalPrice), 0);
 
     dailyTrend.push({ date: dateStr, pos: dayPOS, media: dayMedia });
   }
 
-  // Top products — EUR bazlı
+  // Top products — EUR bazlı (eski 'MEDIA' kayıtlarını normalize et)
   const productTotals: Record<string, number> = {};
   paidSales.forEach(s => {
-    const key = s.itemType;
+    const key = s.itemType === 'MEDIA' ? 'Foto/Video' : s.itemType;
     productTotals[key] = (productTotals[key] || 0) + (s.totalAmountEUR || s.totalPrice);
   });
   const topProducts = Object.entries(productTotals)
@@ -597,19 +603,22 @@ router.get('/daily/:date', authenticate, asyncHandler(async (req: AuthRequest, r
     total: paidSales.reduce((sum, s) => sum + (s.totalAmountEUR || s.totalPrice), 0),
   };
 
-  // Media summary
+  // Media summary — sale tablosundan hesapla (eski 'MEDIA' kayıtları dahil)
+  const mediaFromSales = paidSales
+    .filter(s => s.itemType === 'Foto/Video' || s.itemType === 'MEDIA');
   const mediaSummary = {
     uploaded: mediaFolders.length,
-    sold: mediaFolders.filter(m => m.paymentStatus === 'PAID').length,
+    sold: mediaFromSales.length,
     delivered: mediaFolders.filter(m => m.deliveryStatus === 'DELIVERED').length,
-    revenue: mediaFolders.filter(m => m.paymentStatus === 'PAID').reduce((sum, m) => sum + (m.paymentAmount || 0), 0),
+    revenue: mediaFromSales.reduce((sum, s) => sum + (s.totalAmountEUR || s.totalPrice), 0),
     totalFiles: mediaFolders.reduce((sum, m) => sum + m.fileCount, 0),
   };
 
-  // POS summary by category — EUR bazlı
+  // POS summary by category — EUR bazlı (eski 'MEDIA' kayıtlarını normalize et)
   const posSummary: Record<string, number> = {};
   paidSales.forEach(s => {
-    posSummary[s.itemType] = (posSummary[s.itemType] || 0) + (s.totalAmountEUR || s.totalPrice);
+    const categoryName = s.itemType === 'MEDIA' ? 'Foto/Video' : s.itemType;
+    posSummary[categoryName] = (posSummary[categoryName] || 0) + (s.totalAmountEUR || s.totalPrice);
   });
 
   // Low stock products
@@ -730,14 +739,15 @@ router.get('/staff-sales', authenticate, asyncHandler(async (req: AuthRequest, r
     const totalRevenue = paidSales.reduce((sum, s) => sum + (s.totalAmountEUR || s.totalPrice), 0);
     const totalUnpaid = sales.filter(s => s.paymentStatus === 'UNPAID').reduce((sum, s) => sum + (s.totalAmountEUR || s.totalPrice), 0);
 
-    // Category breakdown — EUR bazlı
+    // Category breakdown — EUR bazlı (eski 'MEDIA' kayıtlarını normalize et)
     const categories: Record<string, { count: number; total: number }> = {};
     paidSales.forEach(s => {
-      if (!categories[s.itemType]) {
-        categories[s.itemType] = { count: 0, total: 0 };
+      const categoryName = s.itemType === 'MEDIA' ? 'Foto/Video' : s.itemType;
+      if (!categories[categoryName]) {
+        categories[categoryName] = { count: 0, total: 0 };
       }
-      categories[s.itemType].count += s.quantity;
-      categories[s.itemType].total += (s.totalAmountEUR || s.totalPrice);
+      categories[categoryName].count += s.quantity;
+      categories[categoryName].total += (s.totalAmountEUR || s.totalPrice);
     });
 
     // Daily trend — EUR bazlı

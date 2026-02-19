@@ -751,11 +751,14 @@ router.patch('/:id/status', authenticate, asyncHandler(async (req: AuthRequest, 
         data: { status: 'IN_FLIGHT' },
       });
     } else if (status === 'COMPLETED') {
-      // Increment daily flight count
+      // Increment daily flight count, set OFF_DUTY if limit reached
+      const pilotForLimit = await tx.pilot.findUnique({ where: { id: flight.pilotId } });
+      const newCount = (pilotForLimit?.dailyFlightCount ?? 0) + 1;
+      const limitReached = newCount >= (pilotForLimit?.maxDailyFlights ?? 7);
       await tx.pilot.update({
         where: { id: flight.pilotId },
         data: {
-          status: 'AVAILABLE',
+          status: limitReached ? 'OFF_DUTY' : 'AVAILABLE',
           dailyFlightCount: { increment: 1 },
         },
       });

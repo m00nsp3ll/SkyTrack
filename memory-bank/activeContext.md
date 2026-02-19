@@ -1,62 +1,52 @@
 # Active Context - SkyTrack
 
-## Son Çalışma Oturumu: 2026-02-17 (Oturum 11)
+## Son Çalışma Oturumu: 2026-02-19 (Oturum 12)
 
 ### Yapılan İşler
 
-1. **nativePush.ts v3 — Tamamen Yeniden Yazıldı** ✅
-   - `_fcmTokenDone` flag ile çift kayıt engelleme
-   - `_nativeFCMToken` window property dinleme (AppDelegate'den)
-   - `initialized` flag ile çift init engelleme
-   - Auth token: parametre veya `localStorage.getItem('token')`
-   - Hem `fcmToken` hem `nativeFCMToken` event'lerini dinliyor
-   - Retry: 4s, 8s, 14s, 22s, 35s delay'lerle
-   - `setInAppNotificationHandler` export eklendi (InAppNotificationBanner uyumluluğu)
-   - `pushNotificationReceived` listener'ında `inAppHandler(n)` çağrısı
-   - `cleanupFcmToken` backward compat alias korundu
+1. **Foto/Video Geliri — Tüm Raporlarda Düzeltme** ✅
+   - Kök neden: Medya satışları `itemType: 'MEDIA'` olarak kaydediliyordu, raporlar `'Foto/Video'` arıyordu
+   - `mediaRevenue` hesaplaması: `mediaFolder.paymentAmount` (hep 0) yerine `sale` tablosundan hesaplanıyor
+   - Tüm raporlarda (dashboard, kasa, gelir, vezne, operasyon) eski `MEDIA` → `Foto/Video` normalize edildi
+   - `media.ts` payment endpoint'inde `paymentAmount` artık kaydediliyor
 
-2. **AppDelegate.swift — Çoklu Delay + Window Property** ✅
-   - Token'ı 2s, 5s, 10s, 20s delay'lerle WebView'a inject ediyor
-   - `window._nativeFCMToken = token` property set ediyor
-   - Hem `fcmToken` hem `nativeFCMToken` CustomEvent dispatch ediyor
+2. **Müşteri Satış Geçmişi — Para Birimi ve Ödeme Yöntemi** ✅
+   - `customers.ts` API'sinde `paymentDetails: true` include eklendi
+   - Frontend'de `PaymentDetail` interface eklendi
+   - Satış geçmişi tablosunda her ödeme detayı ayrı gösteriliyor (para birimi + yöntem)
 
-3. **Firebase Bildirim Servisi — APNs + iOS Desteği** ✅
-   - `sendNativeNotification`: apns bloğu eklendi (alert, badge, sound, content-available, headers)
-   - `sendNativeToAllPilots` ve `sendNativeBroadcast`: sendEachForMulticast → tek tek sendNativeNotification
-   - Detaylı error logging (errorCode, errorInfo)
+3. **Seed Data Güncelleme — Harun Personeli** ✅
+   - Yeni kullanıcı: `harun / harun123` (OFFICE_STAFF)
+   - 22 satış kaydı (8 POS, 3 USD, 3 TRY kart, 5 Foto/Video, 1 split, 2 veresiye)
+   - Sunum için çeşitli para birimi ve ödeme yöntemi senaryoları
 
-4. **APNs Key Yenilendi** ✅
-   - Eski key revoke edildi
-   - Yeni key oluşturuldu: Sandbox & Production, Team Scoped (All Topics)
-   - Firebase Console'a yüklendi
-   - `messaging/third-party-auth-error` hatası çözüldü
-
-5. **Dashboard layout.tsx — 3s Delay ile Push Init** ✅
-6. **Pilot page.tsx — Auth Token Parametre** ✅
-7. **Seed Data Yüklendi** ✅ (sunum için)
+4. **Ödenmemiş Satışlar — Buton Temizliği** ✅
+   - Dropdown'daki nakit/kart butonları kaldırıldı, sadece yeşil "Ödeme Al" butonu kalıyor
 
 ### Değiştirilen Dosyalar
 
 | Dosya | İşlem |
 |-------|-------|
-| `packages/web/lib/nativePush.ts` | v3: tamamen yeniden yazıldı, setInAppNotificationHandler, inAppHandler |
-| `packages/web/ios/App/App/AppDelegate.swift` | Çoklu delay, _nativeFCMToken property, iki event |
-| `packages/web/app/(dashboard)/layout.tsx` | 3s delay, auth token parametre |
-| `packages/web/app/pilot/page.tsx` | initNativePush(token) parametre |
-| `packages/api/src/services/firebaseNotification.ts` | apns bloğu, multicast→tektek, detaylı error log |
+| `packages/api/src/routes/reports.ts` | 6 yerde MEDIA→Foto/Video normalize, mediaRevenue sale tablosundan |
+| `packages/api/src/routes/sales.ts` | mediaSales sale tablosundan, kategori normalize |
+| `packages/api/src/routes/media.ts` | paymentAmount kaydı, itemType Foto/Video |
+| `packages/api/src/routes/customers.ts` | paymentDetails include eklendi |
+| `packages/web/.../customers/[id]/page.tsx` | PaymentDetail gösterimi, itemType Foto/Video |
+| `packages/web/.../sales/unpaid/page.tsx` | Nakit/kart butonları kaldırıldı |
+| `packages/api/prisma/seed.ts` | Harun personeli + 22 satış eklendi |
+| `scripts/seed-demo.sh` | Harun giriş bilgisi eklendi |
 
 ### Önemli Teknik Notlar
 
-- **iOS Push Çalışıyor** ✅ — iPhone ve iPad'e bildirim başarıyla gönderiliyor
-- **APNs Key:** Sandbox & Production, Team Scoped (All Topics)
-- **Auth token key:** `localStorage.getItem('token')`
-- **FCM API:** Express API (`api.skytrackyp.com`) port 3001, Bearer header auth
-- **Sunucu:** LOKAL Mac — skytrackyp.com Cloudflare Tunnel ile lokale yönleniyor
-- **Token Akışı:** AppDelegate → evaluateJavaScript → window._nativeFCMToken + CustomEvent → nativePush.ts → api.skytrackyp.com/api/fcm/register
-- **Broadcast:** sendEachForMulticast kaldırıldı, tek tek sendNativeNotification kullanılıyor (iOS uyumluluğu)
+- **Kategori Normalizasyon:** Tüm rapor endpoint'lerinde `s.itemType === 'MEDIA' ? 'Foto/Video' : s.itemType` kullanılıyor
+- **Eski Kayıtlar:** DB'de hâlâ `MEDIA` olarak duranlar runtime'da normalize ediliyor
+- **Yeni Kayıtlar:** `itemType: 'Foto/Video'` olarak kaydediliyor
+- **Harun kullanıcısı:** `harun / harun123` — sunum için satış yapan ikinci personel
 
 ### Sonraki Adımlar
 
-- [ ] iOS bildirimde Türkçe karakter sorunu araştır (curl encoding)
+- [ ] iOS bildirimde Türkçe karakter sorunu araştır
 - [ ] Admin cron job bildirimleri
 - [ ] Production PM2 yapılandırması
+- [ ] Excel export özelliği
+- [ ] PDF Türkçe font desteği

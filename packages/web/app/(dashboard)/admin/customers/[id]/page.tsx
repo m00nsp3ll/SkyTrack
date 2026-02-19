@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
@@ -38,6 +38,8 @@ import {
   Trash2,
   Star,
   Search,
+  CreditCard,
+  Building,
 } from 'lucide-react'
 import { productsApi, salesApi, currencyApi } from '@/lib/api'
 
@@ -90,6 +92,15 @@ interface MediaFolder {
   paymentMethod?: string
 }
 
+interface PaymentDetail {
+  id: string
+  currency: string
+  amount: number
+  amountInEUR: number
+  amountInTRY: number
+  paymentMethod: string
+}
+
 interface Sale {
   id: string
   itemName: string
@@ -102,6 +113,7 @@ interface Sale {
   paymentMethod?: string
   createdAt: string
   soldBy?: { id: string; name: string | null; username: string } | null
+  paymentDetails?: PaymentDetail[]
 }
 
 interface MediaFile {
@@ -183,13 +195,6 @@ export default function CustomerDetailPage() {
   const [allRates, setAllRates] = useState<Record<string, { buyRate: number; sellRate: number }>>({})
 
   type Currency = 'EUR' | 'USD' | 'GBP' | 'RUB' | 'TRY'
-  interface PaymentLine {
-    id: string
-    currency: Currency
-    amount: string
-    method: 'CASH' | 'CREDIT_CARD' | 'TRANSFER'
-    eurEquivalent: number
-  }
 
   const CURRENCIES: { value: Currency; label: string; symbol: string }[] = [
     { value: 'EUR', label: 'EUR', symbol: '€' },
@@ -227,9 +232,11 @@ export default function CustomerDetailPage() {
   // Media state
   const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([])
   const [mediaPrice, setMediaPrice] = useState('25')
-  const [mediaPaymentLines, setMediaPaymentLines] = useState<PaymentLine[]>([
-    { id: '1', currency: 'EUR', amount: '', method: 'CASH', eurEquivalent: 0 }
-  ])
+  const [mediaPaymentEntries, setMediaPaymentEntries] = useState<{ id: string; currency: Currency; amount: number; method: 'CASH' | 'CREDIT_CARD' | 'TRANSFER'; eurEquivalent: number }[]>([])
+  const [mediaActivePayCurrency, setMediaActivePayCurrency] = useState<Currency | null>(null)
+  const [mediaActivePayMethod, setMediaActivePayMethod] = useState<'CASH' | 'CREDIT_CARD' | 'TRANSFER'>('CASH')
+  const [mediaActivePayAmount, setMediaActivePayAmount] = useState('')
+  const mediaPayAmountInputRef = useRef<HTMLInputElement>(null)
 
   // POS Modal state
   const [showPosModal, setShowPosModal] = useState(false)
@@ -240,17 +247,22 @@ export default function CustomerDetailPage() {
   const [posProductSearch, setPosProductSearch] = useState('')
   const [posLoading, setPosLoading] = useState(false)
   const [posProcessing, setPosProcessing] = useState(false)
-  const [posPaymentLines, setPosPaymentLines] = useState<PaymentLine[]>([
-    { id: '1', currency: 'EUR', amount: '', method: 'CASH', eurEquivalent: 0 }
-  ])
   const [showPosConfirmModal, setShowPosConfirmModal] = useState(false)
+  // Compact payment state for POS modal (matches main POS page)
+  const [posPaymentEntries, setPosPaymentEntries] = useState<{ id: string; currency: Currency; amount: number; method: 'CASH' | 'CREDIT_CARD' | 'TRANSFER'; eurEquivalent: number }[]>([])
+  const [posActivePayCurrency, setPosActivePayCurrency] = useState<Currency | null>(null)
+  const [posActivePayMethod, setPosActivePayMethod] = useState<'CASH' | 'CREDIT_CARD' | 'TRANSFER'>('CASH')
+  const [posActivePayAmount, setPosActivePayAmount] = useState('')
+  const posPayAmountInputRef = useRef<HTMLInputElement>(null)
 
   // Debt collection modal state
   const [showDebtModal, setShowDebtModal] = useState(false)
   const [collectingDebt, setCollectingDebt] = useState(false)
-  const [debtPaymentLines, setDebtPaymentLines] = useState<PaymentLine[]>([
-    { id: '1', currency: 'EUR', amount: '', method: 'CASH', eurEquivalent: 0 }
-  ])
+  const [debtPaymentEntries, setDebtPaymentEntries] = useState<{ id: string; currency: Currency; amount: number; method: 'CASH' | 'CREDIT_CARD' | 'TRANSFER'; eurEquivalent: number }[]>([])
+  const [debtActivePayCurrency, setDebtActivePayCurrency] = useState<Currency | null>(null)
+  const [debtActivePayMethod, setDebtActivePayMethod] = useState<'CASH' | 'CREDIT_CARD' | 'TRANSFER'>('CASH')
+  const [debtActivePayAmount, setDebtActivePayAmount] = useState('')
+  const debtPayAmountInputRef = useRef<HTMLInputElement>(null)
 
   // Timers
   const [waitingTime, setWaitingTime] = useState<string>('')
@@ -271,177 +283,50 @@ export default function CustomerDetailPage() {
     } catch { /* silently fail */ }
   }, [])
 
-  // Payment line helpers
-  const updatePaymentLine = (
-    _lines: PaymentLine[],
-    setLines: React.Dispatch<React.SetStateAction<PaymentLine[]>>,
-    lineId: string,
-    field: keyof PaymentLine,
-    value: any
-  ) => {
-    setLines(prev => prev.map(line => {
-      if (line.id !== lineId) return line
-      const updated = { ...line, [field]: value }
-      if (field === 'currency') {
-        const newCurrency = value as Currency
-        const availMethods = getAvailableMethods(newCurrency)
-        if (!availMethods.includes(updated.method)) updated.method = availMethods[0]
-      }
-      if (field === 'method') {
-        const availCurs = getAvailableCurrencies(value as string)
-        if (!availCurs.includes(updated.currency)) updated.currency = availCurs[0]
-      }
-      const numAmount = parseFloat(updated.amount) || 0
-      updated.eurEquivalent = convertToEUR(numAmount, updated.currency)
-      return updated
-    }))
+  // Generic compact payment helpers
+  type CompactPayState = {
+    entries: { id: string; currency: Currency; amount: number; method: 'CASH' | 'CREDIT_CARD' | 'TRANSFER'; eurEquivalent: number }[]
+    setEntries: React.Dispatch<React.SetStateAction<CompactPayState['entries']>>
+    setActiveCurrency: React.Dispatch<React.SetStateAction<Currency | null>>
+    setActiveMethod: React.Dispatch<React.SetStateAction<'CASH' | 'CREDIT_CARD' | 'TRANSFER'>>
+    setActiveAmount: React.Dispatch<React.SetStateAction<string>>
+    activeCurrency: Currency | null
+    activeMethod: 'CASH' | 'CREDIT_CARD' | 'TRANSFER'
+    activeAmount: string
+    inputRef: React.RefObject<HTMLInputElement | null>
   }
 
-  const addPaymentLine = (lines: PaymentLine[], setLines: React.Dispatch<React.SetStateAction<PaymentLine[]>>) => {
-    if (lines.length >= 5) return
-    setLines(prev => [...prev, { id: String(Date.now()), currency: 'EUR', amount: '', method: 'CASH', eurEquivalent: 0 }])
+  const addCompactEntry = (s: CompactPayState) => {
+    if (!s.activeCurrency) return
+    const amount = parseFloat(s.activeAmount)
+    if (!amount || amount <= 0) return
+    const eurEquivalent = convertToEUR(amount, s.activeCurrency)
+    s.setEntries(prev => [...prev, { id: String(Date.now()), currency: s.activeCurrency!, amount, method: s.activeMethod, eurEquivalent }])
+    s.setActiveAmount('')
+    s.setActiveCurrency(null)
   }
 
-  const removePaymentLine = (lines: PaymentLine[], setLines: React.Dispatch<React.SetStateAction<PaymentLine[]>>, lineId: string) => {
-    if (lines.length <= 1) return
-    setLines(prev => prev.filter(l => l.id !== lineId))
+  const removeCompactEntry = (s: CompactPayState, id: string) => {
+    s.setEntries(prev => prev.filter(e => e.id !== id))
   }
 
-  const resetPaymentLines = (setLines: React.Dispatch<React.SetStateAction<PaymentLine[]>>) => {
-    setLines([{ id: '1', currency: 'EUR', amount: '', method: 'CASH', eurEquivalent: 0 }])
+  const openCompactCurrencyPay = (s: CompactPayState, currency: Currency, totalEUR: number) => {
+    s.setActiveCurrency(currency)
+    s.setActiveMethod('CASH')
+    const currentRemaining = totalEUR - s.entries.reduce((sum, e) => sum + e.eurEquivalent, 0)
+    if (currentRemaining > 0.01) {
+      const amountInCurrency = convertFromEUR(currentRemaining, currency)
+      const rounded = Math.ceil(amountInCurrency * 100) / 100
+      s.setActiveAmount(rounded.toFixed(2))
+    } else {
+      s.setActiveAmount('')
+    }
+    setTimeout(() => s.inputRef.current?.focus(), 50)
   }
 
-  const quickPayLines = (setLines: React.Dispatch<React.SetStateAction<PaymentLine[]>>, totalEUR: number, currency: Currency) => {
-    const fullAmount = convertFromEUR(totalEUR, currency)
-    const rounded = Math.ceil(fullAmount * 100) / 100
-    setLines([{ id: '1', currency, amount: rounded.toFixed(2), method: 'CASH', eurEquivalent: convertToEUR(rounded, currency) }])
-  }
-
-  const getPaidTotal = (lines: PaymentLine[]) => lines.reduce((sum, l) => sum + l.eurEquivalent, 0)
-  const getRemaining = (lines: PaymentLine[], totalEUR: number) => totalEUR - getPaidTotal(lines)
-  const isPaymentValid = (lines: PaymentLine[], totalEUR: number) => getPaidTotal(lines) > 0 && getRemaining(lines, totalEUR) <= 0.01
-
-  // Render payment lines UI component
-  const renderPaymentLinesUI = (
-    lines: PaymentLine[],
-    setLines: React.Dispatch<React.SetStateAction<PaymentLine[]>>,
-    totalEUR: number,
-    compact = false
-  ) => {
-    const remaining = getRemaining(lines, totalEUR)
-    return (
-      <div className="space-y-2">
-        {/* Payment Lines */}
-        <div className="space-y-2 max-h-48 overflow-y-auto">
-          {lines.map((line) => {
-            const availMethods = getAvailableMethods(line.currency)
-            const availCurrencies = getAvailableCurrencies(line.method)
-            return (
-              <div key={line.id} className="p-2 bg-gray-50 rounded-lg border space-y-1">
-                <div className="flex items-center gap-1.5">
-                  <select
-                    value={line.currency}
-                    onChange={(e) => updatePaymentLine(lines, setLines, line.id, 'currency', e.target.value)}
-                    className="h-8 text-xs font-medium border rounded px-1.5 bg-white w-16"
-                  >
-                    {CURRENCIES.filter(c => availCurrencies.includes(c.value)).map(c => (
-                      <option key={c.value} value={c.value}>{c.symbol} {c.value}</option>
-                    ))}
-                  </select>
-                  <Input
-                    type="number"
-                    inputMode="decimal"
-                    step="0.01"
-                    min="0"
-                    value={line.amount}
-                    onChange={(e) => updatePaymentLine(lines, setLines, line.id, 'amount', e.target.value)}
-                    placeholder="0.00"
-                    className="h-8 text-sm font-medium flex-1"
-                  />
-                  <select
-                    value={line.method}
-                    onChange={(e) => updatePaymentLine(lines, setLines, line.id, 'method', e.target.value)}
-                    className="h-8 text-xs border rounded px-1.5 bg-white w-16"
-                  >
-                    {availMethods.map(m => (
-                      <option key={m} value={m}>{getMethodLabel(m)}</option>
-                    ))}
-                  </select>
-                  {lines.length > 1 && (
-                    <button onClick={() => removePaymentLine(lines, setLines, line.id)} className="p-1 text-red-500 hover:bg-red-50 rounded flex-shrink-0">
-                      <X className="h-3.5 w-3.5" />
-                    </button>
-                  )}
-                </div>
-                {line.currency !== 'EUR' && line.eurEquivalent > 0 && (
-                  <p className="text-[10px] text-muted-foreground pl-1">
-                    = €{line.eurEquivalent.toFixed(2)}
-                    <span className="ml-1 opacity-60">
-                      (1€ = {getCurrencySymbol(line.currency)}{(allRates[line.currency]?.buyRate || 0).toFixed(line.currency === 'RUB' ? 4 : 2)})
-                    </span>
-                  </p>
-                )}
-              </div>
-            )
-          })}
-        </div>
-
-        {/* Add line */}
-        {lines.length < 5 && (
-          <Button size="sm" variant="outline" className="w-full h-7 text-xs" onClick={() => addPaymentLine(lines, setLines)}>
-            <Plus className="h-3 w-3 mr-1" /> Satır Ekle
-          </Button>
-        )}
-
-        {/* Remaining */}
-        {totalEUR > 0 && (
-          <div className={`p-2 rounded-lg text-xs font-medium ${
-            remaining <= 0.01 ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-orange-50 text-orange-700 border border-orange-200'
-          }`}>
-            {remaining <= 0.01 ? (
-              <div className="flex items-center gap-1">
-                <Check className="h-3.5 w-3.5" />
-                Tutar tamam
-                {remaining < -0.01 && <span className="ml-1 text-[10px] opacity-70">(Para üstü: €{Math.abs(remaining).toFixed(2)})</span>}
-              </div>
-            ) : (
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <span>Kalan:</span>
-                  <span className="font-bold">€{remaining.toFixed(2)}</span>
-                </div>
-                <div className="flex flex-wrap gap-x-2 gap-y-0.5 text-[10px] opacity-80">
-                  {CURRENCIES.filter(c => c.value !== 'EUR').map(c => {
-                    const equiv = convertFromEUR(remaining, c.value)
-                    return equiv > 0 ? <span key={c.value}>{c.symbol}{equiv.toFixed(2)}</span> : null
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Quick Pay Buttons */}
-        {!compact && (
-          <div className="flex flex-wrap gap-1">
-            {CURRENCIES.map(c => {
-              const fullAmount = convertFromEUR(totalEUR, c.value)
-              return fullAmount > 0 ? (
-                <button
-                  key={c.value}
-                  onClick={() => quickPayLines(setLines, totalEUR, c.value)}
-                  className="px-2 py-1 text-[10px] font-medium bg-white border rounded hover:bg-gray-50 transition-colors"
-                  title={`Tam tutar: ${c.symbol}${fullAmount.toFixed(2)}`}
-                >
-                  Tam {c.value}
-                </button>
-              ) : null
-            })}
-          </div>
-        )}
-      </div>
-    )
-  }
+  const getCompactPaidTotal = (entries: CompactPayState['entries']) => entries.reduce((sum, e) => sum + e.eurEquivalent, 0)
+  const getCompactRemaining = (entries: CompactPayState['entries'], totalEUR: number) => totalEUR - getCompactPaidTotal(entries)
+  const isCompactPaymentValid = (entries: CompactPayState['entries'], totalEUR: number) => getCompactPaidTotal(entries) > 0 && getCompactRemaining(entries, totalEUR) <= 0.01
 
   // Fetch customer data
   const fetchCustomer = useCallback(async () => {
@@ -779,18 +664,18 @@ Bu belgeyi imzalayarak asagidaki hususlari kabul ve beyan ederim:
   const handleMediaPayment = async () => {
     if (!customer) return
     const mediaPriceEUR = parseFloat(mediaPrice)
-    if (!isPaymentValid(mediaPaymentLines, mediaPriceEUR)) {
+    if (!isCompactPaymentValid(mediaPaymentEntries, mediaPriceEUR)) {
       alert('Ödeme tutarını girin')
       return
     }
     setProcessingPayment(true)
     try {
-      const firstLine = mediaPaymentLines[0]
+      const firstEntry = mediaPaymentEntries[0]
       // 1. Update media folder payment status
       await api.patch(`/media/${customer.id}/payment`, {
         status: 'PAID',
         amount: mediaPriceEUR,
-        paymentMethod: firstLine.method
+        paymentMethod: firstEntry.method
       })
 
       // 2. Create a sale record for media payment
@@ -798,24 +683,24 @@ Bu belgeyi imzalayarak asagidaki hususlari kabul ve beyan ederim:
         customerId: customer.id,
         items: [{
           productId: null,
-          itemType: 'MEDIA',
+          itemType: 'Foto/Video',
           itemName: 'Foto/Video Paketi',
           quantity: 1,
           unitPrice: mediaPriceEUR,
         }],
         paymentStatus: 'PAID',
-        paymentMethod: firstLine.method,
-        primaryCurrency: firstLine.currency,
-        paymentDetails: mediaPaymentLines
-          .filter(line => parseFloat(line.amount) > 0)
-          .map(line => ({
-            currency: line.currency,
-            amount: parseFloat(line.amount),
-            paymentMethod: line.method,
-          })),
+        paymentMethod: firstEntry.method,
+        primaryCurrency: firstEntry.currency,
+        paymentDetails: mediaPaymentEntries.map(entry => ({
+          currency: entry.currency,
+          amount: entry.amount,
+          paymentMethod: entry.method,
+        })),
       })
 
-      resetPaymentLines(setMediaPaymentLines)
+      setMediaPaymentEntries([])
+      setMediaActivePayCurrency(null)
+      setMediaActivePayAmount('')
       await fetchCustomer()
     } catch (error: any) {
       alert(error.response?.data?.error?.message || 'Ödeme başarısız')
@@ -896,15 +781,17 @@ Bu belgeyi imzalayarak asagidaki hususlari kabul ve beyan ederim:
 
   const handleCollectAllDebt = async () => {
     if (!customer || unpaidSales.length === 0) return
-    if (!isPaymentValid(debtPaymentLines, totalOwed)) {
+    if (!isCompactPaymentValid(debtPaymentEntries, totalOwed)) {
       alert('Ödeme tutarını girin')
       return
     }
     setCollectingDebt(true)
     try {
-      const firstLine = debtPaymentLines[0]
-      await salesApi.bulkPay(customer.id, firstLine.method, firstLine.currency)
-      resetPaymentLines(setDebtPaymentLines)
+      const firstEntry = debtPaymentEntries[0]
+      await salesApi.bulkPay(customer.id, firstEntry.method, firstEntry.currency)
+      setDebtPaymentEntries([])
+      setDebtActivePayCurrency(null)
+      setDebtActivePayAmount('')
       setShowDebtModal(false)
       await fetchCustomer()
     } catch (error: any) {
@@ -954,6 +841,44 @@ Bu belgeyi imzalayarak asagidaki hususlari kabul ve beyan ederim:
     setPosCart([])
     setPosProductSearch('')
     setPosActiveCategory('Tüm Ürünler')
+    setPosPaymentEntries([])
+    setPosActivePayCurrency(null)
+    setPosActivePayAmount('')
+  }
+
+  // POS compact payment helpers
+  const addPosPaymentEntry = () => {
+    if (!posActivePayCurrency) return
+    const amount = parseFloat(posActivePayAmount)
+    if (!amount || amount <= 0) return
+    const eurEquivalent = convertToEUR(amount, posActivePayCurrency)
+    setPosPaymentEntries(prev => [...prev, {
+      id: String(Date.now()),
+      currency: posActivePayCurrency,
+      amount,
+      method: posActivePayMethod,
+      eurEquivalent,
+    }])
+    setPosActivePayAmount('')
+    setPosActivePayCurrency(null)
+  }
+
+  const removePosPaymentEntry = (id: string) => {
+    setPosPaymentEntries(prev => prev.filter(e => e.id !== id))
+  }
+
+  const openPosCurrencyPay = (currency: Currency) => {
+    setPosActivePayCurrency(currency)
+    setPosActivePayMethod('CASH')
+    const currentRemaining = posCartTotal - posPaymentEntries.reduce((sum, e) => sum + e.eurEquivalent, 0)
+    if (currentRemaining > 0.01) {
+      const amountInCurrency = convertFromEUR(currentRemaining, currency)
+      const rounded = Math.ceil(amountInCurrency * 100) / 100
+      setPosActivePayAmount(rounded.toFixed(2))
+    } else {
+      setPosActivePayAmount('')
+    }
+    setTimeout(() => posPayAmountInputRef.current?.focus(), 50)
   }
 
   const addToPosCart = (product: any) => {
@@ -1000,13 +925,12 @@ Bu belgeyi imzalayarak asagidaki hususlari kabul ve beyan ederim:
   }
 
   const posCartTotal = posCart.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0)
+  const posPaidTotalEUR = posPaymentEntries.reduce((sum, e) => sum + e.eurEquivalent, 0)
+  const posRemainingEUR = posCartTotal - posPaidTotalEUR
+  const posHasValidPayment = posPaidTotalEUR > 0 && posRemainingEUR <= 0.01
 
   const handlePosPaymentConfirm = async () => {
     if (posCart.length === 0 || !customer) return
-    if (!isPaymentValid(posPaymentLines, posCartTotal)) {
-      alert('Ödeme tutarını girin')
-      return
-    }
 
     setPosProcessing(true)
     try {
@@ -1018,23 +942,19 @@ Bu belgeyi imzalayarak asagidaki hususlari kabul ve beyan ederim:
         unitPrice: item.unitPrice,
       }))
 
-      const firstLine = posPaymentLines[0]
       await salesApi.create({
         customerId: customer.id,
         items,
         paymentStatus: 'PAID',
-        paymentMethod: firstLine.method,
-        primaryCurrency: firstLine.currency,
-        paymentDetails: posPaymentLines
-          .filter(line => parseFloat(line.amount) > 0)
-          .map(line => ({
-            currency: line.currency,
-            amount: parseFloat(line.amount),
-            paymentMethod: line.method,
-          })),
+        paymentMethod: posPaymentEntries[0].method,
+        primaryCurrency: posPaymentEntries[0].currency,
+        paymentDetails: posPaymentEntries.map(entry => ({
+          currency: entry.currency,
+          amount: entry.amount,
+          paymentMethod: entry.method,
+        })),
       })
 
-      resetPaymentLines(setPosPaymentLines)
       setShowPosConfirmModal(false)
       closePosModal()
       await fetchCustomer()
@@ -1523,15 +1443,162 @@ Bu belgeyi imzalayarak asagidaki hususlari kabul ve beyan ederim:
                     <span className="text-xs text-muted-foreground">≈ ₺{(parseFloat(mediaPrice) * eurTryRate).toFixed(0)}</span>
                   )}
                 </div>
-                {renderPaymentLinesUI(mediaPaymentLines, setMediaPaymentLines, parseFloat(mediaPrice) || 0)}
-                <Button
-                  className="w-full mt-3 bg-green-600 hover:bg-green-700"
-                  disabled={processingPayment || !isPaymentValid(mediaPaymentLines, parseFloat(mediaPrice) || 0)}
-                  onClick={handleMediaPayment}
-                >
-                  {processingPayment ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : <Check className="w-4 h-4 mr-2" />}
-                  Ödeme Al
-                </Button>
+
+                {(() => {
+                  const mediaTotalEUR = parseFloat(mediaPrice) || 0
+                  const mediaPaidEUR = mediaPaymentEntries.reduce((sum, e) => sum + e.eurEquivalent, 0)
+                  const mediaRemaining = mediaTotalEUR - mediaPaidEUR
+                  const mediaValid = mediaPaidEUR > 0 && mediaRemaining <= 0.01
+
+                  return (
+                    <div className="space-y-2">
+                      {/* Recorded payment entries */}
+                      {mediaPaymentEntries.length > 0 && (
+                        <div className="space-y-1">
+                          {mediaPaymentEntries.map((entry) => (
+                            <div key={entry.id} className="flex items-center justify-between px-2 py-1.5 bg-blue-50 rounded border border-blue-200 text-xs">
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold">{getCurrencySymbol(entry.currency)}{entry.amount.toFixed(2)}</span>
+                                <span className="text-muted-foreground">{getMethodLabel(entry.method)}</span>
+                                {entry.currency !== 'EUR' && (
+                                  <span className="text-muted-foreground">= €{entry.eurEquivalent.toFixed(2)}</span>
+                                )}
+                              </div>
+                              <button onClick={() => removeCompactEntry({ entries: mediaPaymentEntries, setEntries: setMediaPaymentEntries, setActiveCurrency: setMediaActivePayCurrency, setActiveMethod: setMediaActivePayMethod, setActiveAmount: setMediaActivePayAmount, activeCurrency: mediaActivePayCurrency, activeMethod: mediaActivePayMethod, activeAmount: mediaActivePayAmount, inputRef: mediaPayAmountInputRef }, entry.id)} className="p-0.5 text-red-500 hover:bg-red-100 rounded">
+                                <X className="h-3 w-3" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Remaining info */}
+                      {mediaRemaining > 0.01 ? (
+                        <div className="p-2 rounded-lg bg-orange-50 border border-orange-200">
+                          <div className="flex items-center justify-between text-xs font-medium text-orange-700 mb-1">
+                            <span>Kalan:</span>
+                            <span className="font-bold">€{mediaRemaining.toFixed(2)}</span>
+                          </div>
+                          <div className="flex flex-wrap gap-x-2 text-[10px] text-orange-600">
+                            {CURRENCIES.filter(c => c.value !== 'EUR').map(c => {
+                              const equiv = convertFromEUR(mediaRemaining, c.value)
+                              return equiv > 0 ? (
+                                <span key={c.value}>{c.symbol}{equiv.toFixed(2)}</span>
+                              ) : null
+                            })}
+                          </div>
+                        </div>
+                      ) : mediaPaidEUR > 0 ? (
+                        <div className="p-2 rounded-lg bg-green-50 border border-green-200 text-xs font-medium text-green-700 flex items-center gap-1">
+                          <Check className="h-3.5 w-3.5" />
+                          Tutar tamam
+                          {mediaRemaining < -0.01 && (
+                            <span className="ml-1 text-[10px] opacity-70">(Para üstü: €{Math.abs(mediaRemaining).toFixed(2)})</span>
+                          )}
+                        </div>
+                      ) : null}
+
+                      {/* Currency payment buttons */}
+                      {mediaRemaining > 0.01 && (
+                        <>
+                          {mediaActivePayCurrency ? (
+                            <div className="p-2 bg-gray-50 rounded-lg border space-y-2">
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-sm font-bold w-8">{getCurrencySymbol(mediaActivePayCurrency)}</span>
+                                <Input
+                                  ref={mediaPayAmountInputRef}
+                                  type="number"
+                                  inputMode="decimal"
+                                  step="0.01"
+                                  min="0"
+                                  value={mediaActivePayAmount}
+                                  onChange={(e) => setMediaActivePayAmount(e.target.value)}
+                                  placeholder="0.00"
+                                  className="h-8 text-sm font-medium flex-1"
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') addCompactEntry({ entries: mediaPaymentEntries, setEntries: setMediaPaymentEntries, setActiveCurrency: setMediaActivePayCurrency, setActiveMethod: setMediaActivePayMethod, setActiveAmount: setMediaActivePayAmount, activeCurrency: mediaActivePayCurrency, activeMethod: mediaActivePayMethod, activeAmount: mediaActivePayAmount, inputRef: mediaPayAmountInputRef })
+                                    if (e.key === 'Escape') setMediaActivePayCurrency(null)
+                                  }}
+                                />
+                                <button
+                                  onClick={() => addCompactEntry({ entries: mediaPaymentEntries, setEntries: setMediaPaymentEntries, setActiveCurrency: setMediaActivePayCurrency, setActiveMethod: setMediaActivePayMethod, setActiveAmount: setMediaActivePayAmount, activeCurrency: mediaActivePayCurrency, activeMethod: mediaActivePayMethod, activeAmount: mediaActivePayAmount, inputRef: mediaPayAmountInputRef })}
+                                  disabled={!mediaActivePayAmount || parseFloat(mediaActivePayAmount) <= 0}
+                                  className="px-2 py-1.5 bg-green-600 text-white rounded text-xs font-medium hover:bg-green-700 disabled:opacity-40 disabled:cursor-not-allowed"
+                                >
+                                  <Check className="h-3.5 w-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => setMediaActivePayCurrency(null)}
+                                  className="p-1.5 text-gray-500 hover:bg-gray-200 rounded"
+                                >
+                                  <X className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
+                              {/* Method selector */}
+                              <div className="flex gap-1">
+                                {getAvailableMethods(mediaActivePayCurrency).map(m => (
+                                  <button
+                                    key={m}
+                                    onClick={() => setMediaActivePayMethod(m)}
+                                    className={`flex-1 px-2 py-1 rounded text-[11px] font-medium border transition-colors ${
+                                      mediaActivePayMethod === m
+                                        ? 'bg-primary text-white border-primary'
+                                        : 'bg-white text-gray-600 hover:bg-gray-100'
+                                    }`}
+                                  >
+                                    {m === 'CASH' && <Banknote className="h-3 w-3 inline mr-0.5" />}
+                                    {m === 'CREDIT_CARD' && <CreditCard className="h-3 w-3 inline mr-0.5" />}
+                                    {m === 'TRANSFER' && <Building className="h-3 w-3 inline mr-0.5" />}
+                                    {getMethodLabel(m)}
+                                  </button>
+                                ))}
+                              </div>
+                              {/* EUR equivalent preview */}
+                              {mediaActivePayCurrency !== 'EUR' && parseFloat(mediaActivePayAmount) > 0 && (
+                                <p className="text-[10px] text-muted-foreground">
+                                  = €{convertToEUR(parseFloat(mediaActivePayAmount), mediaActivePayCurrency).toFixed(2)}
+                                </p>
+                              )}
+                            </div>
+                          ) : (
+                            /* Currency buttons grid */
+                            <div className="grid grid-cols-5 gap-1">
+                              {CURRENCIES.map(c => {
+                                const amountInCurrency = convertFromEUR(mediaRemaining, c.value)
+                                const symbolColor: Record<Currency, string> = {
+                                  EUR: 'text-blue-600',
+                                  USD: 'text-green-600',
+                                  GBP: 'text-purple-600',
+                                  RUB: 'text-red-600',
+                                  TRY: 'text-orange-600',
+                                }
+                                return (
+                                  <button
+                                    key={c.value}
+                                    onClick={() => openCompactCurrencyPay({ entries: mediaPaymentEntries, setEntries: setMediaPaymentEntries, setActiveCurrency: setMediaActivePayCurrency, setActiveMethod: setMediaActivePayMethod, setActiveAmount: setMediaActivePayAmount, activeCurrency: mediaActivePayCurrency, activeMethod: mediaActivePayMethod, activeAmount: mediaActivePayAmount, inputRef: mediaPayAmountInputRef }, c.value, mediaTotalEUR)}
+                                    className="flex flex-col items-center p-2 rounded-lg border bg-white hover:bg-gray-50 hover:border-gray-400 transition-colors active:scale-95"
+                                  >
+                                    <span className={`text-base font-bold ${symbolColor[c.value]}`}>{c.symbol}</span>
+                                    <span className="text-[10px] font-medium text-muted-foreground">{amountInCurrency.toFixed(c.value === 'RUB' ? 0 : 2)}</span>
+                                  </button>
+                                )
+                              })}
+                            </div>
+                          )}
+                        </>
+                      )}
+
+                      <Button
+                        className="w-full mt-1 bg-green-600 hover:bg-green-700"
+                        disabled={processingPayment || !mediaValid}
+                        onClick={handleMediaPayment}
+                      >
+                        {processingPayment ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : <Check className="w-4 h-4 mr-2" />}
+                        Ödeme Al
+                      </Button>
+                    </div>
+                  )
+                })()}
               </div>
 
               {/* Download link (disabled) */}
@@ -1639,8 +1706,28 @@ Bu belgeyi imzalayarak asagidaki hususlari kabul ve beyan ederim:
                         <td className="py-2">{sale.quantity}</td>
                         <td className="py-2">€{sale.totalPrice.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}{sale.totalAmountTRY ? ` (₺${sale.totalAmountTRY.toLocaleString('tr-TR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })})` : ''}</td>
                         <td className="py-2">
-                          {sale.paymentMethod === 'CASH' ? 'Nakit' : sale.paymentMethod === 'CREDIT_CARD' ? 'Kart' : sale.paymentMethod === 'BANK_TRANSFER' ? 'Havale' : sale.paymentMethod || '-'}
-                          {sale.primaryCurrency && sale.primaryCurrency !== 'TRY' && ` (${sale.primaryCurrency})`}
+                          {sale.paymentStatus === 'PAID' && sale.paymentDetails && sale.paymentDetails.length > 0 ? (
+                            <div className="space-y-0.5">
+                              {sale.paymentDetails.map((pd, i) => (
+                                <div key={pd.id || i} className="text-xs">
+                                  <span className="font-medium">
+                                    {pd.paymentMethod === 'CASH' ? 'Nakit' : pd.paymentMethod === 'CREDIT_CARD' ? 'Kart' : pd.paymentMethod === 'TRANSFER' ? 'Havale' : pd.paymentMethod}
+                                  </span>
+                                  {' '}
+                                  <span className="text-muted-foreground">
+                                    ({pd.currency} {pd.amount.toLocaleString('tr-TR', { minimumFractionDigits: 2 })})
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          ) : sale.paymentStatus === 'PAID' ? (
+                            <>
+                              {sale.paymentMethod === 'CASH' ? 'Nakit' : sale.paymentMethod === 'CREDIT_CARD' ? 'Kart' : sale.paymentMethod === 'TRANSFER' ? 'Havale' : sale.paymentMethod || '-'}
+                              {sale.primaryCurrency && ` (${sale.primaryCurrency})`}
+                            </>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
                         </td>
                         <td className="py-2">{sale.soldBy?.name || sale.soldBy?.username || '-'}</td>
                         <td className="py-2 whitespace-nowrap">
@@ -2077,18 +2164,154 @@ Bu belgeyi imzalayarak asagidaki hususlari kabul ve beyan ederim:
                   )}
 
                   {posCart.length > 0 && (
-                    <>
-                      {renderPaymentLinesUI(posPaymentLines, setPosPaymentLines, posCartTotal)}
+                    <div className="border-t pt-3 space-y-2">
+                      {/* Recorded payment entries */}
+                      {posPaymentEntries.length > 0 && (
+                        <div className="space-y-1">
+                          {posPaymentEntries.map((entry) => (
+                            <div key={entry.id} className="flex items-center justify-between px-2 py-1.5 bg-blue-50 rounded border border-blue-200 text-xs">
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold">{getCurrencySymbol(entry.currency)}{entry.amount.toFixed(2)}</span>
+                                <span className="text-muted-foreground">{getMethodLabel(entry.method)}</span>
+                                {entry.currency !== 'EUR' && (
+                                  <span className="text-muted-foreground">= €{entry.eurEquivalent.toFixed(2)}</span>
+                                )}
+                              </div>
+                              <button onClick={() => removePosPaymentEntry(entry.id)} className="p-0.5 text-red-500 hover:bg-red-100 rounded">
+                                <X className="h-3 w-3" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Remaining info */}
+                      {posRemainingEUR > 0.01 ? (
+                        <div className="p-2 rounded-lg bg-orange-50 border border-orange-200">
+                          <div className="flex items-center justify-between text-xs font-medium text-orange-700 mb-1">
+                            <span>Kalan:</span>
+                            <span className="font-bold">€{posRemainingEUR.toFixed(2)}</span>
+                          </div>
+                          <div className="flex flex-wrap gap-x-2 text-[10px] text-orange-600">
+                            {CURRENCIES.filter(c => c.value !== 'EUR').map(c => {
+                              const equiv = convertFromEUR(posRemainingEUR, c.value)
+                              return equiv > 0 ? (
+                                <span key={c.value}>{c.symbol}{equiv.toFixed(2)}</span>
+                              ) : null
+                            })}
+                          </div>
+                        </div>
+                      ) : posPaidTotalEUR > 0 ? (
+                        <div className="p-2 rounded-lg bg-green-50 border border-green-200 text-xs font-medium text-green-700 flex items-center gap-1">
+                          <Check className="h-3.5 w-3.5" />
+                          Tutar tamam
+                          {posRemainingEUR < -0.01 && (
+                            <span className="ml-1 text-[10px] opacity-70">(Para üstü: €{Math.abs(posRemainingEUR).toFixed(2)})</span>
+                          )}
+                        </div>
+                      ) : null}
+
+                      {/* Currency payment buttons */}
+                      {posRemainingEUR > 0.01 && (
+                        <>
+                          {posActivePayCurrency ? (
+                            <div className="p-2 bg-gray-50 rounded-lg border space-y-2">
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-sm font-bold w-8">{getCurrencySymbol(posActivePayCurrency)}</span>
+                                <Input
+                                  ref={posPayAmountInputRef}
+                                  type="number"
+                                  inputMode="decimal"
+                                  step="0.01"
+                                  min="0"
+                                  value={posActivePayAmount}
+                                  onChange={(e) => setPosActivePayAmount(e.target.value)}
+                                  placeholder="0.00"
+                                  className="h-8 text-sm font-medium flex-1"
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') addPosPaymentEntry()
+                                    if (e.key === 'Escape') setPosActivePayCurrency(null)
+                                  }}
+                                />
+                                <button
+                                  onClick={addPosPaymentEntry}
+                                  disabled={!posActivePayAmount || parseFloat(posActivePayAmount) <= 0}
+                                  className="px-2 py-1.5 bg-green-600 text-white rounded text-xs font-medium hover:bg-green-700 disabled:opacity-40 disabled:cursor-not-allowed"
+                                >
+                                  <Check className="h-3.5 w-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => setPosActivePayCurrency(null)}
+                                  className="p-1.5 text-gray-500 hover:bg-gray-200 rounded"
+                                >
+                                  <X className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
+                              {/* Method selector */}
+                              <div className="flex gap-1">
+                                {getAvailableMethods(posActivePayCurrency).map(m => (
+                                  <button
+                                    key={m}
+                                    onClick={() => setPosActivePayMethod(m)}
+                                    className={`flex-1 px-2 py-1 rounded text-[11px] font-medium border transition-colors ${
+                                      posActivePayMethod === m
+                                        ? 'bg-primary text-white border-primary'
+                                        : 'bg-white text-gray-600 hover:bg-gray-100'
+                                    }`}
+                                  >
+                                    {m === 'CASH' && <Banknote className="h-3 w-3 inline mr-0.5" />}
+                                    {m === 'CREDIT_CARD' && <CreditCard className="h-3 w-3 inline mr-0.5" />}
+                                    {m === 'TRANSFER' && <Building className="h-3 w-3 inline mr-0.5" />}
+                                    {getMethodLabel(m)}
+                                  </button>
+                                ))}
+                              </div>
+                              {/* EUR equivalent preview */}
+                              {posActivePayCurrency !== 'EUR' && parseFloat(posActivePayAmount) > 0 && (
+                                <p className="text-[10px] text-muted-foreground">
+                                  = €{convertToEUR(parseFloat(posActivePayAmount), posActivePayCurrency).toFixed(2)}
+                                </p>
+                              )}
+                            </div>
+                          ) : (
+                            /* Currency buttons grid */
+                            <div className="grid grid-cols-5 gap-1">
+                              {CURRENCIES.map(c => {
+                                const amountInCurrency = convertFromEUR(posRemainingEUR, c.value)
+                                const symbolColor: Record<Currency, string> = {
+                                  EUR: 'text-blue-600',
+                                  USD: 'text-green-600',
+                                  GBP: 'text-purple-600',
+                                  RUB: 'text-red-600',
+                                  TRY: 'text-orange-600',
+                                }
+                                return (
+                                  <button
+                                    key={c.value}
+                                    onClick={() => openPosCurrencyPay(c.value)}
+                                    className="flex flex-col items-center p-2 rounded-lg border bg-white hover:bg-gray-50 hover:border-gray-400 transition-colors active:scale-95"
+                                  >
+                                    <span className={`text-base font-bold ${symbolColor[c.value]}`}>{c.symbol}</span>
+                                    <span className="text-[10px] font-medium text-muted-foreground">{amountInCurrency.toFixed(c.value === 'RUB' ? 0 : 2)}</span>
+                                  </button>
+                                )
+                              })}
+                            </div>
+                          )}
+                        </>
+                      )}
+
+                      {/* Action Buttons */}
                       <div className="grid grid-cols-2 gap-2 pt-1">
                         <Button
                           onClick={() => {
-                            if (!isPaymentValid(posPaymentLines, posCartTotal)) {
+                            if (!posHasValidPayment) {
                               alert('Ödeme tutarını girin')
                               return
                             }
                             setShowPosConfirmModal(true)
                           }}
-                          disabled={posProcessing || !isPaymentValid(posPaymentLines, posCartTotal)}
+                          disabled={posProcessing || !posHasValidPayment}
                           className="h-12 bg-green-600 hover:bg-green-700"
                         >
                           {posProcessing ? (
@@ -2110,7 +2333,7 @@ Bu belgeyi imzalayarak asagidaki hususlari kabul ve beyan ederim:
                           Veresiye
                         </Button>
                       </div>
-                    </>
+                    </div>
                   )}
                 </div>
               </div>
@@ -2135,21 +2358,35 @@ Bu belgeyi imzalayarak asagidaki hususlari kabul ve beyan ederim:
             </div>
             <div className="mb-4 space-y-2">
               <p className="text-sm font-medium">Ödeme Detayları</p>
-              {posPaymentLines.filter(l => parseFloat(l.amount) > 0).map((line) => (
-                <div key={line.id} className="flex items-center justify-between p-2 bg-blue-50 rounded border border-blue-100">
+              {posPaymentEntries.map((entry) => (
+                <div key={entry.id} className="flex items-center justify-between p-2 bg-blue-50 rounded border border-blue-100">
                   <div>
                     <span className="text-sm font-medium">
-                      {getCurrencySymbol(line.currency)}{parseFloat(line.amount).toFixed(2)} {line.currency}
+                      {getCurrencySymbol(entry.currency)}{entry.amount.toFixed(2)} {entry.currency}
                     </span>
                     <span className="text-xs text-muted-foreground ml-2">
-                      ({getMethodLabel(line.method)})
+                      ({getMethodLabel(entry.method)})
                     </span>
                   </div>
-                  {line.currency !== 'EUR' && (
-                    <p className="text-xs font-medium">= €{line.eurEquivalent.toFixed(2)}</p>
+                  {entry.currency !== 'EUR' && (
+                    <div className="text-right">
+                      <p className="text-xs font-medium">= €{entry.eurEquivalent.toFixed(2)}</p>
+                      <p className="text-[10px] text-muted-foreground">
+                        Kur: 1€ = {getCurrencySymbol(entry.currency)}{(allRates[entry.currency]?.buyRate || 0).toFixed(
+                          entry.currency === 'RUB' ? 4 : 2
+                        )}
+                      </p>
+                    </div>
                   )}
                 </div>
               ))}
+
+              {/* Change / overpayment */}
+              {posRemainingEUR < -0.01 && (
+                <div className="p-2 bg-yellow-50 rounded border border-yellow-200 text-xs">
+                  <span className="text-yellow-700">Para üstü: €{Math.abs(posRemainingEUR).toFixed(2)}</span>
+                </div>
+              )}
             </div>
             <div className="flex gap-3">
               <Button
@@ -2197,25 +2434,174 @@ Bu belgeyi imzalayarak asagidaki hususlari kabul ve beyan ederim:
               </p>
             </div>
             <p className="text-sm font-medium mb-3">Ödeme Detayları:</p>
-            {renderPaymentLinesUI(debtPaymentLines, setDebtPaymentLines, totalOwed)}
-            <Button
-              className="w-full mt-4 bg-green-600 hover:bg-green-700"
-              onClick={handleCollectAllDebt}
-              disabled={collectingDebt || !isPaymentValid(debtPaymentLines, totalOwed)}
-            >
-              {collectingDebt ? (
-                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <Check className="h-4 w-4 mr-2" />
-              )}
-              Tahsil Et
-            </Button>
+
+            {(() => {
+              const debtPaidEUR = debtPaymentEntries.reduce((sum, e) => sum + e.eurEquivalent, 0)
+              const debtRemaining = totalOwed - debtPaidEUR
+              const debtValid = debtPaidEUR > 0 && debtRemaining <= 0.01
+
+              return (
+                <div className="space-y-2">
+                  {/* Recorded payment entries */}
+                  {debtPaymentEntries.length > 0 && (
+                    <div className="space-y-1">
+                      {debtPaymentEntries.map((entry) => (
+                        <div key={entry.id} className="flex items-center justify-between px-2 py-1.5 bg-blue-50 rounded border border-blue-200 text-xs">
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold">{getCurrencySymbol(entry.currency)}{entry.amount.toFixed(2)}</span>
+                            <span className="text-muted-foreground">{getMethodLabel(entry.method)}</span>
+                            {entry.currency !== 'EUR' && (
+                              <span className="text-muted-foreground">= €{entry.eurEquivalent.toFixed(2)}</span>
+                            )}
+                          </div>
+                          <button onClick={() => removeCompactEntry({ entries: debtPaymentEntries, setEntries: setDebtPaymentEntries, setActiveCurrency: setDebtActivePayCurrency, setActiveMethod: setDebtActivePayMethod, setActiveAmount: setDebtActivePayAmount, activeCurrency: debtActivePayCurrency, activeMethod: debtActivePayMethod, activeAmount: debtActivePayAmount, inputRef: debtPayAmountInputRef }, entry.id)} className="p-0.5 text-red-500 hover:bg-red-100 rounded">
+                            <X className="h-3 w-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Remaining info */}
+                  {debtRemaining > 0.01 ? (
+                    <div className="p-2 rounded-lg bg-orange-50 border border-orange-200">
+                      <div className="flex items-center justify-between text-xs font-medium text-orange-700 mb-1">
+                        <span>Kalan:</span>
+                        <span className="font-bold">€{debtRemaining.toFixed(2)}</span>
+                      </div>
+                      <div className="flex flex-wrap gap-x-2 text-[10px] text-orange-600">
+                        {CURRENCIES.filter(c => c.value !== 'EUR').map(c => {
+                          const equiv = convertFromEUR(debtRemaining, c.value)
+                          return equiv > 0 ? (
+                            <span key={c.value}>{c.symbol}{equiv.toFixed(2)}</span>
+                          ) : null
+                        })}
+                      </div>
+                    </div>
+                  ) : debtPaidEUR > 0 ? (
+                    <div className="p-2 rounded-lg bg-green-50 border border-green-200 text-xs font-medium text-green-700 flex items-center gap-1">
+                      <Check className="h-3.5 w-3.5" />
+                      Tutar tamam
+                      {debtRemaining < -0.01 && (
+                        <span className="ml-1 text-[10px] opacity-70">(Para üstü: €{Math.abs(debtRemaining).toFixed(2)})</span>
+                      )}
+                    </div>
+                  ) : null}
+
+                  {/* Currency payment buttons */}
+                  {debtRemaining > 0.01 && (
+                    <>
+                      {debtActivePayCurrency ? (
+                        <div className="p-2 bg-gray-50 rounded-lg border space-y-2">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-sm font-bold w-8">{getCurrencySymbol(debtActivePayCurrency)}</span>
+                            <Input
+                              ref={debtPayAmountInputRef}
+                              type="number"
+                              inputMode="decimal"
+                              step="0.01"
+                              min="0"
+                              value={debtActivePayAmount}
+                              onChange={(e) => setDebtActivePayAmount(e.target.value)}
+                              placeholder="0.00"
+                              className="h-8 text-sm font-medium flex-1"
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') addCompactEntry({ entries: debtPaymentEntries, setEntries: setDebtPaymentEntries, setActiveCurrency: setDebtActivePayCurrency, setActiveMethod: setDebtActivePayMethod, setActiveAmount: setDebtActivePayAmount, activeCurrency: debtActivePayCurrency, activeMethod: debtActivePayMethod, activeAmount: debtActivePayAmount, inputRef: debtPayAmountInputRef })
+                                if (e.key === 'Escape') setDebtActivePayCurrency(null)
+                              }}
+                            />
+                            <button
+                              onClick={() => addCompactEntry({ entries: debtPaymentEntries, setEntries: setDebtPaymentEntries, setActiveCurrency: setDebtActivePayCurrency, setActiveMethod: setDebtActivePayMethod, setActiveAmount: setDebtActivePayAmount, activeCurrency: debtActivePayCurrency, activeMethod: debtActivePayMethod, activeAmount: debtActivePayAmount, inputRef: debtPayAmountInputRef })}
+                              disabled={!debtActivePayAmount || parseFloat(debtActivePayAmount) <= 0}
+                              className="px-2 py-1.5 bg-green-600 text-white rounded text-xs font-medium hover:bg-green-700 disabled:opacity-40 disabled:cursor-not-allowed"
+                            >
+                              <Check className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              onClick={() => setDebtActivePayCurrency(null)}
+                              className="p-1.5 text-gray-500 hover:bg-gray-200 rounded"
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                          {/* Method selector */}
+                          <div className="flex gap-1">
+                            {getAvailableMethods(debtActivePayCurrency).map(m => (
+                              <button
+                                key={m}
+                                onClick={() => setDebtActivePayMethod(m)}
+                                className={`flex-1 px-2 py-1 rounded text-[11px] font-medium border transition-colors ${
+                                  debtActivePayMethod === m
+                                    ? 'bg-primary text-white border-primary'
+                                    : 'bg-white text-gray-600 hover:bg-gray-100'
+                                }`}
+                              >
+                                {m === 'CASH' && <Banknote className="h-3 w-3 inline mr-0.5" />}
+                                {m === 'CREDIT_CARD' && <CreditCard className="h-3 w-3 inline mr-0.5" />}
+                                {m === 'TRANSFER' && <Building className="h-3 w-3 inline mr-0.5" />}
+                                {getMethodLabel(m)}
+                              </button>
+                            ))}
+                          </div>
+                          {/* EUR equivalent preview */}
+                          {debtActivePayCurrency !== 'EUR' && parseFloat(debtActivePayAmount) > 0 && (
+                            <p className="text-[10px] text-muted-foreground">
+                              = €{convertToEUR(parseFloat(debtActivePayAmount), debtActivePayCurrency).toFixed(2)}
+                            </p>
+                          )}
+                        </div>
+                      ) : (
+                        /* Currency buttons grid */
+                        <div className="grid grid-cols-5 gap-1">
+                          {CURRENCIES.map(c => {
+                            const amountInCurrency = convertFromEUR(debtRemaining, c.value)
+                            const symbolColor: Record<Currency, string> = {
+                              EUR: 'text-blue-600',
+                              USD: 'text-green-600',
+                              GBP: 'text-purple-600',
+                              RUB: 'text-red-600',
+                              TRY: 'text-orange-600',
+                            }
+                            return (
+                              <button
+                                key={c.value}
+                                onClick={() => openCompactCurrencyPay({ entries: debtPaymentEntries, setEntries: setDebtPaymentEntries, setActiveCurrency: setDebtActivePayCurrency, setActiveMethod: setDebtActivePayMethod, setActiveAmount: setDebtActivePayAmount, activeCurrency: debtActivePayCurrency, activeMethod: debtActivePayMethod, activeAmount: debtActivePayAmount, inputRef: debtPayAmountInputRef }, c.value, totalOwed)}
+                                className="flex flex-col items-center p-2 rounded-lg border bg-white hover:bg-gray-50 hover:border-gray-400 transition-colors active:scale-95"
+                              >
+                                <span className={`text-base font-bold ${symbolColor[c.value]}`}>{c.symbol}</span>
+                                <span className="text-[10px] font-medium text-muted-foreground">{amountInCurrency.toFixed(c.value === 'RUB' ? 0 : 2)}</span>
+                              </button>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </>
+                  )}
+
+                  <Button
+                    className="w-full mt-2 bg-green-600 hover:bg-green-700"
+                    onClick={handleCollectAllDebt}
+                    disabled={collectingDebt || !debtValid}
+                  >
+                    {collectingDebt ? (
+                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Check className="h-4 w-4 mr-2" />
+                    )}
+                    Tahsil Et
+                  </Button>
+                </div>
+              )
+            })()}
+
             <Button
               variant="outline"
               className="w-full mt-2"
               onClick={() => {
                 setShowDebtModal(false)
-                resetPaymentLines(setDebtPaymentLines)
+                setDebtPaymentEntries([])
+                setDebtActivePayCurrency(null)
+                setDebtActivePayAmount('')
               }}
               disabled={collectingDebt}
             >

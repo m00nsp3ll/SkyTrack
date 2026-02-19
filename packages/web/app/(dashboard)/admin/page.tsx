@@ -687,13 +687,13 @@ export default function AdminDashboard() {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-            <Link href="/customers/new">
+            <Link href="/admin/customers/new">
               <Button variant="outline" className="w-full h-16 flex-col">
                 <Users className="h-5 w-5 mb-1" />
                 <span className="text-xs">Yeni Müşteri</span>
               </Button>
             </Link>
-            <Link href="/flights/live">
+            <Link href="/admin/flights/list">
               <Button variant="outline" className="w-full h-16 flex-col">
                 <Plane className="h-5 w-5 mb-1" />
                 <span className="text-xs">Canlı Uçuşlar</span>
@@ -711,7 +711,7 @@ export default function AdminDashboard() {
                 <span className="text-xs">Medya Satış</span>
               </Button>
             </Link>
-            <Link href="/pilots/queue">
+            <Link href="/admin/pilots/queue">
               <Button variant="outline" className="w-full h-16 flex-col">
                 <Clock className="h-5 w-5 mb-1" />
                 <span className="text-xs">Pilot Sırası</span>

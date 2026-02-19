@@ -386,7 +386,10 @@ router.get('/daily-report', authenticate, asyncHandler(async (req: AuthRequest, 
   const cardSales = sales.filter(s => s.paymentMethod === 'CREDIT_CARD' && s.paymentStatus === 'PAID').reduce((sum, s) => sum + (s.totalAmountEUR || s.totalPrice), 0);
   const transferSales = sales.filter(s => s.paymentMethod === 'TRANSFER' && s.paymentStatus === 'PAID').reduce((sum, s) => sum + (s.totalAmountEUR || s.totalPrice), 0);
   const unpaidSales = sales.filter(s => s.paymentStatus === 'UNPAID').reduce((sum, s) => sum + (s.totalAmountEUR || s.totalPrice), 0);
-  const mediaSales = mediaFolders.reduce((sum, m) => sum + (m.paymentAmount || 0), 0);
+  // Foto/Video geliri: sale tablosundan hesapla (eski 'MEDIA' kayıtları dahil)
+  const mediaSales = sales
+    .filter(s => s.paymentStatus === 'PAID' && (s.itemType === 'Foto/Video' || s.itemType === 'MEDIA'))
+    .reduce((sum, s) => sum + (s.totalAmountEUR || s.totalPrice), 0);
 
   // Currency breakdown from payment details
   const allPaymentDetails = sales.flatMap(s => s.paymentDetails || []);
@@ -412,14 +415,15 @@ router.get('/daily-report', authenticate, asyncHandler(async (req: AuthRequest, 
       (cashRegister[detail.currency][detail.paymentMethod] || 0) + detail.amount;
   }
 
-  // Category breakdown — EUR bazlı
+  // Category breakdown — EUR bazlı (eski 'MEDIA' kayıtlarını 'Foto/Video' olarak normalize et)
   const categories: Record<string, { count: number; total: number }> = {};
   for (const sale of sales) {
-    if (!categories[sale.itemType]) {
-      categories[sale.itemType] = { count: 0, total: 0 };
+    const categoryName = sale.itemType === 'MEDIA' ? 'Foto/Video' : sale.itemType;
+    if (!categories[categoryName]) {
+      categories[categoryName] = { count: 0, total: 0 };
     }
-    categories[sale.itemType].count += sale.quantity;
-    categories[sale.itemType].total += (sale.totalAmountEUR || sale.totalPrice);
+    categories[categoryName].count += sale.quantity;
+    categories[categoryName].total += (sale.totalAmountEUR || sale.totalPrice);
   }
 
   // Payment method breakdown
