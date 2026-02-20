@@ -142,6 +142,14 @@
 - [x] Recursive medya dosya tarama (GoPro alt klasörleri dahil)
 - [x] Pilot klasör açma hata toleransı (klasör yoksa oluştur)
 
+### LAN İndirme Sistemi v4 — HTTPS + Otomatik Redirect (2026-02-20)
+- [x] LAN Download sunucusu HTTP → HTTPS (self-signed sertifika, port 3080)
+- [x] Chrome mixed content engeli çözüldü (HTTPS→HTTPS)
+- [x] WiFi'deyse otomatik `window.location.href` ile indirme linkine yönlendirme
+- [x] İnternetteyse müşteri kartı sayfası gösterilir, butonla indirir
+- [x] Server-side LAN algılama (IP karşılaştırma) aynen duruyor
+- [x] `/api/network/discover` → `lanBaseUrl: https://IP:3080`
+
 ### POS / Satış
 - [x] Ürün yönetimi
 - [x] Satış işlemleri

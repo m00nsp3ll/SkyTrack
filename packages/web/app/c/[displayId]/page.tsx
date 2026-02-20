@@ -1,8 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useParams } from 'next/navigation'
-import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import {
   Download,
@@ -12,8 +11,8 @@ import {
   Clock,
   Plane,
   User,
-  RefreshCw,
-  Image,
+  Wifi,
+  Globe,
 } from 'lucide-react'
 
 interface CustomerData {
@@ -72,18 +71,27 @@ function getApiUrl() {
   if (typeof window === 'undefined') return 'https://api.skytrackyp.com/api'
   const hostname = window.location.hostname
 
-  // Custom domain
   if (hostname === 'skytrackyp.com' || hostname === 'www.skytrackyp.com') {
     return 'https://api.skytrackyp.com/api'
   }
-
-  // Cloudflare tunnel
   if (hostname.includes('trycloudflare.com')) {
     return `https://${hostname.replace(/^[^.]+/, 'api')}/api`
   }
-
-  // Local network
   return `https://${hostname}:3001/api`
+}
+
+// Get HTTPS download URL (Cloudflare Tunnel — internet)
+function getDownloadUrl(displayId: string) {
+  if (typeof window === 'undefined') return ''
+  const hostname = window.location.hostname
+
+  if (hostname === 'skytrackyp.com' || hostname === 'www.skytrackyp.com') {
+    return `https://api.skytrackyp.com/api/media/${displayId}/download`
+  }
+  if (hostname.includes('trycloudflare.com')) {
+    return `https://${hostname.replace(/^[^.]+/, 'api')}/api/media/${displayId}/download`
+  }
+  return `https://${hostname}:3001/api/media/${displayId}/download`
 }
 
 export default function CustomerDownloadPage() {
@@ -93,23 +101,40 @@ export default function CustomerDownloadPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [apiUrl, setApiUrl] = useState('')
-  const [downloading, setDownloading] = useState(false)
+
+  // Server-side LAN detection
+  const [isLan, setIsLan] = useState(false)
+  const [lanBaseUrl, setLanBaseUrl] = useState<string | null>(null)
+  const [connectionChecked, setConnectionChecked] = useState(false)
 
   useEffect(() => {
     setApiUrl(getApiUrl())
   }, [])
 
-  const fetchData = async () => {
+  // Server-side LAN detection — LAN'daysa direkt indirme linkine yönlendir
+  useEffect(() => {
+    if (!apiUrl) return
+    fetch(`${apiUrl}/network/discover`, { cache: 'no-store' })
+      .then(r => r.json())
+      .then(d => {
+        if (d.isLan && d.lanBaseUrl) {
+          // LAN'da — direkt indirme linkine git
+          window.location.href = `${d.lanBaseUrl}/api/media/${displayId}/download`
+          return
+        }
+        // İnternette — sayfayı göster
+        if (d.lanBaseUrl) setLanBaseUrl(d.lanBaseUrl)
+        setConnectionChecked(true)
+      })
+      .catch(() => { setConnectionChecked(true) })
+  }, [apiUrl, displayId])
+
+  const fetchData = useCallback(async () => {
     if (!apiUrl) return
     try {
       const response = await fetch(`${apiUrl}/customers/public/${displayId}`)
       const result = await response.json()
-
-      if (!result.success) {
-        setError('Müşteri bulunamadı')
-        return
-      }
-
+      if (!result.success) { setError('Müşteri bulunamadı'); return }
       setData(result.data)
       setError(null)
     } catch (err: any) {
@@ -117,7 +142,7 @@ export default function CustomerDownloadPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [apiUrl, displayId])
 
   useEffect(() => {
     if (apiUrl) {
@@ -125,43 +150,30 @@ export default function CustomerDownloadPage() {
       const interval = setInterval(fetchData, 30000)
       return () => clearInterval(interval)
     }
-  }, [displayId, apiUrl])
+  }, [fetchData, apiUrl])
 
+  // Smart download — window.location.href (top-level navigation, engellenemez)
   const handleDownload = () => {
-    if (typeof window === 'undefined') return
-    const hostname = window.location.hostname
-    setDownloading(true)
-
-    // Build download URL based on hostname
-    let downloadUrl: string
-    if (hostname === 'skytrackyp.com' || hostname === 'www.skytrackyp.com') {
-      downloadUrl = `https://api.skytrackyp.com/api/media/${displayId}/download`
-    } else if (hostname.includes('trycloudflare.com')) {
-      downloadUrl = `https://${hostname.replace(/^[^.]+/, 'api')}/api/media/${displayId}/download`
+    if (isLan && lanBaseUrl) {
+      window.location.href = `${lanBaseUrl}/api/media/${displayId}/download`
     } else {
-      downloadUrl = `https://${hostname}:3001/api/media/${displayId}/download`
+      window.location.href = getDownloadUrl(displayId)
     }
-
-    // Create download link
-    const link = document.createElement('a')
-    link.href = downloadUrl
-    link.download = `Alanya_Paragliding_${displayId}.zip`
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-
-    // Reset downloading state after a delay
-    setTimeout(() => setDownloading(false), 3000)
   }
 
+  // Loading
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-sky-100 to-sky-50 flex items-center justify-center">
-        <RefreshCw className="w-8 h-8 animate-spin text-sky-600" />
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-sky-500 via-blue-600 to-purple-600">
+        <div className="bg-white rounded-3xl p-8 text-center shadow-2xl max-w-sm mx-4">
+          <div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4" />
+          <p className="text-gray-500 text-sm">Yükleniyor...</p>
+        </div>
       </div>
     )
   }
 
+  // Error state
   if (error || !data) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-sky-100 to-sky-50 flex items-center justify-center p-4">
@@ -234,28 +246,35 @@ export default function CustomerDownloadPage() {
                     <h2 className="text-xl font-bold text-green-700 mb-2">
                       İndirmeye Hazır!
                     </h2>
-                    <p className="text-gray-600 mb-4">
+                    <p className="text-gray-600 mb-3">
                       {data.media?.fileCount} dosya indirmeye hazır
                     </p>
 
-                    <Button
-                      size="lg"
-                      className="w-full bg-green-600 hover:bg-green-700"
+                    {/* Connection badge — server-side detection */}
+                    {connectionChecked && (
+                      <div className="mb-4">
+                        {isLan ? (
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700 border border-green-200">
+                            <Wifi className="w-3.5 h-3.5" />
+                            Yerel Ağ (Hızlı İndirme)
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700 border border-blue-200">
+                            <Globe className="w-3.5 h-3.5" />
+                            İnternet Üzerinden
+                          </span>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Single dynamic download button */}
+                    <button
                       onClick={handleDownload}
-                      disabled={downloading}
+                      className="flex items-center justify-center gap-2 w-full py-4 px-6 bg-gradient-to-r from-green-500 to-emerald-600 text-white font-bold text-lg rounded-2xl shadow-lg hover:from-green-600 hover:to-emerald-700 active:scale-[0.98] transition-all"
                     >
-                      {downloading ? (
-                        <>
-                          <RefreshCw className="w-5 h-5 mr-2 animate-spin" />
-                          İndiriliyor...
-                        </>
-                      ) : (
-                        <>
-                          <Download className="w-5 h-5 mr-2" />
-                          Fotoğrafları İndir
-                        </>
-                      )}
-                    </Button>
+                      <Download className="w-5 h-5" />
+                      Fotoğrafları İndir
+                    </button>
 
                     <p className="text-xs text-gray-500 mt-3">
                       ZIP dosyası indirilecek. Telefonunuz otomatik olarak açacaktır.
