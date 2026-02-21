@@ -1020,6 +1020,11 @@ router.get(
           id: latestFlight.id,
           status: latestFlight.status,
           pilotName: latestFlight.pilot.name,
+          assignedAt: latestFlight.createdAt,
+          pickupAt: (latestFlight as any).pickupAt,
+          takeoffAt: latestFlight.takeoffAt,
+          landingAt: latestFlight.landingAt,
+          durationMinutes: (latestFlight as any).durationMinutes,
         } : null,
         mediaFolder: mediaFolder ? {
           id: mediaFolder.id,

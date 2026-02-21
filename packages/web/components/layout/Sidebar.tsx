@@ -73,6 +73,7 @@ const menuGroups: MenuGroup[] = [
     items: [
       { href: '/admin/media', label: 'Foto/Video Raporu', icon: Camera },
       { href: '/admin/media/seller', label: 'Önizleme İstasyonu', icon: Eye },
+      { href: '/admin/media/pos', label: 'Foto/Video Satış', icon: CreditCard },
     ],
   },
   {

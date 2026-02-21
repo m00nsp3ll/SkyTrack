@@ -457,6 +457,7 @@ export default function CustomerDetailPage() {
             .qr-code { width: 4cm; height: 4cm; }
             .display-id { font-size: 14px; font-weight: bold; margin-top: 5px; }
             .customer-name { font-size: 12px; color: #666; }
+            .pilot-name { font-size: 12px; font-weight: bold; color: #333; margin-top: 3px; }
             .datetime { font-size: 10px; color: #888; margin-top: 5px; }
           </style>
         </head>
@@ -465,6 +466,7 @@ export default function CustomerDetailPage() {
             <img src="${qrCodeData}" alt="QR Code" class="qr-code" />
             <div class="display-id">${customer.displayId}</div>
             <div class="customer-name">${customer.firstName} ${customer.lastName}</div>
+            ${customer.assignedPilot ? `<div class="pilot-name">Pilot: ${customer.assignedPilot.name}</div>` : ''}
             <div class="datetime">${dateStr} - ${timeStr}</div>
           </div>
           <script>window.onload = () => { setTimeout(() => window.print(), 200); };</script>

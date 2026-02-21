@@ -3,11 +3,24 @@ import bcrypt from 'bcryptjs';
 import dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
+import QRCode from 'qrcode';
 
 // Load environment variables
 dotenv.config();
 
 const prisma = new PrismaClient();
+
+const CUSTOM_DOMAIN = process.env.CUSTOM_DOMAIN || 'skytrackyp.com';
+
+// Helper: Generate QR code as data URL
+async function generateQRCodeDataURL(displayId: string): Promise<string> {
+  const url = `https://${CUSTOM_DOMAIN}/c/${displayId}`;
+  return QRCode.toDataURL(url, {
+    width: 300,
+    margin: 2,
+    color: { dark: '#000000', light: '#ffffff' },
+  });
+}
 
 // Helper: Generate display ID (A0001 format)
 function generateDisplayId(index: number): string {
@@ -324,6 +337,7 @@ async function main() {
         status: flightStatus,
         waiverSigned: true,
         assignedPilotId: pilot.id,
+        qrCode: await generateQRCodeDataURL(generateDisplayId(customerIndex)),
       },
     });
     customers.push(customer);

@@ -127,3 +127,32 @@ MAX_DAILY_FLIGHTS=7
 │              └─────────────┘            │
 └─────────────────────────────────────────┘
 ```
+
+## LAN Hızlı İndirme Mimarisi
+
+```
+Müşteri QR Tarar → https://skytrackyp.com/c/A0030
+                          │
+                    ┌─────▼──────┐
+                    │  Next.js   │  Arka planda /api/network/discover çağır
+                    │  page.tsx  │  → { lanBaseUrl: "http://192.168.x.x:3080" }
+                    └─────┬──────┘
+                          │
+                    İki buton gösterilir:
+                          │
+              ┌───────────┴───────────┐
+              │                       │
+    ⚡ Hızlı İndir              🌐 Normal İndir
+    (Ofis WiFi)                 (İnternet)
+              │                       │
+    http://192.168.x.x:3080     Cloudflare HTTPS
+    /api/media/:id/download     /api/media/:id/download
+    50-200 MB/s                 2-5 MB/s
+
+LAN HTTP Sunucu Endpoint'leri (port 3080):
+  GET /api/media/:id/download         → ZIP indirme
+  GET /api/media/:id/file/:filename   → Tekli dosya (Range desteği)
+
+Yaklaşım: Otomatik algılama yok, müşteri kendisi seçer.
+LAN sunucu sadece dosya servisi yapar, sayfa sunmaz.
+```

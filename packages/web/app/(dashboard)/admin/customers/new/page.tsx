@@ -405,6 +405,12 @@ export default function NewCustomerPage() {
               font-size: 12px;
               color: #666;
             }
+            .pilot-name {
+              font-size: 12px;
+              font-weight: bold;
+              color: #333;
+              margin-top: 3px;
+            }
             .datetime {
               font-size: 10px;
               color: #888;
@@ -417,6 +423,7 @@ export default function NewCustomerPage() {
             <img src="${result.qrCode}" alt="QR Code" class="qr-code" />
             <div class="display-id">${result.customer.displayId}</div>
             <div class="customer-name">${result.customer.firstName} ${result.customer.lastName}</div>
+            ${result.pilot ? `<div class="pilot-name">Pilot: ${result.pilot.name}</div>` : ''}
             <div class="datetime">${dateStr} - ${timeStr}</div>
           </div>
           <script>window.onload = () => window.print();</script>
