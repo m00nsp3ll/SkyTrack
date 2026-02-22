@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
-import { Bell, Menu } from 'lucide-react'
+import { Bell, Menu, RefreshCw } from 'lucide-react'
 import { currencyApi } from '@/lib/api'
 
 interface User {
@@ -79,32 +79,38 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
           </p>
         </div>
         {rates && rates.allRates && (
-          <div className="hidden sm:flex items-center gap-1 ml-2">
+          <div className="hidden sm:flex items-center gap-3 ml-2">
             {rates.allRates.TRY && (
-              <div className="flex items-center gap-1 bg-gray-50 border rounded-lg px-2 py-1">
-                <span className="text-[10px] text-muted-foreground">₺</span>
-                <span className="text-xs font-semibold text-gray-800">{rates.allRates.TRY.buyRate.toFixed(2)}</span>
+              <div className="flex items-center gap-1">
+                <span className="text-sm font-bold text-red-500">€</span>
+                <span className="text-sm font-semibold text-gray-800">{rates.allRates.TRY.buyRate.toFixed(2)}</span>
               </div>
             )}
             {rates.allRates.USD && (
-              <div className="flex items-center gap-1 bg-gray-50 border rounded-lg px-2 py-1">
-                <span className="text-[10px] text-muted-foreground">$</span>
-                <span className="text-xs font-semibold text-gray-800">{rates.allRates.USD.buyRate.toFixed(4)}</span>
+              <div className="flex items-center gap-1">
+                <span className="text-sm font-bold text-green-600">$</span>
+                <span className="text-sm font-semibold text-gray-800">{rates.allRates.USD.buyRate.toFixed(2)}</span>
               </div>
             )}
             {rates.allRates.GBP && (
-              <div className="flex items-center gap-1 bg-gray-50 border rounded-lg px-2 py-1">
-                <span className="text-[10px] text-muted-foreground">£</span>
-                <span className="text-xs font-semibold text-gray-800">{rates.allRates.GBP.buyRate.toFixed(4)}</span>
+              <div className="flex items-center gap-1">
+                <span className="text-sm font-bold text-blue-600">£</span>
+                <span className="text-sm font-semibold text-gray-800">{rates.allRates.GBP.buyRate.toFixed(2)}</span>
               </div>
             )}
             {rates.allRates.RUB && (
-              <div className="flex items-center gap-1 bg-gray-50 border rounded-lg px-2 py-1">
-                <span className="text-[10px] text-muted-foreground">₽</span>
-                <span className="text-xs font-semibold text-gray-800">{rates.allRates.RUB.buyRate.toFixed(2)}</span>
+              <div className="flex items-center gap-1">
+                <span className="text-sm font-bold text-orange-500">₽</span>
+                <span className="text-sm font-semibold text-gray-800">{rates.allRates.RUB.buyRate.toFixed(0)}</span>
               </div>
             )}
-            <span className="text-[9px] text-gray-400 ml-0.5">{rates.lastUpdate}</span>
+            <button
+              onClick={fetchRates}
+              className="p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
+              title="Kurları güncelle"
+            >
+              <RefreshCw className="h-3 w-3" />
+            </button>
           </div>
         )}
       </div>

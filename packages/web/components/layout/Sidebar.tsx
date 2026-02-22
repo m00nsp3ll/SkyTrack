@@ -207,7 +207,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
           variant="ghost"
           size="icon"
           onClick={() => setIsCollapsed(!isCollapsed)}
-          className="h-8 w-8"
+          className="h-8 w-8 bg-blue-600 text-white hover:bg-blue-700 rounded-md"
         >
           {isCollapsed ? (
             <ChevronRight className="h-4 w-4" />

@@ -128,6 +128,18 @@
 - [x] Müşteri indirme sayfası
 - [x] ZIP indirme özelliği
 
+### Medya POS & Seller Paneli (2026-02-22)
+- [x] /admin/media/pos — yeni Foto/Video satış paneli
+- [x] Canlı istatistik header (aktif uçuş, tamamlanan, ödeme, bekleyen)
+- [x] Aktif uçuş listesi (tıklanabilir)
+- [x] QR tarama: Html5Qrcode (kamera açan, çalışıyor)
+- [x] Silver €100 / Gold €120 / Platinum €150 paketler
+- [x] Foto+Video €70 / Sadece Foto €45 / Sadece Video €50 ürünler
+- [x] Split payment (5 döviz, 3 yöntem)
+- [x] Medya Durumu: Klasörü Aç (turuncu), Webden Yükle (mavi, gerçek upload)
+- [x] Sidebar: mavi kutu aç/kapa ok, "Foto/Video Satış" menüsü
+- [x] Header: renkli döviz kurları (€ kırmızı, $ yeşil, £ mavi, ₽ turuncu) + güncelle butonu
+
 ### Foto & Video Takip Paneli (2026-02-19)
 - [x] Dashboard istatistik kartları (6 kart, değişim yüzdeleri)
 - [x] Günlük gelir bar chart (Recharts, son 30 gün)

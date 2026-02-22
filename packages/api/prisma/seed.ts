@@ -283,9 +283,9 @@ async function main() {
       { name: 'Şapka', category: 'Hediyelik', price: 7.00, priceCurrency: 'EUR', stock: 50, isActive: true, isFavorite: false, sortOrder: 13 },
       { name: 'Bardak', category: 'Hediyelik', price: 4.00, priceCurrency: 'EUR', stock: 80, isActive: true, isFavorite: false, sortOrder: 14 },
       // Foto/Video (EUR)
-      { name: 'Fotoğraf/Video Paketi', category: 'Foto/Video', price: 25.00, priceCurrency: 'EUR', stock: null, isActive: true, isFavorite: true, sortOrder: 15 },
-      { name: 'Sadece Fotoğraf', category: 'Foto/Video', price: 15.00, priceCurrency: 'EUR', stock: null, isActive: true, isFavorite: false, sortOrder: 16 },
-      { name: 'Sadece Video', category: 'Foto/Video', price: 20.00, priceCurrency: 'EUR', stock: null, isActive: true, isFavorite: false, sortOrder: 17 },
+      { name: 'Foto + Video Paketi', category: 'Foto/Video', price: 70.00, priceCurrency: 'EUR', stock: null, isActive: true, isFavorite: true,  sortOrder: 15 },
+      { name: 'Sadece Fotoğraf',     category: 'Foto/Video', price: 45.00, priceCurrency: 'EUR', stock: null, isActive: true, isFavorite: false, sortOrder: 16 },
+      { name: 'Sadece Video',        category: 'Foto/Video', price: 50.00, priceCurrency: 'EUR', stock: null, isActive: true, isFavorite: false, sortOrder: 17 },
     ],
   });
   console.log('   ✅ Created 17 products (EUR prices)');
