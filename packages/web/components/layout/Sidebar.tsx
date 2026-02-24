@@ -28,7 +28,6 @@ import {
   CreditCard,
   ChevronLeft,
   ChevronRight,
-  Menu,
   Bell,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -38,75 +37,109 @@ interface MenuItem {
   href: string
   label: string
   icon: any
+  color: string      // icon rengi (aktif değilken)
+  activeBg: string   // aktif arka plan
+  activeText: string // aktif yazı rengi
+  hoverBg: string
 }
 
 interface MenuGroup {
   title: string
+  titleColor: string
   items: MenuItem[]
 }
 
 const menuGroups: MenuGroup[] = [
   {
     title: 'GENEL',
+    titleColor: 'text-gray-400',
     items: [
-      { href: '/admin', label: 'Ana Panel', icon: LayoutDashboard },
+      { href: '/admin', label: 'Ana Panel', icon: LayoutDashboard,
+        color: 'text-gray-500', activeBg: 'bg-gray-700', activeText: 'text-white', hoverBg: 'hover:bg-gray-100' },
     ],
   },
   {
     title: 'OPERASYON',
+    titleColor: 'text-green-600',
     items: [
-      { href: '/admin/customers/new', label: 'Müşteri Kayıt', icon: UserPlus },
-      { href: '/admin/scan', label: 'QR Tara', icon: QrCode },
-      { href: '/admin/customers', label: 'Müşteri Listesi', icon: Users },
-      { href: '/admin/flights', label: 'Uçuş Takibi', icon: Plane },
+      { href: '/admin/customers/new', label: 'Müşteri Kayıt', icon: UserPlus,
+        color: 'text-green-600', activeBg: 'bg-green-600', activeText: 'text-white', hoverBg: 'hover:bg-green-50' },
+      { href: '/admin/scan', label: 'QR Tara', icon: QrCode,
+        color: 'text-green-600', activeBg: 'bg-green-600', activeText: 'text-white', hoverBg: 'hover:bg-green-50' },
+      { href: '/admin/customers', label: 'Müşteri Listesi', icon: Users,
+        color: 'text-green-600', activeBg: 'bg-green-600', activeText: 'text-white', hoverBg: 'hover:bg-green-50' },
+      { href: '/admin/flights', label: 'Uçuş Takibi', icon: Plane,
+        color: 'text-green-600', activeBg: 'bg-green-600', activeText: 'text-white', hoverBg: 'hover:bg-green-50' },
     ],
   },
   {
     title: 'PİLOT YÖNETİMİ',
+    titleColor: 'text-blue-600',
     items: [
-      { href: '/admin/pilots', label: 'Pilotlar', icon: UserCheck },
-      { href: '/admin/pilots/queue', label: 'Pilot Sırası', icon: ListOrdered },
+      { href: '/admin/pilots', label: 'Pilotlar', icon: UserCheck,
+        color: 'text-blue-600', activeBg: 'bg-blue-600', activeText: 'text-white', hoverBg: 'hover:bg-blue-50' },
+      { href: '/admin/pilots/queue', label: 'Pilot Sırası', icon: ListOrdered,
+        color: 'text-blue-600', activeBg: 'bg-blue-600', activeText: 'text-white', hoverBg: 'hover:bg-blue-50' },
     ],
   },
   {
     title: 'MEDYA',
+    titleColor: 'text-purple-600',
     items: [
-      { href: '/admin/media', label: 'Foto/Video Raporu', icon: Camera },
-      { href: '/admin/media/seller', label: 'Önizleme İstasyonu', icon: Eye },
-      { href: '/admin/media/pos', label: 'Foto/Video Satış', icon: CreditCard },
+      { href: '/admin/media', label: 'Foto/Video Raporu', icon: Camera,
+        color: 'text-purple-600', activeBg: 'bg-purple-600', activeText: 'text-white', hoverBg: 'hover:bg-purple-50' },
+      { href: '/admin/media/seller', label: 'Önizleme İstasyonu', icon: Eye,
+        color: 'text-purple-600', activeBg: 'bg-purple-600', activeText: 'text-white', hoverBg: 'hover:bg-purple-50' },
+      { href: '/admin/media/pos', label: 'Foto/Video Satış', icon: CreditCard,
+        color: 'text-purple-600', activeBg: 'bg-purple-600', activeText: 'text-white', hoverBg: 'hover:bg-purple-50' },
     ],
   },
   {
     title: 'SATIŞ',
+    titleColor: 'text-orange-600',
     items: [
-      { href: '/pos', label: 'POS Satış Ekranı', icon: ShoppingCart },
-      { href: '/admin/products', label: 'Ürün Yönetimi', icon: Package },
-      { href: '/admin/sales/unpaid', label: 'Ödenmemiş Satışlar', icon: CreditCard },
+      { href: '/pos', label: 'POS Satış Ekranı', icon: ShoppingCart,
+        color: 'text-orange-600', activeBg: 'bg-orange-500', activeText: 'text-white', hoverBg: 'hover:bg-orange-50' },
+      { href: '/admin/products', label: 'Ürün Yönetimi', icon: Package,
+        color: 'text-orange-600', activeBg: 'bg-orange-500', activeText: 'text-white', hoverBg: 'hover:bg-orange-50' },
+      { href: '/admin/sales/unpaid', label: 'Ödenmemiş Satışlar', icon: CreditCard,
+        color: 'text-orange-600', activeBg: 'bg-orange-500', activeText: 'text-white', hoverBg: 'hover:bg-orange-50' },
     ],
   },
   {
     title: 'RAPORLAR',
+    titleColor: 'text-teal-600',
     items: [
-      { href: '/admin/sales/daily', label: 'Kasa Raporu', icon: Calendar },
-      { href: '/admin/reports/cashier', label: 'Vezne Raporu', icon: Receipt },
-      { href: '/admin/reports/pilots', label: 'Pilot Raporu', icon: UserCog },
-      { href: '/admin/reports/revenue', label: 'Gelir Raporu', icon: TrendingUp },
-      { href: '/admin/reports/customers', label: 'Müşteri Akışı', icon: BarChart3 },
-      { href: '/admin/reports/compare', label: 'Dönem Karşılaştırma', icon: GitCompare },
+      { href: '/admin/sales/daily', label: 'Kasa Raporu', icon: Calendar,
+        color: 'text-teal-600', activeBg: 'bg-teal-600', activeText: 'text-white', hoverBg: 'hover:bg-teal-50' },
+      { href: '/admin/reports/cashier', label: 'Vezne Raporu', icon: Receipt,
+        color: 'text-teal-600', activeBg: 'bg-teal-600', activeText: 'text-white', hoverBg: 'hover:bg-teal-50' },
+      { href: '/admin/reports/pilots', label: 'Pilot Raporu', icon: UserCog,
+        color: 'text-teal-600', activeBg: 'bg-teal-600', activeText: 'text-white', hoverBg: 'hover:bg-teal-50' },
+      { href: '/admin/reports/revenue', label: 'Gelir Raporu', icon: TrendingUp,
+        color: 'text-teal-600', activeBg: 'bg-teal-600', activeText: 'text-white', hoverBg: 'hover:bg-teal-50' },
+      { href: '/admin/reports/customers', label: 'Müşteri Akışı', icon: BarChart3,
+        color: 'text-teal-600', activeBg: 'bg-teal-600', activeText: 'text-white', hoverBg: 'hover:bg-teal-50' },
+      { href: '/admin/reports/compare', label: 'Dönem Karşılaştırma', icon: GitCompare,
+        color: 'text-teal-600', activeBg: 'bg-teal-600', activeText: 'text-white', hoverBg: 'hover:bg-teal-50' },
     ],
   },
   {
     title: 'SİSTEM',
+    titleColor: 'text-red-500',
     items: [
-      { href: '/admin/notifications', label: 'Bildirimler', icon: Bell },
-      { href: '/admin/staff', label: 'Personel Yönetimi', icon: UserCog },
-      { href: '/admin/reports/system', label: 'Sistem İzleme', icon: Server },
-      { href: '/admin/settings', label: 'Ayarlar', icon: Settings },
+      { href: '/admin/notifications', label: 'Bildirimler', icon: Bell,
+        color: 'text-red-500', activeBg: 'bg-red-500', activeText: 'text-white', hoverBg: 'hover:bg-red-50' },
+      { href: '/admin/staff', label: 'Personel Yönetimi', icon: UserCog,
+        color: 'text-red-500', activeBg: 'bg-red-500', activeText: 'text-white', hoverBg: 'hover:bg-red-50' },
+      { href: '/admin/reports/system', label: 'Sistem İzleme', icon: Server,
+        color: 'text-red-500', activeBg: 'bg-red-500', activeText: 'text-white', hoverBg: 'hover:bg-red-50' },
+      { href: '/admin/settings', label: 'Ayarlar', icon: Settings,
+        color: 'text-red-500', activeBg: 'bg-red-500', activeText: 'text-white', hoverBg: 'hover:bg-red-50' },
     ],
   },
 ]
 
-// Group title to permission key mapping
 const groupPermissionKeys: Record<string, string> = {
   'GENEL': 'GENEL',
   'OPERASYON': 'OPERASYON',
@@ -136,14 +169,11 @@ function getFilteredMenuGroups(): MenuGroup[] {
     return menuGroups
       .map(group => {
         const groupKey = groupPermissionKeys[group.title]
-        // If group is entirely disabled, skip it
         if (groupKey && permissions.groups && permissions.groups[groupKey] === false) {
-          // Check if any individual items are enabled
           const hasEnabledItem = group.items.some(item => permissions.items[item.href] === true)
           if (!hasEnabledItem) return null
         }
 
-        // Filter items
         const filteredItems = group.items.filter(item => {
           return permissions.items[item.href] !== false
         })
@@ -182,7 +212,16 @@ export function Sidebar({ onNavigate }: SidebarProps) {
     if (href === '/admin') {
       return pathname === '/admin'
     }
-    return pathname === href || pathname.startsWith(href + '/')
+    if (pathname === href) return true
+    if (pathname.startsWith(href + '/')) {
+      // Daha spesifik bir menü öğesi varsa onu tercih et
+      const allHrefs = filteredGroups.flatMap(g => g.items.map(i => i.href))
+      const hasBetterMatch = allHrefs.some(
+        h => h !== href && h.length > href.length && (pathname === h || pathname.startsWith(h + '/'))
+      )
+      return !hasBetterMatch
+    }
+    return false
   }
 
   return (
@@ -223,8 +262,8 @@ export function Sidebar({ onNavigate }: SidebarProps) {
           <div key={group.title} className="mb-1">
             {/* Group Title */}
             {!isCollapsed && (
-              <div className="px-4 py-2">
-                <span className="text-[10px] font-semibold text-gray-400 tracking-wider">
+              <div className="px-4 py-1.5">
+                <span className={cn('text-[10px] font-bold tracking-wider', group.titleColor)}>
                   {group.title}
                 </span>
               </div>
@@ -245,12 +284,15 @@ export function Sidebar({ onNavigate }: SidebarProps) {
                       className={cn(
                         'flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors',
                         active
-                          ? 'bg-primary text-primary-foreground'
-                          : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900',
+                          ? `${item.activeBg} ${item.activeText}`
+                          : `text-gray-600 ${item.hoverBg} hover:text-gray-900`,
                         isCollapsed && 'justify-center px-2'
                       )}
                     >
-                      <Icon className={cn('h-5 w-5 flex-shrink-0', active && 'text-primary-foreground')} />
+                      <Icon className={cn(
+                        'h-5 w-5 flex-shrink-0',
+                        active ? item.activeText : item.color
+                      )} />
                       {!isCollapsed && <span className="truncate">{item.label}</span>}
                     </Link>
                   </li>

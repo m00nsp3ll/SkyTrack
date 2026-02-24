@@ -96,8 +96,9 @@ const menuStructure = [
     groupKey: 'MEDYA',
     groupLabel: 'MEDYA',
     items: [
-      { href: '/admin/media', label: 'Medya Yönetimi' },
+      { href: '/admin/media', label: 'Foto/Video Raporu' },
       { href: '/admin/media/seller', label: 'Önizleme İstasyonu' },
+      { href: '/admin/media/pos', label: 'Foto/Video Satış' },
     ],
   },
   {
@@ -113,7 +114,8 @@ const menuStructure = [
     groupKey: 'RAPORLAR',
     groupLabel: 'RAPORLAR',
     items: [
-      { href: '/admin/sales/daily', label: 'Günlük Rapor' },
+      { href: '/admin/sales/daily', label: 'Kasa Raporu' },
+      { href: '/admin/reports/cashier', label: 'Vezne Raporu' },
       { href: '/admin/reports/pilots', label: 'Pilot Raporu' },
       { href: '/admin/reports/revenue', label: 'Gelir Raporu' },
       { href: '/admin/reports/customers', label: 'Müşteri Akışı' },

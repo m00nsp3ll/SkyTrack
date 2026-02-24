@@ -140,6 +140,14 @@
 - [x] Sidebar: mavi kutu aç/kapa ok, "Foto/Video Satış" menüsü
 - [x] Header: renkli döviz kurları (€ kırmızı, $ yeşil, £ mavi, ₽ turuncu) + güncelle butonu
 
+### Önizleme İstasyonu & UI Düzeltmeleri (2026-02-23)
+- [x] /admin/media/seller yeniden yazıldı — sadece pilot listesi ve klasör açma (satış kaldırıldı)
+- [x] Pilot kartları: ad, uçuş sayısı, dosya/satılan/bekleyen istatistikleri
+- [x] 3 özet kart: Aktif Pilot, Toplam Dosya, Bekleyen/Satılan
+- [x] Header döviz kurları: her dövizin TL karşılığı (cross-rate hesaplama)
+- [x] Sidebar isActive düzeltmesi (alt menüler üst menüyü aktif göstermez)
+- [x] Personel yetkileri menuStructure sidebar ile eşleştirildi (eksik menüler eklendi)
+
 ### Foto & Video Takip Paneli (2026-02-19)
 - [x] Dashboard istatistik kartları (6 kart, değişim yüzdeleri)
 - [x] Günlük gelir bar chart (Recharts, son 30 gün)

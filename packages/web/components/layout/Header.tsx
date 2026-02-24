@@ -83,25 +83,25 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
             {rates.allRates.TRY && (
               <div className="flex items-center gap-1">
                 <span className="text-sm font-bold text-red-500">€</span>
-                <span className="text-sm font-semibold text-gray-800">{rates.allRates.TRY.buyRate.toFixed(2)}</span>
+                <span className="text-sm font-semibold text-gray-800">₺{rates.allRates.TRY.buyRate.toFixed(2)}</span>
               </div>
             )}
-            {rates.allRates.USD && (
+            {rates.allRates.USD && rates.allRates.TRY && (
               <div className="flex items-center gap-1">
                 <span className="text-sm font-bold text-green-600">$</span>
-                <span className="text-sm font-semibold text-gray-800">{rates.allRates.USD.buyRate.toFixed(2)}</span>
+                <span className="text-sm font-semibold text-gray-800">₺{(rates.allRates.TRY.buyRate / rates.allRates.USD.buyRate).toFixed(2)}</span>
               </div>
             )}
-            {rates.allRates.GBP && (
+            {rates.allRates.GBP && rates.allRates.TRY && (
               <div className="flex items-center gap-1">
                 <span className="text-sm font-bold text-blue-600">£</span>
-                <span className="text-sm font-semibold text-gray-800">{rates.allRates.GBP.buyRate.toFixed(2)}</span>
+                <span className="text-sm font-semibold text-gray-800">₺{(rates.allRates.TRY.buyRate / rates.allRates.GBP.buyRate).toFixed(2)}</span>
               </div>
             )}
-            {rates.allRates.RUB && (
+            {rates.allRates.RUB && rates.allRates.TRY && (
               <div className="flex items-center gap-1">
                 <span className="text-sm font-bold text-orange-500">₽</span>
-                <span className="text-sm font-semibold text-gray-800">{rates.allRates.RUB.buyRate.toFixed(0)}</span>
+                <span className="text-sm font-semibold text-gray-800">₺{(rates.allRates.TRY.buyRate / rates.allRates.RUB.buyRate).toFixed(4)}</span>
               </div>
             )}
             <button
