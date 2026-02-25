@@ -286,9 +286,11 @@ async function main() {
       { name: 'Foto + Video Paketi', category: 'Foto/Video', price: 70.00, priceCurrency: 'EUR', stock: null, isActive: true, isFavorite: true,  sortOrder: 15 },
       { name: 'Sadece Fotoğraf',     category: 'Foto/Video', price: 45.00, priceCurrency: 'EUR', stock: null, isActive: true, isFavorite: false, sortOrder: 16 },
       { name: 'Sadece Video',        category: 'Foto/Video', price: 50.00, priceCurrency: 'EUR', stock: null, isActive: true, isFavorite: false, sortOrder: 17 },
+      // Rest (EUR) — Acentadan gelen müşterilerin kalan ödemesi (fiyat serbest girilir)
+      { name: 'Rest Ödemesi', category: 'Rest', price: 0, priceCurrency: 'EUR', stock: null, isActive: true, isFavorite: true, sortOrder: 18 },
     ],
   });
-  console.log('   ✅ Created 17 products (EUR prices)');
+  console.log('   ✅ Created 18 products (EUR prices)');
 
   // =====================
   // 4. SIMULATE REAL QUEUE ROTATION
@@ -1219,23 +1221,29 @@ async function main() {
 
   const allGroups = { GENEL: true, OPERASYON: true, PILOT_YONETIMI: true, MEDYA: true, SATIS: true, RAPORLAR: true, SISTEM: true };
 
+  const allPosCategories = { 'Rest': true, 'İçecek': true, 'Yiyecek': true, 'Hediyelik': true, 'Foto/Video': true, 'Diğer': true };
+
   const rolePermsData = [
-    { role: 'ADMIN' as const, permissions: { groups: allGroups, items: allItems } },
+    { role: 'ADMIN' as const, permissions: { groups: allGroups, items: allItems, posCategories: allPosCategories } },
     { role: 'OFFICE_STAFF' as const, permissions: {
       groups: { GENEL: true, OPERASYON: true, PILOT_YONETIMI: true, MEDYA: true, SATIS: true, RAPORLAR: false, SISTEM: false },
       items: { ...allItems, '/admin/sales/daily': false, '/admin/reports/pilots': false, '/admin/reports/revenue': false, '/admin/reports/customers': false, '/admin/reports/compare': false, '/admin/notifications': false, '/admin/staff': false, '/admin/reports/system': false, '/admin/settings': false },
+      posCategories: { 'Rest': true, 'İçecek': true, 'Yiyecek': true, 'Hediyelik': false, 'Foto/Video': true, 'Diğer': false },
     }},
     { role: 'PILOT' as const, permissions: {
       groups: { GENEL: false, OPERASYON: false, PILOT_YONETIMI: false, MEDYA: false, SATIS: false, RAPORLAR: false, SISTEM: false },
       items: Object.fromEntries(Object.keys(allItems).map(k => [k, false])),
+      posCategories: { 'Rest': false, 'İçecek': false, 'Yiyecek': false, 'Hediyelik': false, 'Foto/Video': false, 'Diğer': false },
     }},
     { role: 'MEDIA_SELLER' as const, permissions: {
       groups: { GENEL: true, OPERASYON: false, PILOT_YONETIMI: false, MEDYA: true, SATIS: false, RAPORLAR: false, SISTEM: false },
       items: { ...Object.fromEntries(Object.keys(allItems).map(k => [k, false])), '/admin': true, '/admin/media': true, '/admin/media/seller': true },
+      posCategories: { 'Rest': false, 'İçecek': false, 'Yiyecek': false, 'Hediyelik': false, 'Foto/Video': true, 'Diğer': false },
     }},
     { role: 'CUSTOM' as const, permissions: {
       groups: { GENEL: true, OPERASYON: false, PILOT_YONETIMI: false, MEDYA: false, SATIS: false, RAPORLAR: false, SISTEM: false },
       items: { ...Object.fromEntries(Object.keys(allItems).map(k => [k, false])), '/admin': true },
+      posCategories: { 'Rest': false, 'İçecek': false, 'Yiyecek': false, 'Hediyelik': false, 'Foto/Video': false, 'Diğer': false },
     }},
   ];
 

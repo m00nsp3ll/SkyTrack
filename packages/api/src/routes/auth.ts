@@ -7,6 +7,24 @@ import { authenticate, generateToken, AuthRequest } from '../middleware/auth.js'
 const router = Router();
 const prisma = new PrismaClient();
 
+// Default posCategories per role (for backward compat)
+const DEFAULT_POS_CATEGORIES: Record<string, Record<string, boolean>> = {
+  ADMIN: { 'Rest': true, 'İçecek': true, 'Yiyecek': true, 'Hediyelik': true, 'Foto/Video': true, 'Diğer': true },
+  OFFICE_STAFF: { 'Rest': true, 'İçecek': true, 'Yiyecek': true, 'Hediyelik': false, 'Foto/Video': true, 'Diğer': false },
+  PILOT: { 'Rest': false, 'İçecek': false, 'Yiyecek': false, 'Hediyelik': false, 'Foto/Video': false, 'Diğer': false },
+  MEDIA_SELLER: { 'Rest': false, 'İçecek': false, 'Yiyecek': false, 'Hediyelik': false, 'Foto/Video': true, 'Diğer': false },
+  CUSTOM: { 'Rest': false, 'İçecek': false, 'Yiyecek': false, 'Hediyelik': false, 'Foto/Video': false, 'Diğer': false },
+};
+
+// Ensure posCategories exists in permissions (backward compat)
+function ensurePosCategories(permissions: any, role: string): any {
+  if (!permissions) return permissions;
+  if (!permissions.posCategories) {
+    return { ...permissions, posCategories: DEFAULT_POS_CATEGORIES[role] || DEFAULT_POS_CATEGORIES.CUSTOM };
+  }
+  return permissions;
+}
+
 // POST /api/auth/login
 router.post('/login', asyncHandler(async (req: AuthRequest, res: any) => {
   const { username, password } = req.body;
@@ -44,6 +62,12 @@ router.post('/login', asyncHandler(async (req: AuthRequest, res: any) => {
   // Get role permissions
   const rolePerm = await prisma.rolePermission.findUnique({ where: { role: user.role } });
 
+  // User-level posCategories override role-level
+  let permissions = ensurePosCategories(rolePerm?.permissions || null, user.role);
+  if (user.posCategories) {
+    permissions = { ...permissions, posCategories: user.posCategories };
+  }
+
   res.json({
     success: true,
     data: {
@@ -55,7 +79,7 @@ router.post('/login', asyncHandler(async (req: AuthRequest, res: any) => {
         pilotId: user.pilotId,
         pilotName: user.pilot?.name || null,
       },
-      permissions: rolePerm?.permissions || null,
+      permissions,
     },
   });
 }));
@@ -73,6 +97,12 @@ router.get('/me', authenticate, asyncHandler(async (req: AuthRequest, res: any) 
 
   const rolePerm = await prisma.rolePermission.findUnique({ where: { role: user.role } });
 
+  // User-level posCategories override role-level
+  let mePermissions = ensurePosCategories(rolePerm?.permissions || null, user.role);
+  if (user.posCategories) {
+    mePermissions = { ...mePermissions, posCategories: user.posCategories };
+  }
+
   res.json({
     success: true,
     data: {
@@ -81,7 +111,7 @@ router.get('/me', authenticate, asyncHandler(async (req: AuthRequest, res: any) 
       role: user.role,
       pilotId: user.pilotId,
       pilotName: user.pilot?.name || null,
-      permissions: rolePerm?.permissions || null,
+      permissions: mePermissions,
     },
   });
 }));

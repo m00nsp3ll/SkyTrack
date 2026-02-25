@@ -1,6 +1,6 @@
 const withPWA = require('@ducanh2912/next-pwa').default({
   dest: 'public',
-  disable: false, // Enable PWA in development for push notifications
+  disable: process.env.NODE_ENV === 'development', // Disable PWA caching in dev
   register: true,
   skipWaiting: true,
   customWorkerSrc: 'service-worker',

@@ -75,6 +75,7 @@ model User {
   isActive          Boolean            @default(true) @map("is_active")
   pilotId           String?            @unique @map("pilot_id")
   pilot             Pilot?             @relation(fields: [pilotId], references: [id])
+  posCategories     Json?              @map("pos_categories")
   sales             Sale[]
   pushSubscriptions PushSubscription[]
   fcmTokens         FcmToken[]

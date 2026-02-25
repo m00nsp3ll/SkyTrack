@@ -1012,7 +1012,7 @@ Bu belgeyi imzalayarak asagidaki hususlari kabul ve beyan ederim:
     return list
   }
 
-  const POS_CATEGORIES = ['Tüm Ürünler', 'İçecek', 'Yiyecek', 'Hediyelik', 'Foto/Video', 'Diğer']
+  const POS_CATEGORIES = ['Tüm Ürünler', 'Rest', 'İçecek', 'Yiyecek', 'Hediyelik', 'Foto/Video', 'Diğer']
 
   // Computed values
   const flight = customer?.flights[0]

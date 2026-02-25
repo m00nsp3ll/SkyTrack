@@ -15,6 +15,7 @@ const DEFAULT_PERMISSIONS: Record<string, any> = {
       '/admin/reports/pilots': true, '/admin/reports/revenue': true, '/admin/reports/customers': true, '/admin/reports/compare': true,
       '/admin/notifications': true, '/admin/staff': true, '/admin/reports/system': true, '/admin/settings': true,
     },
+    posCategories: { 'Rest': true, 'İçecek': true, 'Yiyecek': true, 'Hediyelik': true, 'Foto/Video': true, 'Diğer': true },
   },
   OFFICE_STAFF: {
     groups: { GENEL: true, OPERASYON: true, PILOT_YONETIMI: true, MEDYA: true, SATIS: true, RAPORLAR: false, SISTEM: false },
@@ -25,6 +26,7 @@ const DEFAULT_PERMISSIONS: Record<string, any> = {
       '/admin/reports/pilots': false, '/admin/reports/revenue': false, '/admin/reports/customers': false, '/admin/reports/compare': false,
       '/admin/notifications': false, '/admin/staff': false, '/admin/reports/system': false, '/admin/settings': false,
     },
+    posCategories: { 'Rest': true, 'İçecek': true, 'Yiyecek': true, 'Hediyelik': false, 'Foto/Video': true, 'Diğer': false },
   },
   PILOT: {
     groups: { GENEL: false, OPERASYON: false, PILOT_YONETIMI: false, MEDYA: false, SATIS: false, RAPORLAR: false, SISTEM: false },
@@ -35,6 +37,7 @@ const DEFAULT_PERMISSIONS: Record<string, any> = {
       '/admin/reports/pilots': false, '/admin/reports/revenue': false, '/admin/reports/customers': false, '/admin/reports/compare': false,
       '/admin/notifications': false, '/admin/staff': false, '/admin/reports/system': false, '/admin/settings': false,
     },
+    posCategories: { 'Rest': false, 'İçecek': false, 'Yiyecek': false, 'Hediyelik': false, 'Foto/Video': false, 'Diğer': false },
   },
   MEDIA_SELLER: {
     groups: { GENEL: true, OPERASYON: false, PILOT_YONETIMI: false, MEDYA: true, SATIS: false, RAPORLAR: false, SISTEM: false },
@@ -45,6 +48,7 @@ const DEFAULT_PERMISSIONS: Record<string, any> = {
       '/admin/reports/pilots': false, '/admin/reports/revenue': false, '/admin/reports/customers': false, '/admin/reports/compare': false,
       '/admin/notifications': false, '/admin/staff': false, '/admin/reports/system': false, '/admin/settings': false,
     },
+    posCategories: { 'Rest': false, 'İçecek': false, 'Yiyecek': false, 'Hediyelik': false, 'Foto/Video': true, 'Diğer': false },
   },
   CUSTOM: {
     groups: { GENEL: true, OPERASYON: false, PILOT_YONETIMI: false, MEDYA: false, SATIS: false, RAPORLAR: false, SISTEM: false },
@@ -55,6 +59,7 @@ const DEFAULT_PERMISSIONS: Record<string, any> = {
       '/admin/reports/pilots': false, '/admin/reports/revenue': false, '/admin/reports/customers': false, '/admin/reports/compare': false,
       '/admin/notifications': false, '/admin/staff': false, '/admin/reports/system': false, '/admin/settings': false,
     },
+    posCategories: { 'Rest': false, 'İçecek': false, 'Yiyecek': false, 'Hediyelik': false, 'Foto/Video': false, 'Diğer': false },
   },
 };
 
@@ -70,9 +75,64 @@ async function ensureDefaultPermissions() {
       await prisma.rolePermission.create({
         data: { role, permissions: DEFAULT_PERMISSIONS[role] },
       });
+    } else {
+      // Backward compat: add posCategories if missing
+      const perms = existing.permissions as any;
+      if (!perms.posCategories) {
+        const defaultPosCategories = DEFAULT_PERMISSIONS[role]?.posCategories;
+        if (defaultPosCategories) {
+          await prisma.rolePermission.update({
+            where: { role },
+            data: { permissions: { ...perms, posCategories: defaultPosCategories } },
+          });
+        }
+      }
     }
   }
 }
+
+// ============ USER POS CATEGORIES ENDPOINTS ============
+
+// GET /api/users/pos-categories - Get all users with their POS categories (for cashier tab)
+router.get('/pos-categories', authenticate, requireRole('ADMIN'), asyncHandler(async (req: AuthRequest, res: any) => {
+  const users = await prisma.user.findMany({
+    where: { role: { in: ['OFFICE_STAFF', 'MEDIA_SELLER', 'CUSTOM'] } },
+    orderBy: { username: 'asc' },
+    select: {
+      id: true, username: true, role: true, posCategories: true,
+      pilot: { select: { name: true } },
+    },
+  });
+
+  const result = users.map((u: any) => ({
+    id: u.id,
+    username: u.username,
+    name: u.pilot?.name || u.username,
+    role: u.role,
+    posCategories: u.posCategories || null,
+  }));
+
+  res.json({ success: true, data: result });
+}));
+
+// PUT /api/users/pos-categories/:id - Update POS categories for a specific user
+router.put('/pos-categories/:id', authenticate, requireRole('ADMIN'), asyncHandler(async (req: AuthRequest, res: any) => {
+  const { id } = req.params;
+  const { posCategories } = req.body;
+
+  const user = await prisma.user.findUnique({ where: { id } });
+  if (!user) {
+    throw new AppError('Kullanıcı bulunamadı', 404, 'USER_NOT_FOUND');
+  }
+
+  const updated = await prisma.user.update({
+    where: { id },
+    data: { posCategories },
+    select: { id: true, username: true, posCategories: true },
+  });
+
+  res.json({ success: true, data: updated, message: 'Kasiyer POS yetkileri güncellendi' });
+}));
 
 // ============ PERMISSIONS ENDPOINTS (must be before /:id) ============
 

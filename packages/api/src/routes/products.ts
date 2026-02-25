@@ -8,7 +8,7 @@ const router = Router();
 const prisma = new PrismaClient();
 
 // Product categories
-const CATEGORIES = ['İçecek', 'Yiyecek', 'Hediyelik', 'Foto/Video', 'Diğer'];
+const CATEGORIES = ['Rest', 'İçecek', 'Yiyecek', 'Hediyelik', 'Foto/Video', 'Diğer'];
 
 // GET /api/products - List all products (with optional category filter)
 router.get('/', authenticate, asyncHandler(async (req: AuthRequest, res: any) => {

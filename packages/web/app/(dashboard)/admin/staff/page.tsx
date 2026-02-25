@@ -53,6 +53,7 @@ interface RolePermission {
   permissions: {
     groups: Record<string, boolean>
     items: Record<string, boolean>
+    posCategories?: Record<string, boolean>
   }
   updatedAt: string
 }
@@ -64,6 +65,9 @@ const roleLabels: Record<string, { label: string; color: string; bgColor: string
   MEDIA_SELLER: { label: 'Foto Satış', color: 'text-orange-700', bgColor: 'bg-orange-100', icon: Camera },
   CUSTOM: { label: 'Özel Yetki', color: 'text-indigo-700', bgColor: 'bg-indigo-100', icon: Key },
 }
+
+// POS product categories for permission control
+const POS_PRODUCT_CATEGORIES = ['Rest', 'İçecek', 'Yiyecek', 'Hediyelik', 'Foto/Video', 'Diğer']
 
 // Menu structure matching Sidebar
 const menuStructure = [
@@ -135,7 +139,7 @@ const menuStructure = [
 ]
 
 export default function StaffPage() {
-  const [activeTab, setActiveTab] = useState<'list' | 'roles'>('list')
+  const [activeTab, setActiveTab] = useState<'list' | 'roles' | 'cashier'>('list')
   const [users, setUsers] = useState<User[]>([])
   const [pilots, setPilots] = useState<Pilot[]>([])
   const [loading, setLoading] = useState(true)
@@ -151,6 +155,19 @@ export default function StaffPage() {
   const [expandedRole, setExpandedRole] = useState<string | null>(null)
   const [editedPerms, setEditedPerms] = useState<Record<string, any>>({})
   const [savingRole, setSavingRole] = useState<string | null>(null)
+
+  // Cashier tab state
+  interface CashierUser {
+    id: string
+    username: string
+    name: string
+    role: string
+    posCategories: Record<string, boolean> | null
+  }
+  const [cashierUsers, setCashierUsers] = useState<CashierUser[]>([])
+  const [loadingCashier, setLoadingCashier] = useState(false)
+  const [editedCashierPerms, setEditedCashierPerms] = useState<Record<string, Record<string, boolean>>>({})
+  const [savingCashier, setSavingCashier] = useState<string | null>(null)
 
   const [formData, setFormData] = useState({
     username: '',
@@ -187,6 +204,18 @@ export default function StaffPage() {
     }
   }
 
+  const fetchCashierUsers = async () => {
+    setLoadingCashier(true)
+    try {
+      const res = await api.get('/users/pos-categories')
+      setCashierUsers(res.data.data || [])
+    } catch (error) {
+      console.error('Failed to fetch cashier users:', error)
+    } finally {
+      setLoadingCashier(false)
+    }
+  }
+
   useEffect(() => {
     fetchData()
   }, [])
@@ -194,6 +223,9 @@ export default function StaffPage() {
   useEffect(() => {
     if (activeTab === 'roles') {
       fetchPermissions()
+    }
+    if (activeTab === 'cashier') {
+      fetchCashierUsers()
     }
   }, [activeTab])
 
@@ -241,9 +273,11 @@ export default function StaffPage() {
         await api.post('/users', payload)
       }
       setShowModal(false)
-      await fetchData()
+      fetchData()
     } catch (error: any) {
-      alert(error.response?.data?.error?.message || 'İşlem başarısız')
+      const msg = error.response?.data?.error?.message || error.response?.data?.message || 'İşlem başarısız'
+      alert(msg)
+      setShowModal(false)
     } finally {
       setSaving(false)
     }
@@ -350,6 +384,100 @@ export default function StaffPage() {
 
   const hasChanges = (role: string) => !!editedPerms[role]
 
+  // ============ POS CATEGORY PERMISSION HELPERS ============
+
+  const updatePosCategoryPerm = (role: string, category: string, value: boolean) => {
+    const current = { ...getPermsForRole(role) }
+    current.posCategories = { ...(current.posCategories || {}), [category]: value }
+    setEditedPerms(prev => ({ ...prev, [role]: current }))
+  }
+
+  const toggleAllPosCategories = (role: string, value: boolean) => {
+    const current = { ...getPermsForRole(role) }
+    const posCategories: Record<string, boolean> = {}
+    POS_PRODUCT_CATEGORIES.forEach(cat => { posCategories[cat] = value })
+    current.posCategories = posCategories
+    setEditedPerms(prev => ({ ...prev, [role]: current }))
+  }
+
+  const getPosAllState = (role: string): 'all' | 'some' | 'none' => {
+    const perms = getPermsForRole(role)
+    const posCategories = perms.posCategories || {}
+    const enabledCount = POS_PRODUCT_CATEGORIES.filter(cat => posCategories[cat]).length
+    if (enabledCount === POS_PRODUCT_CATEGORIES.length) return 'all'
+    if (enabledCount > 0) return 'some'
+    return 'none'
+  }
+
+  // ============ CASHIER TAB HELPERS ============
+
+  const getCashierPerms = (userId: string): Record<string, boolean> => {
+    if (editedCashierPerms[userId]) return editedCashierPerms[userId]
+    const user = cashierUsers.find(u => u.id === userId)
+    return user?.posCategories || {}
+  }
+
+  const updateCashierPerm = (userId: string, category: string, value: boolean) => {
+    const current = { ...getCashierPerms(userId) }
+    current[category] = value
+    setEditedCashierPerms(prev => ({ ...prev, [userId]: current }))
+  }
+
+  const toggleAllCashierPerms = (userId: string, value: boolean) => {
+    const current: Record<string, boolean> = {}
+    POS_PRODUCT_CATEGORIES.forEach(cat => { current[cat] = value })
+    setEditedCashierPerms(prev => ({ ...prev, [userId]: current }))
+  }
+
+  const getCashierAllState = (userId: string): 'all' | 'some' | 'none' => {
+    const perms = getCashierPerms(userId)
+    const enabledCount = POS_PRODUCT_CATEGORIES.filter(cat => perms[cat]).length
+    if (enabledCount === POS_PRODUCT_CATEGORIES.length) return 'all'
+    if (enabledCount > 0) return 'some'
+    return 'none'
+  }
+
+  const hasCashierChanges = (userId: string) => !!editedCashierPerms[userId]
+
+  const saveCashierPerms = async (userId: string) => {
+    const perms = editedCashierPerms[userId]
+    if (!perms) return
+
+    setSavingCashier(userId)
+    try {
+      await api.put(`/users/pos-categories/${userId}`, { posCategories: perms })
+      await fetchCashierUsers()
+      setEditedCashierPerms(prev => {
+        const next = { ...prev }
+        delete next[userId]
+        return next
+      })
+      alert('Kasiyer POS yetkileri kaydedildi')
+    } catch (error: any) {
+      alert(error.response?.data?.error?.message || 'Kaydetme başarısız')
+    } finally {
+      setSavingCashier(null)
+    }
+  }
+
+  const resetCashierPerms = async (userId: string) => {
+    setSavingCashier(userId)
+    try {
+      await api.put(`/users/pos-categories/${userId}`, { posCategories: null })
+      await fetchCashierUsers()
+      setEditedCashierPerms(prev => {
+        const next = { ...prev }
+        delete next[userId]
+        return next
+      })
+      alert('Rol varsayılanına sıfırlandı')
+    } catch (error: any) {
+      alert(error.response?.data?.error?.message || 'Sıfırlama başarısız')
+    } finally {
+      setSavingCashier(null)
+    }
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -389,6 +517,17 @@ export default function StaffPage() {
         >
           <Shield className="w-4 h-4 inline mr-2" />
           Personel Rolleri
+        </button>
+        <button
+          onClick={() => setActiveTab('cashier')}
+          className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === 'cashier'
+              ? 'border-orange-500 text-orange-600'
+              : 'border-transparent text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          <ShoppingCart className="w-4 h-4 inline mr-2" />
+          Kasiyer Yetkileri
         </button>
       </div>
 
@@ -642,10 +781,132 @@ export default function StaffPage() {
         </div>
       )}
 
+      {/* ============ CASHIER TAB ============ */}
+      {activeTab === 'cashier' && (
+        <div className="space-y-4">
+          <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg">
+            <p className="text-sm text-orange-700">
+              <strong>Kasiyer POS Yetkileri:</strong> Her kasiyerin POS ekranında görebileceği ürün kategorilerini kullanıcı bazında ayarlayın.
+              Özel atama yapılmayan kullanıcılar rol varsayılanını kullanır.
+            </p>
+          </div>
+
+          {loadingCashier ? (
+            <div className="flex items-center justify-center py-8">
+              <RefreshCw className="w-8 h-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : cashierUsers.length === 0 ? (
+            <p className="text-center text-muted-foreground py-8">Kasa personeli bulunamadı</p>
+          ) : (
+            cashierUsers.map(user => {
+              const roleInfo = roleLabels[user.role]
+              const RoleIcon = roleInfo?.icon || Users
+              const perms = getCashierPerms(user.id)
+              const changed = hasCashierChanges(user.id)
+              const hasCustom = user.posCategories !== null
+              const allState = getCashierAllState(user.id)
+
+              return (
+                <Card key={user.id} className={changed ? 'ring-2 ring-orange-400' : ''}>
+                  <CardContent className="pt-5">
+                    <div className="flex items-start gap-4">
+                      {/* User info */}
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${roleInfo?.bgColor}`}>
+                        <RoleIcon className={`w-5 h-5 ${roleInfo?.color}`} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <p className="font-semibold">{user.name}</p>
+                          <span className="text-xs text-muted-foreground">@{user.username}</span>
+                          <span className={`text-xs px-2 py-0.5 rounded ${roleInfo?.bgColor} ${roleInfo?.color}`}>
+                            {roleInfo?.label}
+                          </span>
+                          {hasCustom && (
+                            <span className="text-xs px-2 py-0.5 rounded bg-orange-100 text-orange-700 font-medium">
+                              Özel Atama
+                            </span>
+                          )}
+                        </div>
+
+                        {/* POS Category checkboxes */}
+                        <div className="flex flex-wrap items-center gap-3 mt-3">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={allState === 'all'}
+                              ref={(el) => {
+                                if (el) el.indeterminate = allState === 'some'
+                              }}
+                              onChange={(e) => toggleAllCashierPerms(user.id, e.target.checked)}
+                              className="w-4 h-4 rounded accent-orange-500"
+                            />
+                            <span className="text-sm font-medium text-orange-700">Tümü</span>
+                          </label>
+                          <div className="w-px h-5 bg-gray-300" />
+                          {POS_PRODUCT_CATEGORIES.map(cat => {
+                            const isRest = cat === 'Rest'
+                            return (
+                              <label key={cat} className="flex items-center gap-1.5 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={!!perms[cat]}
+                                  onChange={(e) => updateCashierPerm(user.id, cat, e.target.checked)}
+                                  className={`w-3.5 h-3.5 rounded ${isRest ? 'accent-red-500' : 'accent-orange-500'}`}
+                                />
+                                <span className={`text-sm ${isRest ? 'text-red-600 font-medium' : 'text-gray-700'}`}>{cat}</span>
+                              </label>
+                            )
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Action buttons */}
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        {hasCustom && !changed && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-xs border-gray-300"
+                            onClick={() => resetCashierPerms(user.id)}
+                            disabled={savingCashier === user.id}
+                          >
+                            {savingCashier === user.id ? (
+                              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <X className="w-3.5 h-3.5 mr-1" />
+                            )}
+                            Sıfırla
+                          </Button>
+                        )}
+                        {changed && (
+                          <Button
+                            size="sm"
+                            onClick={() => saveCashierPerms(user.id)}
+                            disabled={savingCashier === user.id}
+                            className="bg-orange-500 hover:bg-orange-600"
+                          >
+                            {savingCashier === user.id ? (
+                              <RefreshCw className="w-4 h-4 animate-spin mr-1" />
+                            ) : (
+                              <Save className="w-4 h-4 mr-1" />
+                            )}
+                            Kaydet
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )
+            })
+          )}
+        </div>
+      )}
+
       {/* Add/Edit Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg max-w-md w-full mx-4">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowModal(false)}>
+          <div className="bg-white p-6 rounded-lg max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-bold">
                 {editingUser ? 'Personel Düzenle' : 'Yeni Personel'}

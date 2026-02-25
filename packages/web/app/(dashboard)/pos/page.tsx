@@ -96,7 +96,7 @@ const CURRENCIES: { value: Currency; label: string; symbol: string }[] = [
   { value: 'TRY', label: 'TRY', symbol: '₺' },
 ]
 
-const CATEGORIES = ['Tüm Ürünler', 'İçecek', 'Yiyecek', 'Hediyelik', 'Foto/Video', 'Diğer']
+const ALL_CATEGORIES = ['Rest', 'İçecek', 'Yiyecek', 'Hediyelik', 'Foto/Video', 'Diğer']
 
 function getCurrencySymbol(currency: string): string {
   return CURRENCIES.find(c => c.value === currency)?.symbol || currency
@@ -131,6 +131,25 @@ export default function POSPage() {
   const [showQrScanner, setShowQrScanner] = useState(false)
   const searchInputRef = useRef<HTMLInputElement>(null)
 
+  // Get visible categories based on role permissions
+  const getVisibleCategories = (): string[] => {
+    try {
+      const userStr = typeof window !== 'undefined' ? localStorage.getItem('user') : null
+      if (!userStr) return ALL_CATEGORIES
+      const user = JSON.parse(userStr)
+      if (user.role === 'ADMIN') return ALL_CATEGORIES
+      const permsStr = typeof window !== 'undefined' ? localStorage.getItem('permissions') : null
+      if (!permsStr) return ALL_CATEGORIES
+      const perms = JSON.parse(permsStr)
+      if (!perms.posCategories) return ALL_CATEGORIES
+      return ALL_CATEGORIES.filter(cat => perms.posCategories[cat])
+    } catch {
+      return ALL_CATEGORIES
+    }
+  }
+
+  const visibleCategories = getVisibleCategories()
+
   // Currency state
   const [eurTryRate, setEurTryRate] = useState(0)
   const [allRates, setAllRates] = useState<Record<string, { buyRate: number; sellRate: number }>>({})
@@ -149,6 +168,11 @@ export default function POSPage() {
   const [activePayAmount, setActivePayAmount] = useState('')
   const [showConfirmModal, setShowConfirmModal] = useState(false)
   const payAmountInputRef = useRef<HTMLInputElement>(null)
+
+  // Rest price input state
+  const [restProduct, setRestProduct] = useState<Product | null>(null)
+  const [restPrice, setRestPrice] = useState('')
+  const restPriceInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     fetchProducts()
@@ -425,6 +449,14 @@ export default function POSPage() {
       return
     }
 
+    // Rest category: show price input instead of adding directly
+    if (product.category === 'Rest') {
+      setRestProduct(product)
+      setRestPrice('')
+      setTimeout(() => restPriceInputRef.current?.focus(), 50)
+      return
+    }
+
     setCart((prev) => {
       const existing = prev.find((item) => item.productId === product.id)
       if (existing) {
@@ -445,6 +477,23 @@ export default function POSPage() {
         },
       ]
     })
+  }
+
+  const addRestToCart = () => {
+    const price = parseFloat(restPrice)
+    if (!restProduct || !price || price <= 0) return
+    setCart((prev) => [
+      ...prev,
+      {
+        productId: restProduct.id,
+        name: restProduct.name,
+        category: restProduct.category,
+        unitPrice: price,
+        quantity: 1,
+      },
+    ])
+    setRestProduct(null)
+    setRestPrice('')
   }
 
   const updateQuantity = (productId: string, delta: number) => {
@@ -574,7 +623,8 @@ export default function POSPage() {
     let list: Product[] = []
 
     if (activeCategory === 'Tüm Ürünler') {
-      list = products
+      // Only show products from visible categories
+      list = products.filter((p) => visibleCategories.includes(p.category))
     } else if (activeCategory === 'Foto/Video') {
       list = products.filter((p) => ['VIDEO', 'PHOTO', 'PACKAGE', 'Foto/Video'].includes(p.category))
     } else {
@@ -819,17 +869,30 @@ export default function POSPage() {
         <div className="flex-1 flex flex-col min-w-0">
           {/* Category Tabs */}
           <div className="flex gap-1 mb-3 overflow-x-auto pb-1">
-            {CATEGORIES.map((cat) => (
-              <Button
-                key={cat}
-                variant={activeCategory === cat ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setActiveCategory(cat)}
-                className="flex-shrink-0"
-              >
-                {cat}
-              </Button>
-            ))}
+            <Button
+              key="Tüm Ürünler"
+              variant={activeCategory === 'Tüm Ürünler' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setActiveCategory('Tüm Ürünler')}
+              className="flex-shrink-0"
+            >
+              Tüm Ürünler
+            </Button>
+            {visibleCategories.map((cat) => {
+              const isRest = cat === 'Rest'
+              const isActive = activeCategory === cat
+              return (
+                <Button
+                  key={cat}
+                  variant={isActive ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setActiveCategory(cat)}
+                  className={`flex-shrink-0 ${isRest ? (isActive ? 'bg-red-600 hover:bg-red-700 border-red-600' : 'border-red-300 text-red-600 hover:bg-red-50') : ''}`}
+                >
+                  {cat}
+                </Button>
+              )
+            })}
           </div>
 
           {/* Product Search */}
@@ -859,6 +922,7 @@ export default function POSPage() {
               <div className="grid grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
                 {displayProducts.map((product) => {
                   const isOutOfStock = product.stock !== null && product.stock <= 0
+                  const isRest = product.category === 'Rest'
                   return (
                     <button
                       key={product.id}
@@ -867,13 +931,21 @@ export default function POSPage() {
                       className={`p-3 rounded-lg border text-left transition-all ${
                         isOutOfStock
                           ? 'bg-gray-100 opacity-50 cursor-not-allowed'
+                          : isRest
+                          ? 'bg-red-50 hover:bg-red-100 hover:border-red-400 border-red-200 active:scale-95'
                           : 'bg-white hover:bg-primary/5 hover:border-primary active:scale-95'
                       }`}
                     >
-                      <p className="font-medium text-sm truncate">{product.name}</p>
-                      <p className="text-lg font-bold text-primary">€{product.price.toFixed(2)}</p>
-                      {eurTryRate > 0 && (
-                        <p className="text-xs text-muted-foreground">≈ ₺{(product.price * eurTryRate).toFixed(0)}</p>
+                      <p className={`font-medium text-sm truncate ${isRest ? 'text-red-700' : ''}`}>{product.name}</p>
+                      {isRest ? (
+                        <p className="text-sm font-semibold text-red-500 mt-1">Tutar Girin</p>
+                      ) : (
+                        <>
+                          <p className="text-lg font-bold text-primary">€{product.price.toFixed(2)}</p>
+                          {eurTryRate > 0 && (
+                            <p className="text-xs text-muted-foreground">≈ ₺{(product.price * eurTryRate).toFixed(0)}</p>
+                          )}
+                        </>
                       )}
                       {product.stock !== null && (
                         <p className={`text-xs ${isOutOfStock ? 'text-red-500' : 'text-muted-foreground'}`}>
@@ -1282,6 +1354,56 @@ export default function POSPage() {
                   <Check className="h-4 w-4 mr-2" />
                 )}
                 Onayla
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Rest Price Input Modal */}
+      {restProduct && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-xl max-w-sm w-full mx-4 shadow-2xl border-2 border-red-200">
+            <h3 className="text-lg font-bold text-red-700 mb-1">Rest Ödemesi</h3>
+            <p className="text-sm text-muted-foreground mb-4">{restProduct.name} — tutar girin</p>
+            <div className="flex items-center gap-2 mb-4">
+              <span className="text-2xl font-bold text-red-600">€</span>
+              <Input
+                ref={restPriceInputRef}
+                type="number"
+                inputMode="decimal"
+                step="0.01"
+                min="0"
+                value={restPrice}
+                onChange={(e) => setRestPrice(e.target.value)}
+                placeholder="0.00"
+                className="text-xl font-bold h-12 border-red-300 focus:border-red-500"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') addRestToCart()
+                  if (e.key === 'Escape') setRestProduct(null)
+                }}
+              />
+            </div>
+            {restPrice && parseFloat(restPrice) > 0 && eurTryRate > 0 && (
+              <p className="text-sm text-muted-foreground mb-4">
+                ≈ ₺{(parseFloat(restPrice) * eurTryRate).toFixed(2)}
+              </p>
+            )}
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => setRestProduct(null)}
+              >
+                İptal
+              </Button>
+              <Button
+                className="flex-1 bg-red-600 hover:bg-red-700"
+                onClick={addRestToCart}
+                disabled={!restPrice || parseFloat(restPrice) <= 0}
+              >
+                <Check className="h-4 w-4 mr-2" />
+                Sepete Ekle
               </Button>
             </div>
           </div>

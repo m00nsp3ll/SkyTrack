@@ -179,6 +179,10 @@
 - [x] Personel satış takip sistemi (soldBy kaydı)
 - [x] Ödenmemiş satışlar sayfası - personel/saat bilgisi (/admin/sales/unpaid)
 - [x] Ödenmemiş satışlarda sadece "Ödeme Al" butonu (nakit/kart butonları kaldırıldı)
+- [x] Rest kategorisi (acentadan gelen müşteri kalan ödeme bakiyesi)
+- [x] Rest serbest tutar girişi (sabit fiyat yok, POS'ta modal ile tutar girilir)
+- [x] Kullanıcı bazlı POS kategori yetkileri (Admin → Kasiyer Yetkileri sekmesi)
+- [x] POS'ta rol/kullanıcı bazlı kategori filtreleme
 
 ### Multi-Currency (Döviz) Sistemi (2026-02-14)
 - [x] TCMB XML API entegrasyonu (kur çekme, cross-rate hesaplama)

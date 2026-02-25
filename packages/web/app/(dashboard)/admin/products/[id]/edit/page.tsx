@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label'
 import { productsApi } from '@/lib/api'
 import { ArrowLeft, Package, RefreshCw } from 'lucide-react'
 
-const CATEGORIES = ['İçecek', 'Yiyecek', 'Hediyelik', 'Foto/Video', 'Diğer', 'VIDEO', 'PHOTO', 'PACKAGE', 'MERCH']
+const CATEGORIES = ['Rest', 'İçecek', 'Yiyecek', 'Hediyelik', 'Foto/Video', 'Diğer', 'VIDEO', 'PHOTO', 'PACKAGE', 'MERCH']
 
 export default function EditProductPage() {
   const router = useRouter()
