@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import SignatureCanvas from 'react-signature-canvas'
 import { Button } from '@/components/ui/button'
@@ -8,24 +8,9 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { api } from '@/lib/api'
-import { ArrowLeft, UserPlus, Printer, Download, FileText, Eraser, Check, X, PenLine } from 'lucide-react'
+import { ArrowLeft, UserPlus, Printer, Eraser, Check, X, PenLine } from 'lucide-react'
 import Link from 'next/link'
-
-const WAIVER_TEXT = `YAMAÇ PARAŞÜTÜ UÇUŞU RİSK VE SORUMLULUK BEYANI
-
-Bu belgeyi imzalayarak aşağıdaki hususları kabul ve beyan ederim:
-
-1. Yamaç paraşütü sporu, doğası gereği tehlikeli bir aktivitedir ve ciddi yaralanma veya ölüm riski taşımaktadır.
-
-2. Uçuş sırasında hava koşulları, ekipman arızası veya diğer öngörülemeyen durumlar nedeniyle kaza meydana gelebileceğini biliyorum.
-
-3. Herhangi bir sağlık problemim (kalp hastalığı, epilepsi, hamilelik, vb.) bulunmamaktadır veya varsa pilot ve yetkilere bildirdim.
-
-4. Uçuş öncesi verilen tüm güvenlik talimatlarına uyacağımı taahhüt ederim.
-
-5. Meydana gelebilecek herhangi bir kaza, yaralanma veya maddi hasar durumunda kooperatif ve pilotu sorumlu tutmayacağımı kabul ederim.
-
-6. 18 yaşından büyük olduğumu veya yasal veli/vasi onayı aldığımı beyan ederim.`
+import { type Language, LANGUAGES, t, isRtl } from '@/lib/translations'
 
 // Dynamic base URL for customer pages
 function getBaseUrl() {
@@ -40,18 +25,18 @@ function getBaseUrl() {
   return `https://${hostname}:${window.location.port || '3000'}`
 }
 
-// Dynamic API URL
-function getApiUrl() {
-  if (typeof window === 'undefined') return 'https://api.skytrackyp.com/api'
-  const hostname = window.location.hostname
-  if (hostname === 'skytrackyp.com' || hostname === 'www.skytrackyp.com') {
-    return 'https://api.skytrackyp.com/api'
-  }
-  if (hostname.includes('trycloudflare.com')) {
-    return `https://${hostname.replace(/^[^.]+/, 'api')}/api`
-  }
-  return `https://${hostname}:3001/api`
-}
+const WELCOME_MESSAGES = [
+  'Hoş Geldiniz! Lütfen dilinizi seçin.',
+  'Welcome! Please select your language.',
+  'Добро пожаловать! Пожалуйста, выберите язык.',
+  'Willkommen! Bitte wählen Sie Ihre Sprache.',
+  'مرحباً! يرجى اختيار لغتك.',
+  'Witamy! Proszę wybrać język.',
+  'Ласкаво просимо! Будь ласка, оберіть мову.',
+  '欢迎！请选择您的语言。',
+  'Bienvenue ! Veuillez sélectionner votre langue.',
+  '!خوش آمدید! لطفاً زبان خود را انتخاب کنید',
+]
 
 interface RegistrationResult {
   customer: {
@@ -67,15 +52,202 @@ interface RegistrationResult {
   message: string
 }
 
+// Country data with ISO 3166-1 alpha-2 codes for Intl.DisplayNames localization
+const ALL_COUNTRIES = [
+  { code: '+90', flag: '🇹🇷', iso: 'TR' },
+  { code: '+93', flag: '🇦🇫', iso: 'AF' },
+  { code: '+355', flag: '🇦🇱', iso: 'AL' },
+  { code: '+213', flag: '🇩🇿', iso: 'DZ' },
+  { code: '+376', flag: '🇦🇩', iso: 'AD' },
+  { code: '+244', flag: '🇦🇴', iso: 'AO' },
+  { code: '+54', flag: '🇦🇷', iso: 'AR' },
+  { code: '+374', flag: '🇦🇲', iso: 'AM' },
+  { code: '+61', flag: '🇦🇺', iso: 'AU' },
+  { code: '+43', flag: '🇦🇹', iso: 'AT' },
+  { code: '+994', flag: '🇦🇿', iso: 'AZ' },
+  { code: '+1-242', flag: '🇧🇸', iso: 'BS' },
+  { code: '+973', flag: '🇧🇭', iso: 'BH' },
+  { code: '+880', flag: '🇧🇩', iso: 'BD' },
+  { code: '+375', flag: '🇧🇾', iso: 'BY' },
+  { code: '+32', flag: '🇧🇪', iso: 'BE' },
+  { code: '+501', flag: '🇧🇿', iso: 'BZ' },
+  { code: '+229', flag: '🇧🇯', iso: 'BJ' },
+  { code: '+975', flag: '🇧🇹', iso: 'BT' },
+  { code: '+591', flag: '🇧🇴', iso: 'BO' },
+  { code: '+387', flag: '🇧🇦', iso: 'BA' },
+  { code: '+267', flag: '🇧🇼', iso: 'BW' },
+  { code: '+55', flag: '🇧🇷', iso: 'BR' },
+  { code: '+673', flag: '🇧🇳', iso: 'BN' },
+  { code: '+359', flag: '🇧🇬', iso: 'BG' },
+  { code: '+226', flag: '🇧🇫', iso: 'BF' },
+  { code: '+257', flag: '🇧🇮', iso: 'BI' },
+  { code: '+855', flag: '🇰🇭', iso: 'KH' },
+  { code: '+237', flag: '🇨🇲', iso: 'CM' },
+  { code: '+1', flag: '🇨🇦', iso: 'CA' },
+  { code: '+238', flag: '🇨🇻', iso: 'CV' },
+  { code: '+236', flag: '🇨🇫', iso: 'CF' },
+  { code: '+235', flag: '🇹🇩', iso: 'TD' },
+  { code: '+56', flag: '🇨🇱', iso: 'CL' },
+  { code: '+86', flag: '🇨🇳', iso: 'CN' },
+  { code: '+57', flag: '🇨🇴', iso: 'CO' },
+  { code: '+269', flag: '🇰🇲', iso: 'KM' },
+  { code: '+243', flag: '🇨🇩', iso: 'CD' },
+  { code: '+242', flag: '🇨🇬', iso: 'CG' },
+  { code: '+506', flag: '🇨🇷', iso: 'CR' },
+  { code: '+385', flag: '🇭🇷', iso: 'HR' },
+  { code: '+53', flag: '🇨🇺', iso: 'CU' },
+  { code: '+357', flag: '🇨🇾', iso: 'CY' },
+  { code: '+420', flag: '🇨🇿', iso: 'CZ' },
+  { code: '+45', flag: '🇩🇰', iso: 'DK' },
+  { code: '+253', flag: '🇩🇯', iso: 'DJ' },
+  { code: '+1-809', flag: '🇩🇴', iso: 'DO' },
+  { code: '+593', flag: '🇪🇨', iso: 'EC' },
+  { code: '+20', flag: '🇪🇬', iso: 'EG' },
+  { code: '+503', flag: '🇸🇻', iso: 'SV' },
+  { code: '+240', flag: '🇬🇶', iso: 'GQ' },
+  { code: '+291', flag: '🇪🇷', iso: 'ER' },
+  { code: '+372', flag: '🇪🇪', iso: 'EE' },
+  { code: '+268', flag: '🇸🇿', iso: 'SZ' },
+  { code: '+251', flag: '🇪🇹', iso: 'ET' },
+  { code: '+679', flag: '🇫🇯', iso: 'FJ' },
+  { code: '+358', flag: '🇫🇮', iso: 'FI' },
+  { code: '+33', flag: '🇫🇷', iso: 'FR' },
+  { code: '+241', flag: '🇬🇦', iso: 'GA' },
+  { code: '+220', flag: '🇬🇲', iso: 'GM' },
+  { code: '+995', flag: '🇬🇪', iso: 'GE' },
+  { code: '+49', flag: '🇩🇪', iso: 'DE' },
+  { code: '+233', flag: '🇬🇭', iso: 'GH' },
+  { code: '+30', flag: '🇬🇷', iso: 'GR' },
+  { code: '+502', flag: '🇬🇹', iso: 'GT' },
+  { code: '+224', flag: '🇬🇳', iso: 'GN' },
+  { code: '+245', flag: '🇬🇼', iso: 'GW' },
+  { code: '+592', flag: '🇬🇾', iso: 'GY' },
+  { code: '+509', flag: '🇭🇹', iso: 'HT' },
+  { code: '+504', flag: '🇭🇳', iso: 'HN' },
+  { code: '+36', flag: '🇭🇺', iso: 'HU' },
+  { code: '+354', flag: '🇮🇸', iso: 'IS' },
+  { code: '+91', flag: '🇮🇳', iso: 'IN' },
+  { code: '+62', flag: '🇮🇩', iso: 'ID' },
+  { code: '+98', flag: '🇮🇷', iso: 'IR' },
+  { code: '+964', flag: '🇮🇶', iso: 'IQ' },
+  { code: '+353', flag: '🇮🇪', iso: 'IE' },
+  { code: '+972', flag: '🇮🇱', iso: 'IL' },
+  { code: '+39', flag: '🇮🇹', iso: 'IT' },
+  { code: '+1-876', flag: '🇯🇲', iso: 'JM' },
+  { code: '+81', flag: '🇯🇵', iso: 'JP' },
+  { code: '+962', flag: '🇯🇴', iso: 'JO' },
+  { code: '+7', flag: '🇰🇿', iso: 'KZ' },
+  { code: '+254', flag: '🇰🇪', iso: 'KE' },
+  { code: '+686', flag: '🇰🇮', iso: 'KI' },
+  { code: '+850', flag: '🇰🇵', iso: 'KP' },
+  { code: '+82', flag: '🇰🇷', iso: 'KR' },
+  { code: '+965', flag: '🇰🇼', iso: 'KW' },
+  { code: '+996', flag: '🇰🇬', iso: 'KG' },
+  { code: '+856', flag: '🇱🇦', iso: 'LA' },
+  { code: '+371', flag: '🇱🇻', iso: 'LV' },
+  { code: '+961', flag: '🇱🇧', iso: 'LB' },
+  { code: '+266', flag: '🇱🇸', iso: 'LS' },
+  { code: '+231', flag: '🇱🇷', iso: 'LR' },
+  { code: '+218', flag: '🇱🇾', iso: 'LY' },
+  { code: '+423', flag: '🇱🇮', iso: 'LI' },
+  { code: '+370', flag: '🇱🇹', iso: 'LT' },
+  { code: '+352', flag: '🇱🇺', iso: 'LU' },
+  { code: '+261', flag: '🇲🇬', iso: 'MG' },
+  { code: '+265', flag: '🇲🇼', iso: 'MW' },
+  { code: '+60', flag: '🇲🇾', iso: 'MY' },
+  { code: '+960', flag: '🇲🇻', iso: 'MV' },
+  { code: '+223', flag: '🇲🇱', iso: 'ML' },
+  { code: '+356', flag: '🇲🇹', iso: 'MT' },
+  { code: '+222', flag: '🇲🇷', iso: 'MR' },
+  { code: '+230', flag: '🇲🇺', iso: 'MU' },
+  { code: '+52', flag: '🇲🇽', iso: 'MX' },
+  { code: '+373', flag: '🇲🇩', iso: 'MD' },
+  { code: '+377', flag: '🇲🇨', iso: 'MC' },
+  { code: '+976', flag: '🇲🇳', iso: 'MN' },
+  { code: '+382', flag: '🇲🇪', iso: 'ME' },
+  { code: '+212', flag: '🇲🇦', iso: 'MA' },
+  { code: '+258', flag: '🇲🇿', iso: 'MZ' },
+  { code: '+95', flag: '🇲🇲', iso: 'MM' },
+  { code: '+264', flag: '🇳🇦', iso: 'NA' },
+  { code: '+977', flag: '🇳🇵', iso: 'NP' },
+  { code: '+31', flag: '🇳🇱', iso: 'NL' },
+  { code: '+64', flag: '🇳🇿', iso: 'NZ' },
+  { code: '+505', flag: '🇳🇮', iso: 'NI' },
+  { code: '+227', flag: '🇳🇪', iso: 'NE' },
+  { code: '+234', flag: '🇳🇬', iso: 'NG' },
+  { code: '+389', flag: '🇲🇰', iso: 'MK' },
+  { code: '+47', flag: '🇳🇴', iso: 'NO' },
+  { code: '+968', flag: '🇴🇲', iso: 'OM' },
+  { code: '+92', flag: '🇵🇰', iso: 'PK' },
+  { code: '+507', flag: '🇵🇦', iso: 'PA' },
+  { code: '+675', flag: '🇵🇬', iso: 'PG' },
+  { code: '+595', flag: '🇵🇾', iso: 'PY' },
+  { code: '+51', flag: '🇵🇪', iso: 'PE' },
+  { code: '+63', flag: '🇵🇭', iso: 'PH' },
+  { code: '+48', flag: '🇵🇱', iso: 'PL' },
+  { code: '+351', flag: '🇵🇹', iso: 'PT' },
+  { code: '+974', flag: '🇶🇦', iso: 'QA' },
+  { code: '+40', flag: '🇷🇴', iso: 'RO' },
+  { code: '+7', flag: '🇷🇺', iso: 'RU' },
+  { code: '+250', flag: '🇷🇼', iso: 'RW' },
+  { code: '+966', flag: '🇸🇦', iso: 'SA' },
+  { code: '+221', flag: '🇸🇳', iso: 'SN' },
+  { code: '+381', flag: '🇷🇸', iso: 'RS' },
+  { code: '+232', flag: '🇸🇱', iso: 'SL' },
+  { code: '+65', flag: '🇸🇬', iso: 'SG' },
+  { code: '+421', flag: '🇸🇰', iso: 'SK' },
+  { code: '+386', flag: '🇸🇮', iso: 'SI' },
+  { code: '+252', flag: '🇸🇴', iso: 'SO' },
+  { code: '+27', flag: '🇿🇦', iso: 'ZA' },
+  { code: '+211', flag: '🇸🇸', iso: 'SS' },
+  { code: '+34', flag: '🇪🇸', iso: 'ES' },
+  { code: '+94', flag: '🇱🇰', iso: 'LK' },
+  { code: '+249', flag: '🇸🇩', iso: 'SD' },
+  { code: '+597', flag: '🇸🇷', iso: 'SR' },
+  { code: '+46', flag: '🇸🇪', iso: 'SE' },
+  { code: '+41', flag: '🇨🇭', iso: 'CH' },
+  { code: '+963', flag: '🇸🇾', iso: 'SY' },
+  { code: '+886', flag: '🇹🇼', iso: 'TW' },
+  { code: '+992', flag: '🇹🇯', iso: 'TJ' },
+  { code: '+255', flag: '🇹🇿', iso: 'TZ' },
+  { code: '+66', flag: '🇹🇭', iso: 'TH' },
+  { code: '+228', flag: '🇹🇬', iso: 'TG' },
+  { code: '+676', flag: '🇹🇴', iso: 'TO' },
+  { code: '+1-868', flag: '🇹🇹', iso: 'TT' },
+  { code: '+216', flag: '🇹🇳', iso: 'TN' },
+  { code: '+993', flag: '🇹🇲', iso: 'TM' },
+  { code: '+256', flag: '🇺🇬', iso: 'UG' },
+  { code: '+380', flag: '🇺🇦', iso: 'UA' },
+  { code: '+971', flag: '🇦🇪', iso: 'AE' },
+  { code: '+44', flag: '🇬🇧', iso: 'GB' },
+  { code: '+1', flag: '🇺🇸', iso: 'US' },
+  { code: '+598', flag: '🇺🇾', iso: 'UY' },
+  { code: '+998', flag: '🇺🇿', iso: 'UZ' },
+  { code: '+678', flag: '🇻🇺', iso: 'VU' },
+  { code: '+58', flag: '🇻🇪', iso: 'VE' },
+  { code: '+84', flag: '🇻🇳', iso: 'VN' },
+  { code: '+967', flag: '🇾🇪', iso: 'YE' },
+  { code: '+260', flag: '🇿🇲', iso: 'ZM' },
+  { code: '+263', flag: '🇿🇼', iso: 'ZW' },
+]
+
+// Language code mapping for Intl.DisplayNames
+const LANG_TO_LOCALE: Record<string, string> = {
+  tr: 'tr', en: 'en', ru: 'ru', de: 'de', ar: 'ar',
+  pl: 'pl', uk: 'uk', zh: 'zh', fr: 'fr', fa: 'fa',
+}
+
 export default function NewCustomerPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [result, setResult] = useState<RegistrationResult | null>(null)
   const signatureRef = useRef<SignatureCanvas | null>(null)
+  const countryDropdownRef = useRef<HTMLDivElement | null>(null)
   const [signatureData, setSignatureData] = useState<string | null>(null)
   const [showWaiverModal, setShowWaiverModal] = useState(false)
-  const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 })
+  const [showKvkkModal, setShowKvkkModal] = useState(false)
+  const [selectedLanguage, setSelectedLanguage] = useState<Language | null>(null)
 
   const [countryCode, setCountryCode] = useState('+90')
   const [countrySearch, setCountrySearch] = useState('')
@@ -89,195 +261,50 @@ export default function NewCustomerPage() {
     weight: '',
   })
 
-  const ALL_COUNTRIES = [
-    { code: '+90', flag: '🇹🇷', name: 'Türkiye' },
-    { code: '+93', flag: '🇦🇫', name: 'Afganistan' },
-    { code: '+355', flag: '🇦🇱', name: 'Arnavutluk' },
-    { code: '+213', flag: '🇩🇿', name: 'Cezayir' },
-    { code: '+376', flag: '🇦🇩', name: 'Andorra' },
-    { code: '+244', flag: '🇦🇴', name: 'Angola' },
-    { code: '+54', flag: '🇦🇷', name: 'Arjantin' },
-    { code: '+374', flag: '🇦🇲', name: 'Ermenistan' },
-    { code: '+61', flag: '🇦🇺', name: 'Avustralya' },
-    { code: '+43', flag: '🇦🇹', name: 'Avusturya' },
-    { code: '+994', flag: '🇦🇿', name: 'Azerbaycan' },
-    { code: '+1-242', flag: '🇧🇸', name: 'Bahamalar' },
-    { code: '+973', flag: '🇧🇭', name: 'Bahreyn' },
-    { code: '+880', flag: '🇧🇩', name: 'Bangladeş' },
-    { code: '+375', flag: '🇧🇾', name: 'Beyaz Rusya' },
-    { code: '+32', flag: '🇧🇪', name: 'Belçika' },
-    { code: '+501', flag: '🇧🇿', name: 'Belize' },
-    { code: '+229', flag: '🇧🇯', name: 'Benin' },
-    { code: '+975', flag: '🇧🇹', name: 'Bhutan' },
-    { code: '+591', flag: '🇧🇴', name: 'Bolivya' },
-    { code: '+387', flag: '🇧🇦', name: 'Bosna Hersek' },
-    { code: '+267', flag: '🇧🇼', name: 'Botsvana' },
-    { code: '+55', flag: '🇧🇷', name: 'Brezilya' },
-    { code: '+673', flag: '🇧🇳', name: 'Brunei' },
-    { code: '+359', flag: '🇧🇬', name: 'Bulgaristan' },
-    { code: '+226', flag: '🇧🇫', name: 'Burkina Faso' },
-    { code: '+257', flag: '🇧🇮', name: 'Burundi' },
-    { code: '+855', flag: '🇰🇭', name: 'Kamboçya' },
-    { code: '+237', flag: '🇨🇲', name: 'Kamerun' },
-    { code: '+1', flag: '🇨🇦', name: 'Kanada' },
-    { code: '+238', flag: '🇨🇻', name: 'Yeşil Burun' },
-    { code: '+236', flag: '🇨🇫', name: 'Orta Afrika' },
-    { code: '+235', flag: '🇹🇩', name: 'Çad' },
-    { code: '+56', flag: '🇨🇱', name: 'Şili' },
-    { code: '+86', flag: '🇨🇳', name: 'Çin' },
-    { code: '+57', flag: '🇨🇴', name: 'Kolombiya' },
-    { code: '+269', flag: '🇰🇲', name: 'Komorlar' },
-    { code: '+243', flag: '🇨🇩', name: 'Kongo (DR)' },
-    { code: '+242', flag: '🇨🇬', name: 'Kongo' },
-    { code: '+506', flag: '🇨🇷', name: 'Kosta Rika' },
-    { code: '+385', flag: '🇭🇷', name: 'Hırvatistan' },
-    { code: '+53', flag: '🇨🇺', name: 'Küba' },
-    { code: '+357', flag: '🇨🇾', name: 'Kıbrıs' },
-    { code: '+420', flag: '🇨🇿', name: 'Çekya' },
-    { code: '+45', flag: '🇩🇰', name: 'Danimarka' },
-    { code: '+253', flag: '🇩🇯', name: 'Cibuti' },
-    { code: '+1-809', flag: '🇩🇴', name: 'Dominik Cum.' },
-    { code: '+593', flag: '🇪🇨', name: 'Ekvador' },
-    { code: '+20', flag: '🇪🇬', name: 'Mısır' },
-    { code: '+503', flag: '🇸🇻', name: 'El Salvador' },
-    { code: '+240', flag: '🇬🇶', name: 'Ekvator Ginesi' },
-    { code: '+291', flag: '🇪🇷', name: 'Eritre' },
-    { code: '+372', flag: '🇪🇪', name: 'Estonya' },
-    { code: '+268', flag: '🇸🇿', name: 'Esvatini' },
-    { code: '+251', flag: '🇪🇹', name: 'Etiyopya' },
-    { code: '+679', flag: '🇫🇯', name: 'Fiji' },
-    { code: '+358', flag: '🇫🇮', name: 'Finlandiya' },
-    { code: '+33', flag: '🇫🇷', name: 'Fransa' },
-    { code: '+241', flag: '🇬🇦', name: 'Gabon' },
-    { code: '+220', flag: '🇬🇲', name: 'Gambiya' },
-    { code: '+995', flag: '🇬🇪', name: 'Gürcistan' },
-    { code: '+49', flag: '🇩🇪', name: 'Almanya' },
-    { code: '+233', flag: '🇬🇭', name: 'Gana' },
-    { code: '+30', flag: '🇬🇷', name: 'Yunanistan' },
-    { code: '+502', flag: '🇬🇹', name: 'Guatemala' },
-    { code: '+224', flag: '🇬🇳', name: 'Gine' },
-    { code: '+245', flag: '🇬🇼', name: 'Gine-Bissau' },
-    { code: '+592', flag: '🇬🇾', name: 'Guyana' },
-    { code: '+509', flag: '🇭🇹', name: 'Haiti' },
-    { code: '+504', flag: '🇭🇳', name: 'Honduras' },
-    { code: '+36', flag: '🇭🇺', name: 'Macaristan' },
-    { code: '+354', flag: '🇮🇸', name: 'İzlanda' },
-    { code: '+91', flag: '🇮🇳', name: 'Hindistan' },
-    { code: '+62', flag: '🇮🇩', name: 'Endonezya' },
-    { code: '+98', flag: '🇮🇷', name: 'İran' },
-    { code: '+964', flag: '🇮🇶', name: 'Irak' },
-    { code: '+353', flag: '🇮🇪', name: 'İrlanda' },
-    { code: '+972', flag: '🇮🇱', name: 'İsrail' },
-    { code: '+39', flag: '🇮🇹', name: 'İtalya' },
-    { code: '+1-876', flag: '🇯🇲', name: 'Jamaika' },
-    { code: '+81', flag: '🇯🇵', name: 'Japonya' },
-    { code: '+962', flag: '🇯🇴', name: 'Ürdün' },
-    { code: '+7', flag: '🇰🇿', name: 'Kazakistan' },
-    { code: '+254', flag: '🇰🇪', name: 'Kenya' },
-    { code: '+686', flag: '🇰🇮', name: 'Kiribati' },
-    { code: '+850', flag: '🇰🇵', name: 'Kuzey Kore' },
-    { code: '+82', flag: '🇰🇷', name: 'Güney Kore' },
-    { code: '+965', flag: '🇰🇼', name: 'Kuveyt' },
-    { code: '+996', flag: '🇰🇬', name: 'Kırgızistan' },
-    { code: '+856', flag: '🇱🇦', name: 'Laos' },
-    { code: '+371', flag: '🇱🇻', name: 'Letonya' },
-    { code: '+961', flag: '🇱🇧', name: 'Lübnan' },
-    { code: '+266', flag: '🇱🇸', name: 'Lesoto' },
-    { code: '+231', flag: '🇱🇷', name: 'Liberya' },
-    { code: '+218', flag: '🇱🇾', name: 'Libya' },
-    { code: '+423', flag: '🇱🇮', name: 'Lihtenştayn' },
-    { code: '+370', flag: '🇱🇹', name: 'Litvanya' },
-    { code: '+352', flag: '🇱🇺', name: 'Lüksemburg' },
-    { code: '+261', flag: '🇲🇬', name: 'Madagaskar' },
-    { code: '+265', flag: '🇲🇼', name: 'Malavi' },
-    { code: '+60', flag: '🇲🇾', name: 'Malezya' },
-    { code: '+960', flag: '🇲🇻', name: 'Maldivler' },
-    { code: '+223', flag: '🇲🇱', name: 'Mali' },
-    { code: '+356', flag: '🇲🇹', name: 'Malta' },
-    { code: '+222', flag: '🇲🇷', name: 'Moritanya' },
-    { code: '+230', flag: '🇲🇺', name: 'Mauritius' },
-    { code: '+52', flag: '🇲🇽', name: 'Meksika' },
-    { code: '+373', flag: '🇲🇩', name: 'Moldova' },
-    { code: '+377', flag: '🇲🇨', name: 'Monako' },
-    { code: '+976', flag: '🇲🇳', name: 'Moğolistan' },
-    { code: '+382', flag: '🇲🇪', name: 'Karadağ' },
-    { code: '+212', flag: '🇲🇦', name: 'Fas' },
-    { code: '+258', flag: '🇲🇿', name: 'Mozambik' },
-    { code: '+95', flag: '🇲🇲', name: 'Myanmar' },
-    { code: '+264', flag: '🇳🇦', name: 'Namibya' },
-    { code: '+977', flag: '🇳🇵', name: 'Nepal' },
-    { code: '+31', flag: '🇳🇱', name: 'Hollanda' },
-    { code: '+64', flag: '🇳🇿', name: 'Yeni Zelanda' },
-    { code: '+505', flag: '🇳🇮', name: 'Nikaragua' },
-    { code: '+227', flag: '🇳🇪', name: 'Nijer' },
-    { code: '+234', flag: '🇳🇬', name: 'Nijerya' },
-    { code: '+389', flag: '🇲🇰', name: 'Kuzey Makedonya' },
-    { code: '+47', flag: '🇳🇴', name: 'Norveç' },
-    { code: '+968', flag: '🇴🇲', name: 'Umman' },
-    { code: '+92', flag: '🇵🇰', name: 'Pakistan' },
-    { code: '+507', flag: '🇵🇦', name: 'Panama' },
-    { code: '+675', flag: '🇵🇬', name: 'Papua Yeni Gine' },
-    { code: '+595', flag: '🇵🇾', name: 'Paraguay' },
-    { code: '+51', flag: '🇵🇪', name: 'Peru' },
-    { code: '+63', flag: '🇵🇭', name: 'Filipinler' },
-    { code: '+48', flag: '🇵🇱', name: 'Polonya' },
-    { code: '+351', flag: '🇵🇹', name: 'Portekiz' },
-    { code: '+974', flag: '🇶🇦', name: 'Katar' },
-    { code: '+40', flag: '🇷🇴', name: 'Romanya' },
-    { code: '+7', flag: '🇷🇺', name: 'Rusya' },
-    { code: '+250', flag: '🇷🇼', name: 'Ruanda' },
-    { code: '+966', flag: '🇸🇦', name: 'Suudi Arabistan' },
-    { code: '+221', flag: '🇸🇳', name: 'Senegal' },
-    { code: '+381', flag: '🇷🇸', name: 'Sırbistan' },
-    { code: '+232', flag: '🇸🇱', name: 'Sierra Leone' },
-    { code: '+65', flag: '🇸🇬', name: 'Singapur' },
-    { code: '+421', flag: '🇸🇰', name: 'Slovakya' },
-    { code: '+386', flag: '🇸🇮', name: 'Slovenya' },
-    { code: '+252', flag: '🇸🇴', name: 'Somali' },
-    { code: '+27', flag: '🇿🇦', name: 'Güney Afrika' },
-    { code: '+211', flag: '🇸🇸', name: 'Güney Sudan' },
-    { code: '+34', flag: '🇪🇸', name: 'İspanya' },
-    { code: '+94', flag: '🇱🇰', name: 'Sri Lanka' },
-    { code: '+249', flag: '🇸🇩', name: 'Sudan' },
-    { code: '+597', flag: '🇸🇷', name: 'Surinam' },
-    { code: '+46', flag: '🇸🇪', name: 'İsveç' },
-    { code: '+41', flag: '🇨🇭', name: 'İsviçre' },
-    { code: '+963', flag: '🇸🇾', name: 'Suriye' },
-    { code: '+886', flag: '🇹🇼', name: 'Tayvan' },
-    { code: '+992', flag: '🇹🇯', name: 'Tacikistan' },
-    { code: '+255', flag: '🇹🇿', name: 'Tanzanya' },
-    { code: '+66', flag: '🇹🇭', name: 'Tayland' },
-    { code: '+228', flag: '🇹🇬', name: 'Togo' },
-    { code: '+676', flag: '🇹🇴', name: 'Tonga' },
-    { code: '+1-868', flag: '🇹🇹', name: 'Trinidad ve Tobago' },
-    { code: '+216', flag: '🇹🇳', name: 'Tunus' },
-    { code: '+993', flag: '🇹🇲', name: 'Türkmenistan' },
-    { code: '+256', flag: '🇺🇬', name: 'Uganda' },
-    { code: '+380', flag: '🇺🇦', name: 'Ukrayna' },
-    { code: '+971', flag: '🇦🇪', name: 'Birleşik Arap Emirlikleri' },
-    { code: '+44', flag: '🇬🇧', name: 'İngiltere' },
-    { code: '+1', flag: '🇺🇸', name: 'ABD' },
-    { code: '+598', flag: '🇺🇾', name: 'Uruguay' },
-    { code: '+998', flag: '🇺🇿', name: 'Özbekistan' },
-    { code: '+678', flag: '🇻🇺', name: 'Vanuatu' },
-    { code: '+58', flag: '🇻🇪', name: 'Venezuela' },
-    { code: '+84', flag: '🇻🇳', name: 'Vietnam' },
-    { code: '+967', flag: '🇾🇪', name: 'Yemen' },
-    { code: '+260', flag: '🇿🇲', name: 'Zambiya' },
-    { code: '+263', flag: '🇿🇼', name: 'Zimbabve' },
-  ]
+  const lang = selectedLanguage || 'tr'
+  const tr = t(lang)
+  const rtl = isRtl(lang)
 
-  const selectedCountry = ALL_COUNTRIES.find(c => c.code === countryCode && c.name === (ALL_COUNTRIES.find(x => x.code === countryCode)?.name)) || ALL_COUNTRIES[0]
+  // Localize country names based on selected language
+  const localizedCountries = useMemo(() => {
+    const locale = LANG_TO_LOCALE[lang] || 'en'
+    try {
+      const regionNames = new Intl.DisplayNames([locale], { type: 'region' })
+      return ALL_COUNTRIES.map(c => ({
+        ...c,
+        name: regionNames.of(c.iso) || c.iso,
+      }))
+    } catch {
+      // Fallback: use English
+      const regionNames = new Intl.DisplayNames(['en'], { type: 'region' })
+      return ALL_COUNTRIES.map(c => ({
+        ...c,
+        name: regionNames.of(c.iso) || c.iso,
+      }))
+    }
+  }, [lang])
 
-  const filteredCountries = ALL_COUNTRIES.filter(c =>
+  const filteredCountries = localizedCountries.filter(c =>
     c.name.toLowerCase().includes(countrySearch.toLowerCase()) ||
     c.code.includes(countrySearch)
   )
 
+  // Close country dropdown when clicking outside
+  useEffect(() => {
+    if (!showCountryDropdown) return
+    const handleClickOutside = (e: MouseEvent) => {
+      if (countryDropdownRef.current && !countryDropdownRef.current.contains(e.target as Node)) {
+        setShowCountryDropdown(false)
+        setCountrySearch('')
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showCountryDropdown])
+
   // Handle canvas resize for fullscreen modal
   useEffect(() => {
     if (showWaiverModal && signatureRef.current) {
-      // Small delay to ensure DOM is ready
       const timer = setTimeout(() => {
         const canvas = signatureRef.current?.getCanvas()
         if (canvas) {
@@ -286,7 +313,6 @@ export default function NewCustomerPage() {
             const rect = parent.getBoundingClientRect()
             canvas.width = rect.width
             canvas.height = rect.height
-            // Clear and set background after resize
             const ctx = canvas.getContext('2d')
             if (ctx) {
               ctx.fillStyle = 'white'
@@ -301,14 +327,31 @@ export default function NewCustomerPage() {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
-    setFormData(prev => ({
-      ...prev,
-      [name]: value,
-    }))
+    setFormData(prev => ({ ...prev, [name]: value }))
   }
 
   const clearSignature = () => {
     signatureRef.current?.clear()
+  }
+
+  const submitRegistration = async (sigData: string) => {
+    setLoading(true)
+    setError('')
+    try {
+      const response = await api.post('/customers', {
+        ...formData,
+        phone: `${countryCode}${formData.phone}`,
+        waiverSigned: true,
+        signatureData: sigData,
+        language: lang,
+      })
+      setResult(response.data.data)
+    } catch (err: any) {
+      console.error('Registration error:', err)
+      setError(err.response?.data?.error?.message || tr.registrationFailed)
+    } finally {
+      setLoading(false)
+    }
   }
 
   const handleSignatureConfirm = () => {
@@ -316,6 +359,7 @@ export default function NewCustomerPage() {
       const data = signatureRef.current.toDataURL('image/png')
       setSignatureData(data)
       setShowWaiverModal(false)
+      submitRegistration(data)
     }
   }
 
@@ -325,9 +369,8 @@ export default function NewCustomerPage() {
   }
 
   const openWaiverModal = () => {
-    // Validate form before opening modal
     if (!formData.firstName || !formData.lastName || !formData.phone) {
-      setError('Lütfen önce Ad, Soyad ve Telefon bilgilerini doldurun')
+      setError(tr.fillNamePhone)
       return
     }
     setError('')
@@ -337,28 +380,11 @@ export default function NewCustomerPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
-
     if (!signatureData) {
-      setError('Lütfen risk formunu imzalayın')
+      setError(tr.signRequired)
       return
     }
-
-    setLoading(true)
-
-    try {
-      const response = await api.post('/customers', {
-        ...formData,
-        phone: `${countryCode}${formData.phone}`,
-        waiverSigned: true,
-        signatureData,
-      })
-      setResult(response.data.data)
-    } catch (err: any) {
-      console.error('Registration error:', err)
-      setError(err.response?.data?.error?.message || 'Kayıt oluşturulamadı')
-    } finally {
-      setLoading(false)
-    }
+    await submitRegistration(signatureData)
   }
 
   const handlePrint = () => {
@@ -373,49 +399,15 @@ export default function NewCustomerPage() {
         <head>
           <title>QR Kod - ${result.customer.displayId}</title>
           <style>
-            @page {
-              size: auto;
-              margin: 0;
-            }
-            @media print {
-              html, body {
-                margin: 0;
-                padding: 0;
-              }
-            }
-            body {
-              font-family: Arial, sans-serif;
-              text-align: center;
-              padding: 10px;
-              margin: 0;
-            }
-            .qr-container {
-              width: 5cm;
-              margin: 0 auto;
-              padding: 10px;
-              border: 1px dashed #ccc;
-            }
+            @page { size: auto; margin: 0; }
+            @media print { html, body { margin: 0; padding: 0; } }
+            body { font-family: Arial, sans-serif; text-align: center; padding: 10px; margin: 0; }
+            .qr-container { width: 5cm; margin: 0 auto; padding: 10px; border: 1px dashed #ccc; }
             .qr-code { width: 4cm; height: 4cm; }
-            .display-id {
-              font-size: 14px;
-              font-weight: bold;
-              margin-top: 5px;
-            }
-            .customer-name {
-              font-size: 12px;
-              color: #666;
-            }
-            .pilot-name {
-              font-size: 12px;
-              font-weight: bold;
-              color: #333;
-              margin-top: 3px;
-            }
-            .datetime {
-              font-size: 10px;
-              color: #888;
-              margin-top: 5px;
-            }
+            .display-id { font-size: 14px; font-weight: bold; margin-top: 5px; }
+            .customer-name { font-size: 12px; color: #666; }
+            .pilot-name { font-size: 12px; font-weight: bold; color: #333; margin-top: 3px; }
+            .datetime { font-size: 10px; color: #888; margin-top: 5px; }
           </style>
         </head>
         <body>
@@ -434,142 +426,10 @@ export default function NewCustomerPage() {
     }
   }
 
-  const handlePrintWaiver = () => {
-    if (result && signatureData) {
-      const printWindow = window.open('', '_blank')
-      if (printWindow) {
-        const now = new Date()
-        const dateStr = now.toLocaleDateString('tr-TR')
-        const timeStr = now.toLocaleTimeString('tr-TR')
-
-        const waiverText = `YAMAC PARASUTU UCUSU RISK VE SORUMLULUK BEYANI
-
-Bu belgeyi imzalayarak asagidaki hususlari kabul ve beyan ederim:
-
-1. Yamac parasutu sporu, dogasi geregi tehlikeli bir aktivitedir ve ciddi yaralanma veya olum riski tasimaktadir.
-
-2. Ucus sirasinda hava kosullari, ekipman arizasi veya diger ongorulemeyen durumlar nedeniyle kaza meydana gelebilecegini biliyorum.
-
-3. Herhangi bir saglik problemim (kalp hastaligi, epilepsi, hamilelik, vb.) bulunmamaktadir veya varsa pilot ve yetkilere bildirdim.
-
-4. Ucus oncesi verilen tum guvenlik talimatlarina uyacagimi taahhut ederim.
-
-5. Meydana gelebilecek herhangi bir kaza, yaralanma veya maddi hasar durumunda kooperatif ve pilotu sorumlu tutmayacagimi kabul ederim.
-
-6. 18 yasindan buyuk oldugumu veya yasal veli/vasi onayi aldigimi beyan ederim.`
-
-        printWindow.document.write(`
-          <!DOCTYPE html>
-          <html>
-          <head>
-            <title>Risk Formu - ${result.customer.displayId}</title>
-            <style>
-              @page {
-                size: A4;
-                margin: 15mm;
-              }
-              @media print {
-                html, body {
-                  margin: 0;
-                  padding: 0;
-                }
-              }
-              body {
-                font-family: Arial, sans-serif;
-                padding: 20px;
-                margin: 0;
-                font-size: 12px;
-                line-height: 1.5;
-              }
-              .header {
-                text-align: center;
-                margin-bottom: 20px;
-              }
-              .header h1 {
-                font-size: 18px;
-                margin: 0 0 5px 0;
-              }
-              .header h2 {
-                font-size: 14px;
-                margin: 0;
-                font-weight: normal;
-              }
-              .info-box {
-                border: 1px solid #ccc;
-                padding: 10px;
-                margin-bottom: 15px;
-                background: #f9f9f9;
-              }
-              .info-box p {
-                margin: 3px 0;
-              }
-              .waiver-text {
-                white-space: pre-line;
-                text-align: justify;
-                margin-bottom: 20px;
-              }
-              .signature-section {
-                margin-top: 30px;
-              }
-              .signature-section h3 {
-                font-size: 12px;
-                margin-bottom: 10px;
-                text-decoration: underline;
-              }
-              .signature-name {
-                font-weight: bold;
-                margin-bottom: 5px;
-              }
-              .signature-img {
-                max-width: 200px;
-                max-height: 80px;
-                border-bottom: 1px solid #000;
-              }
-            </style>
-          </head>
-          <body>
-            <div class="header">
-              <h1>ALANYA PARAGLIDING</h1>
-              <h2>RISK VE SORUMLULUK BEYANI</h2>
-            </div>
-
-            <div class="info-box">
-              <p><strong>Musteri No:</strong> ${result.customer.displayId}</p>
-              <p><strong>Ad Soyad:</strong> ${result.customer.firstName} ${result.customer.lastName}</p>
-              <p><strong>Tarih:</strong> ${dateStr}</p>
-              <p><strong>Saat:</strong> ${timeStr}</p>
-            </div>
-
-            <div class="waiver-text">${waiverText}</div>
-
-            <div class="signature-section">
-              <h3>IMZA</h3>
-              <p>Yukaridaki beyani okudum, anladim ve kabul ediyorum.</p>
-              <p class="signature-name">${result.customer.firstName} ${result.customer.lastName}</p>
-              <img src="${signatureData}" alt="Imza" class="signature-img" />
-            </div>
-
-            <script>window.onload = () => window.print();</script>
-          </body>
-          </html>
-        `)
-        printWindow.document.close()
-      }
-    }
-  }
-
-  const handleDownloadQR = () => {
-    if (result) {
-      const link = document.createElement('a')
-      link.href = result.qrCode
-      link.download = `${result.customer.displayId}-qr.png`
-      link.click()
-    }
-  }
-
   const resetForm = () => {
     setResult(null)
     setSignatureData(null)
+    setSelectedLanguage(null)
     setCountryCode('+90')
     setCountrySearch('')
     setFormData({
@@ -582,13 +442,49 @@ Bu belgeyi imzalayarak asagidaki hususlari kabul ve beyan ederim:
     })
   }
 
-  // Fullscreen Waiver Modal
+  // Build waiver text from translations
+  const getWaiverText = () => {
+    return `${tr.waiverFullTitle}\n\n${tr.waiverIntro}\n\n${tr.waiverAccept}\n\n1. ${tr.waiverItem1}\n\n2. ${tr.waiverItem2}\n\n3. ${tr.waiverItem3}\n\n4. ${tr.waiverItem4}\n\n5. ${tr.waiverItem5}\n\n6. ${tr.waiverItem6}\n\n7. ${tr.waiverItem7}\n\n8. ${tr.waiverItem8}`
+  }
+
+  // ==================== STEP 1: Language Selection ====================
+  if (!selectedLanguage) {
+    return (
+      <div className="min-h-[80vh] flex flex-col items-center justify-center px-4">
+        {/* Logo */}
+        <div className="mb-8 text-center">
+          <img
+            src="/skytrack-logo.png"
+            alt="SkyTrack"
+            className="w-24 h-24 mx-auto mb-4 rounded-2xl shadow-lg"
+          />
+          <p className="text-lg text-gray-600">Welcome! Please select your language.</p>
+        </div>
+
+        {/* Language buttons grid */}
+        <div className="w-full max-w-md grid grid-cols-2 gap-3">
+          {LANGUAGES.map((l) => (
+            <button
+              key={l.code}
+              onClick={() => setSelectedLanguage(l.code)}
+              className="flex items-center justify-center gap-3 px-4 py-4 bg-white border-2 border-gray-200 rounded-xl text-lg font-medium hover:border-blue-500 hover:bg-blue-50 active:bg-blue-100 transition-all min-h-[60px] shadow-sm"
+            >
+              <span className="text-2xl">{l.flag}</span>
+              <span>{l.name}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  // ==================== Waiver Modal (Fullscreen) ====================
   if (showWaiverModal) {
     return (
-      <div className="fixed inset-0 z-50 bg-white flex flex-col overflow-hidden">
+      <div className="fixed inset-0 z-50 bg-white flex flex-col overflow-hidden" dir={rtl ? 'rtl' : 'ltr'}>
         {/* Header */}
         <div className="flex-shrink-0 bg-blue-600 text-white p-4 flex items-center justify-between">
-          <h1 className="text-xl font-bold">Risk ve Sorumluluk Beyanı</h1>
+          <h1 className="text-xl font-bold">{tr.waiverTitle}</h1>
           <Button
             variant="ghost"
             size="icon"
@@ -612,13 +508,26 @@ Bu belgeyi imzalayarak asagidaki hususlari kabul ve beyan ederim:
         <div className="flex-1 overflow-y-auto">
           {/* Waiver Text */}
           <div className="p-4 bg-gray-50 text-sm whitespace-pre-line border-b">
-            {WAIVER_TEXT}
+            {getWaiverText()}
+          </div>
+
+          {/* KVKK Consent Line */}
+          <div className="px-4 py-3 bg-blue-50 border-b text-sm">
+            {tr.waiverKvkkLine.split('{link}')[0]}
+            <button
+              type="button"
+              onClick={() => setShowKvkkModal(true)}
+              className="text-blue-600 underline font-medium hover:text-blue-800"
+            >
+              {tr.kvkkLinkText}
+            </button>
+            {tr.waiverKvkkLine.split('{link}')[1]}
           </div>
 
           {/* Signature Area */}
           <div className="p-4">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-lg font-semibold">Aşağıya imzanızı atın:</p>
+              <p className="text-lg font-semibold">{tr.signHere}</p>
               <Button
                 type="button"
                 variant="outline"
@@ -626,7 +535,7 @@ Bu belgeyi imzalayarak asagidaki hususlari kabul ve beyan ederim:
                 onClick={clearSignature}
               >
                 <Eraser className="w-4 h-4 mr-1" />
-                Temizle
+                {tr.signClear}
               </Button>
             </div>
             <div
@@ -651,12 +560,12 @@ Bu belgeyi imzalayarak asagidaki hususlari kabul ve beyan ederim:
               />
             </div>
             <p className="text-xs text-muted-foreground mt-2 text-center">
-              Parmağınız veya mouse ile yukarıdaki alana imzanızı atın
+              {tr.signHelper}
             </p>
           </div>
         </div>
 
-        {/* Footer Buttons - Fixed at bottom */}
+        {/* Footer Buttons */}
         <div className="flex-shrink-0 p-4 bg-gray-100 border-t flex gap-3">
           <Button
             variant="outline"
@@ -664,31 +573,61 @@ Bu belgeyi imzalayarak asagidaki hususlari kabul ve beyan ederim:
             onClick={handleSignatureCancel}
           >
             <X className="w-5 h-5 mr-2" />
-            İptal
+            {tr.signCancel}
           </Button>
           <Button
             className="flex-1 h-12 text-base bg-green-600 hover:bg-green-700"
             onClick={handleSignatureConfirm}
           >
             <Check className="w-5 h-5 mr-2" />
-            İmzayı Onayla
+            {tr.signConfirm}
           </Button>
         </div>
+
+        {/* KVKK Modal - overlay inside waiver modal */}
+        {showKvkkModal && (
+          <div className="fixed inset-0 z-[60] bg-black/50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] flex flex-col">
+              <div className="flex-shrink-0 bg-blue-600 text-white p-4 rounded-t-lg flex items-center justify-between">
+                <h2 className="text-lg font-bold">{tr.kvkkModalTitle}</h2>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setShowKvkkModal(false)}
+                  className="text-white hover:bg-blue-700"
+                >
+                  <X className="w-6 h-6" />
+                </Button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-4 text-sm whitespace-pre-line">
+                {tr.kvkkText}
+              </div>
+              <div className="flex-shrink-0 p-4 border-t">
+                <Button
+                  className="w-full"
+                  onClick={() => setShowKvkkModal(false)}
+                >
+                  {tr.kvkkClose}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     )
   }
 
-  // Success state - show QR code
+  // ==================== Success State ====================
   if (result) {
     const now = new Date()
     const dateStr = now.toLocaleDateString('tr-TR')
     const timeStr = now.toLocaleTimeString('tr-TR')
 
     return (
-      <div className="max-w-lg mx-auto space-y-6">
+      <div className="max-w-lg mx-auto space-y-6" dir={rtl ? 'rtl' : 'ltr'}>
         <Card className="border-green-200 bg-green-50">
           <CardHeader className="text-center">
-            <CardTitle className="text-green-700">Kayıt Başarılı!</CardTitle>
+            <CardTitle className="text-green-700">{tr.registrationSuccess}</CardTitle>
             <CardDescription>{result.message}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -716,114 +655,87 @@ Bu belgeyi imzalayarak asagidaki hususlari kabul ve beyan ederim:
               </div>
             )}
 
-            <div className="flex gap-3">
-              <Button onClick={handlePrint} className="flex-1">
-                <Printer className="w-4 h-4 mr-2" />
-                QR Yazdır
-              </Button>
-              <Button onClick={handleDownloadQR} variant="outline" className="flex-1">
-                <Download className="w-4 h-4 mr-2" />
-                QR İndir
-              </Button>
-            </div>
+            <Button onClick={handlePrint} className="w-full h-12 text-base">
+              <Printer className="w-5 h-5 mr-2" />
+              {tr.printQR}
+            </Button>
 
-            <div className="flex gap-3">
-              <Button
-                variant="secondary"
-                className="flex-1"
-                onClick={handlePrintWaiver}
-              >
-                <Printer className="w-4 h-4 mr-2" />
-                Risk Formu Yazdır
-              </Button>
-              <Button
-                variant="outline"
-                className="flex-1"
-                onClick={() => window.open(`${API_URL}/customers/${result.customer.id}/waiver-pdf`)}
-              >
-                <FileText className="w-4 h-4 mr-2" />
-                PDF İndir
-              </Button>
-            </div>
-
-            <div className="flex gap-3">
-              <Button
-                variant="outline"
-                className="flex-1"
-                onClick={resetForm}
-              >
-                <UserPlus className="w-4 h-4 mr-2" />
-                Yeni Kayıt
-              </Button>
-              <Link href={`/admin/customers/${result.customer.id}`} className="flex-1">
-                <Button variant="secondary" className="w-full">
-                  Detayları Gör
-                </Button>
-              </Link>
-            </div>
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={resetForm}
+            >
+              <UserPlus className="w-4 h-4 mr-2" />
+              {tr.newRegistration}
+            </Button>
           </CardContent>
         </Card>
       </div>
     )
   }
 
-  // Registration form
+  // ==================== Registration Form ====================
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
+    <div className="max-w-2xl mx-auto space-y-6" dir={rtl ? 'rtl' : 'ltr'}>
       <div className="flex items-center gap-4">
-        <Link href="/admin/customers">
-          <Button variant="ghost" size="icon">
-            <ArrowLeft className="w-5 h-5" />
-          </Button>
-        </Link>
-        <div>
-          <h1 className="text-2xl font-bold">Yeni Müşteri Kaydı</h1>
-          <p className="text-muted-foreground">Müşteri bilgilerini doldurun</p>
+        <Button variant="ghost" size="icon" onClick={() => setSelectedLanguage(null)}>
+          <ArrowLeft className={`w-5 h-5 ${rtl ? 'rotate-180' : ''}`} />
+        </Button>
+        <div className="flex-1">
+          <h1 className="text-2xl font-bold">{tr.formTitle}</h1>
+          <p className="text-muted-foreground">{tr.personalInfo}</p>
         </div>
+        {/* Language indicator */}
+        <button
+          onClick={() => setSelectedLanguage(null)}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-sm hover:bg-gray-50"
+        >
+          <span>{LANGUAGES.find(l => l.code === lang)?.flag}</span>
+          <span>{LANGUAGES.find(l => l.code === lang)?.name}</span>
+        </button>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
         <Card>
           <CardHeader>
-            <CardTitle>Kişisel Bilgiler</CardTitle>
+            <CardTitle>{tr.personalInfo}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="firstName">Ad *</Label>
+                <Label htmlFor="firstName">{tr.firstName} *</Label>
                 <Input
                   id="firstName"
                   name="firstName"
                   value={formData.firstName}
                   onChange={handleChange}
-                  placeholder="Adı"
+                  placeholder={tr.firstName}
                   required
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="lastName">Soyad *</Label>
+                <Label htmlFor="lastName">{tr.lastName} *</Label>
                 <Input
                   id="lastName"
                   name="lastName"
                   value={formData.lastName}
                   onChange={handleChange}
-                  placeholder="Soyadı"
+                  placeholder={tr.lastName}
                   required
                 />
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="phone">Telefon *</Label>
+              <Label htmlFor="phone">{tr.phone} *</Label>
               <div className="flex gap-2">
-                {/* Searchable country code picker */}
-                <div className="relative">
+                <div className="relative" ref={countryDropdownRef}>
                   <button
                     type="button"
                     onClick={() => setShowCountryDropdown(v => !v)}
                     className="flex h-10 items-center gap-1 rounded-md border border-input bg-background px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 whitespace-nowrap"
                   >
-                    {ALL_COUNTRIES.find(c => c.code === countryCode)?.flag} {countryCode}
+                    {localizedCountries.find(c => c.code === countryCode)?.flag} {countryCode}
                     <span className="ml-1 text-muted-foreground">▾</span>
                   </button>
                   {showCountryDropdown && (
@@ -834,7 +746,7 @@ Bu belgeyi imzalayarak asagidaki hususlari kabul ve beyan ederim:
                           type="text"
                           value={countrySearch}
                           onChange={e => setCountrySearch(e.target.value)}
-                          placeholder="Ülke adı veya kod..."
+                          placeholder={tr.countrySearchPlaceholder}
                           className="w-full rounded border border-input px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
                         />
                       </div>
@@ -855,7 +767,7 @@ Bu belgeyi imzalayarak asagidaki hususlari kabul ve beyan ederim:
                           </li>
                         ))}
                         {filteredCountries.length === 0 && (
-                          <li className="px-3 py-2 text-sm text-muted-foreground">Sonuç bulunamadı</li>
+                          <li className="px-3 py-2 text-sm text-muted-foreground">{tr.noResults}</li>
                         )}
                       </ul>
                     </div>
@@ -875,7 +787,7 @@ Bu belgeyi imzalayarak asagidaki hususlari kabul ve beyan ederim:
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="email">E-posta *</Label>
+              <Label htmlFor="email">{tr.email} *</Label>
               <Input
                 id="email"
                 name="email"
@@ -888,18 +800,18 @@ Bu belgeyi imzalayarak asagidaki hususlari kabul ve beyan ederim:
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="emergencyContact">Acil Durumda Aranacak Kişi</Label>
+              <Label htmlFor="emergencyContact">{tr.emergencyContact}</Label>
               <Input
                 id="emergencyContact"
                 name="emergencyContact"
                 value={formData.emergencyContact}
                 onChange={handleChange}
-                placeholder="İsim"
+                placeholder={tr.emergencyContact}
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="weight">Kilo (kg) *</Label>
+              <Label htmlFor="weight">{tr.weight} *</Label>
               <Input
                 id="weight"
                 name="weight"
@@ -908,11 +820,11 @@ Bu belgeyi imzalayarak asagidaki hususlari kabul ve beyan ederim:
                 max="150"
                 value={formData.weight}
                 onChange={handleChange}
-                placeholder="Örn: 70"
+                placeholder="70"
                 required
               />
               <p className="text-xs text-muted-foreground">
-                Uçuş güvenliği için gereklidir (20-150 kg)
+                {tr.weightHelper}
               </p>
             </div>
           </CardContent>
@@ -920,9 +832,9 @@ Bu belgeyi imzalayarak asagidaki hususlari kabul ve beyan ederim:
 
         <Card>
           <CardHeader>
-            <CardTitle>Risk ve Sorumluluk Beyanı</CardTitle>
+            <CardTitle>{tr.waiverTitle}</CardTitle>
             <CardDescription>
-              Uçuş öncesi risk formunu imzalamanız gerekmektedir
+              {tr.signRequired}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -933,7 +845,7 @@ Bu belgeyi imzalayarak asagidaki hususlari kabul ve beyan ederim:
                     <Check className="w-6 h-6 text-white" />
                   </div>
                   <div className="flex-1">
-                    <p className="font-semibold text-green-700">Risk Formu İmzalandı</p>
+                    <p className="font-semibold text-green-700">{tr.signed}</p>
                     <p className="text-sm text-green-600">
                       {new Date().toLocaleDateString('tr-TR')} - {new Date().toLocaleTimeString('tr-TR')}
                     </p>
@@ -947,14 +859,14 @@ Bu belgeyi imzalayarak asagidaki hususlari kabul ve beyan ederim:
                       setShowWaiverModal(true)
                     }}
                   >
-                    Yeniden İmzala
+                    {tr.resignLabel}
                   </Button>
                 </div>
                 <div className="border rounded-lg p-2 bg-gray-50">
-                  <p className="text-xs text-muted-foreground mb-1">İmza Önizleme:</p>
+                  <p className="text-xs text-muted-foreground mb-1">{tr.signed}:</p>
                   <img
                     src={signatureData}
-                    alt="İmza"
+                    alt="Signature"
                     className="max-h-20 mx-auto"
                   />
                 </div>
@@ -966,7 +878,7 @@ Bu belgeyi imzalayarak asagidaki hususlari kabul ve beyan ederim:
                 className="w-full h-24 rounded-lg border-2 border-green-500 bg-green-50 hover:bg-green-100 transition-colors flex flex-col items-center justify-center gap-2"
               >
                 <PenLine className="w-8 h-8 text-green-600" />
-                <span className="text-lg font-semibold text-green-700">Risk Formunu Görüntüle ve İmzala</span>
+                <span className="text-lg font-semibold text-green-700">{tr.signViewAndSign}</span>
               </button>
             )}
           </CardContent>
@@ -984,7 +896,7 @@ Bu belgeyi imzalayarak asagidaki hususlari kabul ve beyan ederim:
           className="w-full"
           disabled={loading || !signatureData}
         >
-          {loading ? 'Kaydediliyor...' : 'Kaydı Tamamla ve QR Oluştur'}
+          {loading ? tr.saving : tr.submit}
         </Button>
       </form>
     </div>

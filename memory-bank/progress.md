@@ -58,6 +58,31 @@
 - [x] PDF oluşturma (pdfkit)
 - [x] PDF indirme endpoint'i
 - [x] Depolama: `./media/Risk Formlari/{displayId}/{Ad Soyad} risk_formu.pdf`
+- [x] Risk formu metni güncellendi (6 madde → 8 madde, kooperatif ve sigorta bilgileri eklendi)
+- [x] Başlık: "Risk ve Sorumluluk Beyanı" → "Risk Kabul ve Sorumluluk Beyanı"
+- [x] KVKK Aydınlatma Metni linki ve modalı eklendi (imza üstünde)
+- [x] kvkkConsent + kvkkConsentAt DB alanları eklendi (imza ile otomatik true)
+- [x] signatureData alanı @db.Text olarak güncellendi
+
+### Çok Dilli Karşılama ve Kayıt Sistemi (2026-03-05)
+- [x] Dil seçim ekranı (10 dil, bayraklı butonlar, SkyTrack origami logo)
+- [x] Çeviri sistemi (lib/translations.ts — 10 dil, 50+ çeviri anahtarı)
+- [x] Desteklenen diller: TR, EN, RU, DE, AR, PL, UK, ZH, FR, FA
+- [x] RTL desteği (Arapça, Farsça — dir="rtl" ile layout mirror)
+- [x] Kayıt formu tüm alanlar çevrildi (ad, soyad, telefon, kilo, vb.)
+- [x] Risk formu 8 madde tüm dillerde çevrildi
+- [x] KVKK metni ve linki çevrildi
+- [x] İmza alanı etiketleri çevrildi (imzala, temizle, onayla, iptal)
+- [x] Başarı ekranı çevrildi
+- [x] Customer tablosuna `language` String @default("tr") eklendi
+- [x] API'de language alanı kayıt sırasında set ediliyor
+- [x] Form akışı: Dil seçimi → Bilgi girişi → Risk formu + İmza → QR sonuç
+- [x] Ülke isimleri Intl.DisplayNames ile seçilen dile göre otomatik çeviri (ISO 3166-1)
+- [x] Ülke arama placeholder ve "sonuç bulunamadı" metni çevrildi
+- [x] Ülke dropdown click-outside kapanma (useEffect + ref)
+- [x] İmza sonrası otomatik form submit (handleSignatureConfirm → submitRegistration)
+- [x] Başarı ekranı sadeleştirildi (sadece QR Yazdır + Yeni Kayıt)
+- [x] Risk formu PDF tek sayfa sığdırma (font/spacing optimize)
 
 ### Personel Yönetimi
 - [x] Kullanıcı rolleri (ADMIN, OFFICE_STAFF, PILOT, MEDIA_SELLER, CUSTOM)

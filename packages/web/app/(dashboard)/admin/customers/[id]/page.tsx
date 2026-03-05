@@ -56,6 +56,7 @@ interface Customer {
   qrCode: string
   waiverSigned: boolean
   waiverSignedAt: string | null
+  signatureData: string | null
   status: string
   createdAt: string
   assignedPilot: {
@@ -485,21 +486,27 @@ export default function CustomerDetailPage() {
       const dateStr = now.toLocaleDateString('tr-TR')
       const timeStr = now.toLocaleTimeString('tr-TR')
 
-      const waiverText = `YAMAC PARASUTU UCUSU RISK VE SORUMLULUK BEYANI
+      const waiverText = `YAMAC PARASUTU UCUSU RISK KABUL VE SORUMLULUK BEYANI
+
+Isbu belge, Sinirli Sorumlu Alanya Yamac Parasutu ve Spor Turizm Gelistirme Kooperatifi bunyesinde gerceklestirilecek tandem yamac parasutu ucusuna iliskin olarak duzenlenmistir.
 
 Bu belgeyi imzalayarak asagidaki hususlari kabul ve beyan ederim:
 
-1. Yamac parasutu sporu, dogasi geregi tehlikeli bir aktivitedir ve ciddi yaralanma veya olum riski tasimaktadir.
+1. Yamac parasutu sporu dogasi geregi tehlikeli bir aktivitedir ve kaza riski tasimaktadir.
 
-2. Ucus sirasinda hava kosullari, ekipman arizasi veya diger ongorulemeyen durumlar nedeniyle kaza meydana gelebilecegini biliyorum.
+2. Ben yamac parasutu ile tandem ucusu yapmak icin gerekli on egitimi ve bilgilendirmeyi pilotumdan aldim, bu konuda tum bilgilere sahibim ve tum riskleri kabul ederek kendi istegimle ucusa hazirim.
 
-3. Herhangi bir saglik problemim (kalp hastaligi, epilepsi, hamilelik, vb.) bulunmamaktadir veya varsa pilot ve yetkilere bildirdim.
+3. Ucus sirasinda hava kosullari, ekipman arizasi veya diger ongorulemeyen durumlar nedeniyle kaza meydana gelebilecegini biliyorum.
 
-4. Ucus oncesi verilen tum guvenlik talimatlarina uyacagimi taahhut ederim.
+4. Herhangi bir saglik problemim (kalp hastaligi, epilepsi, hamilelik, vb.) bulunmamaktadir veya varsa pilot ve yetkilere bildirdim.
 
-5. Meydana gelebilecek herhangi bir kaza, yaralanma veya maddi hasar durumunda kooperatif ve pilotu sorumlu tutmayacagimi kabul ederim.
+5. Ucus oncesi verilen tum guvenlik talimatlarina uyacagimi taahhut ederim.
 
-6. 18 yasindan buyuk oldugumu veya yasal veli/vasi onayi aldigimi beyan ederim.`
+6. Tandem ucusu RAY SIGORTA A.S. guvencesindedir. Meydana gelebilecek herhangi bir kazada Alanya Ilce Sportif Turizm Kurulu Ucus Kontrol Heyeti, Kooperatif ve isletmesini yuruten sirketten/pilotundan ve diger sahislardan hicbir hak ve talep etmeyecegimi kabul ederim.
+
+7. Ucus sirasinda cekilen fotograf ve videolarin Kooperatif tarafindan kayit altina alinabilecegini ve bu gorsel/isitsel kayitlarin hizmet sunumu amaciyla kullanilabilecegini kabul ederim.
+
+8. 18 yasindan buyuk oldugumu veya yasal veli/vasi onayi aldigimi beyan ederim.`
 
       printWindow.document.write(`
         <!DOCTYPE html>
@@ -563,18 +570,17 @@ Bu belgeyi imzalayarak asagidaki hususlari kabul ve beyan ederim:
               font-weight: bold;
               margin-bottom: 10px;
             }
-            .signature-line {
+            .signature-img {
+              max-width: 200px;
+              max-height: 80px;
               border-bottom: 1px solid #000;
-              width: 200px;
-              height: 60px;
-              margin-top: 10px;
             }
           </style>
         </head>
         <body>
           <div class="header">
-            <h1>ALANYA PARAGLIDING</h1>
-            <h2>RISK VE SORUMLULUK BEYANI</h2>
+            <h1>S.S. Alanya Yamac Parasutu ve Spor Turizm Gelistirme Kooperatifi</h1>
+            <h2>RISK KABUL VE SORUMLULUK BEYANI</h2>
           </div>
 
           <div class="info-box">
@@ -587,11 +593,13 @@ Bu belgeyi imzalayarak asagidaki hususlari kabul ve beyan ederim:
 
           <div class="waiver-text">${waiverText}</div>
 
+          <p style="font-size: 11px; margin-bottom: 20px; font-style: italic;">Bu formu imzalayarak Kisisel Verilerin Korunmasi Kanunu (KVKK) Aydinlatma Metni kapsaminda kisisel verilerimin islenmesine onay verdigimi kabul ederim.</p>
+
           <div class="signature-section">
             <h3>IMZA</h3>
             <p>Yukaridaki beyani okudum, anladim ve kabul ediyorum.</p>
             <p class="signature-name">${customer.firstName} ${customer.lastName}</p>
-            <div class="signature-line"></div>
+            ${customer.signatureData ? `<img src="${customer.signatureData}" alt="Imza" class="signature-img" />` : '<div style="border-bottom: 1px solid #000; width: 200px; height: 60px; margin-top: 10px;"></div>'}
           </div>
 
           <script>window.onload = () => window.print();</script>

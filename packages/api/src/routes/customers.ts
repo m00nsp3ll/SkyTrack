@@ -191,7 +191,8 @@ router.post('/', authenticate, requireRole('ADMIN', 'OFFICE_STAFF'), asyncHandle
     emergencyContact,
     weight,
     waiverSigned,
-    signatureData
+    signatureData,
+    language
   } = req.body;
 
   // Validation
@@ -233,6 +234,9 @@ router.post('/', authenticate, requireRole('ADMIN', 'OFFICE_STAFF'), asyncHandle
     qrCode,
     waiverSigned: true,
     waiverSignedAt: new Date(),
+    kvkkConsent: true,
+    kvkkConsentAt: new Date(),
+    language: language || 'tr',
     status: 'REGISTERED',
   };
 

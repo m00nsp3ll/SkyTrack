@@ -1,68 +1,52 @@
 # Active Context - SkyTrack
 
-## Son Çalışma Oturumu: 2026-02-25 (Oturum 25)
+## Son Çalışma Oturumu: 2026-03-05 (Oturum 28)
 
 ### Yapılan İşler
 
-1. **POS "Rest" Kategorisi Eklendi** ✅
-   - Acentadan gelen müşterilerin kalan ödeme bakiyesi için yeni kategori
-   - Tüm CATEGORIES dizilerine eklendi (7 dosya: API, POS, admin products, customers)
-   - POS'ta ilk sırada, kırmızı tema (bg-red-50, border-red-200)
-   - Rest ürünü sabit fiyatsız — tıklandığında serbest tutar giriş modalı açılır
-   - Modal: € simgesi, büyük input, TRY karşılığı, Enter/Escape kısayolları
+1. **Risk Formu Güncellendi** ✅
+   - Başlık: "Risk ve Sorumluluk Beyanı" → "Risk Kabul ve Sorumluluk Beyanı"
+   - 6 madde → 8 madde (kooperatif adı, RAY SİGORTA, medya kaydı onayı, 18 yaş beyanı)
+   - KVKK Aydınlatma Metni linki ve modalı eklendi (imza üstünde)
+   - kvkkConsent + kvkkConsentAt DB alanları eklendi
+   - signatureData @db.Text olarak güncellendi
+   - İmza sonrası otomatik form submit (auto-submit)
+   - Başarı ekranı sadeleştirildi (sadece QR Yazdır + Yeni Kayıt)
+   - PDF tek sayfa sığdırma (font küçültme, spacing sıkıştırma)
 
-2. **Kullanıcı Bazlı POS Kategori Yetkileri** ✅
-   - Prisma schema: User modeline `posCategories Json?` alanı eklendi + migration
-   - Backend API: `GET/PUT /api/users/pos-categories` endpoint'leri
-   - Auth: Login/me'de kullanıcı bazlı posCategories, rol default'ını override eder
-   - Backward compat: posCategories yoksa rol varsayılanı kullanılır
+2. **Çok Dilli Kayıt Sistemi** ✅
+   - 10 dil desteği: TR, EN, RU, DE, AR, PL, UK, ZH, FR, FA
+   - `lib/translations.ts` — 50+ çeviri anahtarı per dil
+   - RTL desteği: Arapça ve Farsça (dir="rtl")
+   - Dil seçim ekranı (SkyTrack origami logo + bayraklı butonlar)
+   - Customer tablosuna `language` alanı eklendi
 
-3. **Staff Sayfasına "Kasiyer Yetkileri" Sekmesi** ✅ (`/admin/staff`)
-   - 3 sekme: Personel Listesi / Personel Rolleri / Kasiyer Yetkileri
-   - Her kasiyer için satır içi POS kategori checkbox'ları
-   - "Özel Atama" badge, "Sıfırla" (rol varsayılanına dön), "Kaydet" butonları
-   - Turuncu tema, Rest checkbox kırmızı accent
-   - Personel Rolleri sekmesindeki POS Kategori Yetkileri kaldırıldı (kullanıcı bazlı yeterli)
+3. **Ülke İsimleri Dil Bazlı Çeviri** ✅
+   - ALL_COUNTRIES dizisine ISO 3166-1 alpha-2 kodları eklendi
+   - `Intl.DisplayNames` API ile seçilen dile göre otomatik ülke ismi çevirisi
+   - Arama placeholder ve "sonuç bulunamadı" metni çevrildi
+   - Dropdown dışına tıklayınca kapanma (click-outside handler)
 
-4. **POS Sayfasında Kategori Filtreleme** ✅
-   - `getVisibleCategories()`: localStorage'dan kullanıcı permissions okur
-   - ADMIN → tümü, posCategories undefined → tümü (fallback)
-   - "Tüm Ürünler" sadece izin verilen kategorilerdeki ürünleri gösterir
-
-5. **PWA Cache Sorunu Düzeltildi** ✅
-   - Development modda PWA cache devre dışı bırakıldı (`disable: process.env.NODE_ENV === 'development'`)
-   - Eski JS cache'leri overlay sorununa neden oluyordu
-
-6. **Manifest & Meta Tag Düzeltmeleri** ✅
-   - manifest.json: var olmayan PNG ikonlar → mevcut SVG ikonlara güncellendi
-   - layout.tsx: `apple-mobile-web-app-capable` → `mobile-web-app-capable` (deprecated fix)
-
-7. **Staff Modal Overlay Düzeltmesi** ✅
-   - Modal arka planına tıklayınca kapanma eklendi (onClick + stopPropagation)
-   - Hata durumunda da modal kapanır
+4. **Logo Düzeltmesi** ✅
+   - SkyTrack origami logosu (`SkyTrack-logo.png`) → `public/skytrack-logo.png`
+   - Cache sorunu için farklı dosya adı kullanıldı
 
 ### Değiştirilen Dosyalar
 
 | Dosya | İşlem |
 |-------|-------|
-| `packages/api/prisma/schema.prisma` | User modeline posCategories Json? eklendi |
-| `packages/api/prisma/migrations/20260225...` | Migration: add_user_pos_categories |
-| `packages/api/src/routes/products.ts` | Rest kategorisi eklendi |
-| `packages/api/src/routes/users.ts` | posCategories default + backward compat + API endpoints |
-| `packages/api/src/routes/auth.ts` | Login/me'de kullanıcı bazlı posCategories override |
-| `packages/api/prisma/seed.ts` | Rest Ödemesi ürünü (fiyat: 0) + posCategories tüm rollere |
-| `packages/web/app/(dashboard)/pos/page.tsx` | Rest filtreleme, kırmızı stil, fiyat giriş modalı |
-| `packages/web/app/(dashboard)/admin/staff/page.tsx` | Kasiyer Yetkileri sekmesi, rol POS yetkileri kaldırıldı |
-| `packages/web/app/(dashboard)/admin/products/page.tsx` | Rest kategorisi |
-| `packages/web/app/(dashboard)/admin/products/new/page.tsx` | Rest kategorisi |
-| `packages/web/app/(dashboard)/admin/products/[id]/edit/page.tsx` | Rest kategorisi |
-| `packages/web/app/(dashboard)/admin/customers/[id]/page.tsx` | Rest kategorisi |
-| `packages/web/next.config.js` | PWA cache dev'de devre dışı |
-| `packages/web/public/manifest.json` | SVG ikonlara güncellendi |
-| `packages/web/app/layout.tsx` | Deprecated meta tag düzeltmesi |
+| `packages/web/lib/translations.ts` | YENİ — 10 dilde çeviri sistemi + countrySearchPlaceholder, noResults |
+| `packages/web/app/(dashboard)/admin/customers/new/page.tsx` | Çok dilli form, ISO ülke kodları, Intl.DisplayNames, click-outside |
+| `packages/web/app/(dashboard)/admin/customers/[id]/page.tsx` | İmza gösterimi, risk formu yazdırma düzeltmesi |
+| `packages/api/prisma/schema.prisma` | kvkkConsent, kvkkConsentAt, language, signatureData @db.Text |
+| `packages/api/prisma/migrations/...` | 2 migration: kvkk_consent_fields, customer_language |
+| `packages/api/src/routes/customers.ts` | language, kvkkConsent API'ye eklendi |
+| `packages/api/src/services/waiverPdf.ts` | 8 madde, kooperatif adı, tek sayfa PDF |
+| `packages/web/public/skytrack-logo.png` | YENİ — SkyTrack origami logosu |
 
 ### Sonraki Adımlar
 
+- [ ] Müşteri landing page'inde (/c/{displayId}) seçilen dili kullanma
 - [ ] Raporlarda Rest kategorisi ayrı gösterilmeli
 - [ ] iOS bildirimde Türkçe karakter sorunu
 - [ ] Production PM2 yapılandırması
