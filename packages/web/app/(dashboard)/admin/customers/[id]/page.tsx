@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { api } from '@/lib/api'
-import { io, Socket } from 'socket.io-client'
+import { io } from 'socket.io-client'
 import {
   ArrowLeft,
   Printer,
@@ -174,6 +174,14 @@ export default function CustomerDetailPage() {
   const [loading, setLoading] = useState(true)
   const [qrCodeData, setQrCodeData] = useState<string | null>(null)
   const [showQrModal, setShowQrModal] = useState(false)
+
+  // Current user role
+  const [userRole, setUserRole] = useState<string>('OFFICE_STAFF')
+  useEffect(() => {
+    const u = localStorage.getItem('user')
+    if (u) { try { setUserRole(JSON.parse(u).role || 'OFFICE_STAFF') } catch {} }
+  }, [])
+  const canCollectPayment = userRole === 'ADMIN' || userRole === 'OFFICE_STAFF'
   const [copied, setCopied] = useState(false)
   const [personalInfoOpen, setPersonalInfoOpen] = useState(false)
 
@@ -183,7 +191,6 @@ export default function CustomerDetailPage() {
   const [openingFolder, setOpeningFolder] = useState(false)
   const [processingPayment, setProcessingPayment] = useState(false)
   const [uploadingFiles, setUploadingFiles] = useState(false)
-  const [markingDelivered, setMarkingDelivered] = useState(false)
   const [showPilotModal, setShowPilotModal] = useState(false)
   const [availablePilots, setAvailablePilots] = useState<{ id: string; name: string; dailyFlightCount: number; maxDailyFlights: number; queuePosition: number }[]>([])
   const [loadingPilots, setLoadingPilots] = useState(false)
@@ -211,11 +218,6 @@ export default function CustomerDetailPage() {
     if (currency === 'GBP' || currency === 'RUB') return ['CASH']
     return ['CASH', 'CREDIT_CARD', 'TRANSFER']
   }
-  const getAvailableCurrencies = (method: string): Currency[] => {
-    if (method === 'CREDIT_CARD' || method === 'TRANSFER') return ['EUR', 'USD', 'TRY']
-    return ['EUR', 'USD', 'GBP', 'RUB', 'TRY']
-  }
-
   const convertToEUR = (amount: number, fromCurrency: Currency): number => {
     if (fromCurrency === 'EUR') return amount
     const rate = allRates[fromCurrency]?.buyRate
@@ -233,16 +235,12 @@ export default function CustomerDetailPage() {
   // Media state
   const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([])
   const [mediaPrice, setMediaPrice] = useState('25')
-  const [mediaPaymentEntries, setMediaPaymentEntries] = useState<{ id: string; currency: Currency; amount: number; method: 'CASH' | 'CREDIT_CARD' | 'TRANSFER'; eurEquivalent: number }[]>([])
-  const [mediaActivePayCurrency, setMediaActivePayCurrency] = useState<Currency | null>(null)
-  const [mediaActivePayMethod, setMediaActivePayMethod] = useState<'CASH' | 'CREDIT_CARD' | 'TRANSFER'>('CASH')
-  const [mediaActivePayAmount, setMediaActivePayAmount] = useState('')
-  const mediaPayAmountInputRef = useRef<HTMLInputElement>(null)
+  const [mediaCurrency, setMediaCurrency] = useState<Currency>('EUR')
+  const [mediaSentToCashier, setMediaSentToCashier] = useState(false)
 
   // POS Modal state
   const [showPosModal, setShowPosModal] = useState(false)
   const [posProducts, setPosProducts] = useState<any[]>([])
-  const [_posFavorites, setPosFavorites] = useState<any[]>([])
   const [posCart, setPosCart] = useState<any[]>([])
   const [posActiveCategory, setPosActiveCategory] = useState('Tüm Ürünler')
   const [posProductSearch, setPosProductSearch] = useState('')
@@ -268,9 +266,6 @@ export default function CustomerDetailPage() {
   // Timers
   const [waitingTime, setWaitingTime] = useState<string>('')
   const [flightTime, setFlightTime] = useState<string>('')
-
-  // Socket
-  const [socket, setSocket] = useState<Socket | null>(null)
 
   // Fetch currency rates
   const fetchRates = useCallback(async () => {
@@ -385,7 +380,6 @@ export default function CustomerDetailPage() {
           : `https://${window.location.hostname}:3001`)
       : 'https://localhost:3001'
     const newSocket = io(socketUrl)
-    setSocket(newSocket)
 
     newSocket.on('customer:updated', (data: { customerId: string }) => {
       if (data.customerId === customer?.id) {
@@ -673,22 +667,28 @@ Bu belgeyi imzalayarak asagidaki hususlari kabul ve beyan ederim:
 
   const handleMediaPayment = async () => {
     if (!customer) return
-    const mediaPriceEUR = parseFloat(mediaPrice)
-    if (!isCompactPaymentValid(mediaPaymentEntries, mediaPriceEUR)) {
-      alert('Ödeme tutarını girin')
+    const priceNum = parseFloat(mediaPrice)
+    if (isNaN(priceNum) || priceNum <= 0) {
+      alert('Geçerli bir tutar girin')
       return
     }
+
+    // Keep original price in original currency — backend will handle EUR conversion
+    const priceInEUR = mediaCurrency === 'EUR' ? priceNum : convertToEUR(priceNum, mediaCurrency)
+
     setProcessingPayment(true)
     try {
-      const firstEntry = mediaPaymentEntries[0]
-      // 1. Update media folder payment status
-      await api.patch(`/media/${customer.id}/payment`, {
-        status: 'PAID',
-        amount: mediaPriceEUR,
-        paymentMethod: firstEntry.method
-      })
+      // 1. Update media folder if exists (may not exist for all customers)
+      try {
+        await api.patch(`/media/${customer.id}/payment`, {
+          status: 'PENDING',
+          amount: priceInEUR,
+        })
+      } catch {
+        // Media folder may not exist — that's OK, sale will still be created
+      }
 
-      // 2. Create a sale record for media payment
+      // 2. Create UNPAID sale — store in ORIGINAL currency (not EUR)
       await salesApi.create({
         customerId: customer.id,
         items: [{
@@ -696,39 +696,19 @@ Bu belgeyi imzalayarak asagidaki hususlari kabul ve beyan ederim:
           itemType: 'Foto/Video',
           itemName: 'Foto/Video Paketi',
           quantity: 1,
-          unitPrice: mediaPriceEUR,
+          unitPrice: priceNum,  // original amount in original currency
         }],
-        paymentStatus: 'PAID',
-        paymentMethod: firstEntry.method,
-        primaryCurrency: firstEntry.currency,
-        paymentDetails: mediaPaymentEntries.map(entry => ({
-          currency: entry.currency,
-          amount: entry.amount,
-          paymentMethod: entry.method,
-        })),
+        paymentStatus: 'UNPAID',
+        primaryCurrency: mediaCurrency,
+        paymentDetails: [],
       })
 
-      setMediaPaymentEntries([])
-      setMediaActivePayCurrency(null)
-      setMediaActivePayAmount('')
-      await fetchCustomer()
-    } catch (error: any) {
-      alert(error.response?.data?.error?.message || 'Ödeme başarısız')
-    } finally {
-      setProcessingPayment(false)
-    }
-  }
-
-  const handleMarkDelivered = async () => {
-    if (!customer) return
-    setMarkingDelivered(true)
-    try {
-      await api.patch(`/media/${customer.id}/delivery`, { status: 'DELIVERED' })
+      setMediaSentToCashier(true)
       await fetchCustomer()
     } catch (error: any) {
       alert(error.response?.data?.error?.message || 'İşlem başarısız')
     } finally {
-      setMarkingDelivered(false)
+      setProcessingPayment(false)
     }
   }
 
@@ -1031,6 +1011,11 @@ Bu belgeyi imzalayarak asagidaki hususlari kabul ve beyan ederim:
   const hasMedia = mediaFolder && mediaFolder.fileCount > 0
   const isPaid = mediaFolder?.paymentStatus === 'PAID'
   const isDelivered = mediaFolder?.deliveryStatus === 'DELIVERED'
+
+  // Check if there's already an unpaid Foto/Video sale (sent to cashier)
+  const hasUnpaidMediaSale = customer?.sales?.some(
+    (s: any) => s.itemType === 'Foto/Video' && s.paymentStatus === 'UNPAID'
+  ) || false
 
   // Sort sales: unpaid first
   const sortedSales = customer?.sales ? [...customer.sales].sort((a, b) => {
@@ -1422,7 +1407,7 @@ Bu belgeyi imzalayarak asagidaki hususlari kabul ve beyan ederim:
               {/* File preview */}
               {mediaFiles.length > 0 && (
                 <div className="flex gap-2 overflow-x-auto pb-2">
-                  {mediaFiles.slice(0, 5).map((file, i) => (
+                  {mediaFiles.slice(0, 5).map((_file, i) => (
                     <div key={i} className="w-20 h-20 bg-gray-100 rounded flex-shrink-0 overflow-hidden">
                       <div className="w-full h-full flex items-center justify-center">
                         <Camera className="w-6 h-6 text-muted-foreground" />
@@ -1437,185 +1422,112 @@ Bu belgeyi imzalayarak asagidaki hususlari kabul ve beyan ederim:
                 </div>
               )}
 
-              {/* Payment section */}
-              <div className="border-t pt-4">
-                <p className="font-semibold mb-3">Ödeme Al</p>
-                <div className="flex items-center gap-2 mb-3">
-                  <span className="text-sm text-muted-foreground">Tutar:</span>
-                  <Input
-                    type="number"
-                    value={mediaPrice}
-                    onChange={(e) => setMediaPrice(e.target.value)}
-                    className="w-24"
-                  />
-                  <span className="text-sm font-medium">€</span>
-                  {eurTryRate > 0 && (
-                    <span className="text-xs text-muted-foreground">≈ ₺{(parseFloat(mediaPrice) * eurTryRate).toFixed(0)}</span>
-                  )}
-                </div>
-
-                {(() => {
-                  const mediaTotalEUR = parseFloat(mediaPrice) || 0
-                  const mediaPaidEUR = mediaPaymentEntries.reduce((sum, e) => sum + e.eurEquivalent, 0)
-                  const mediaRemaining = mediaTotalEUR - mediaPaidEUR
-                  const mediaValid = mediaPaidEUR > 0 && mediaRemaining <= 0.01
-
-                  return (
-                    <div className="space-y-2">
-                      {/* Recorded payment entries */}
-                      {mediaPaymentEntries.length > 0 && (
-                        <div className="space-y-1">
-                          {mediaPaymentEntries.map((entry) => (
-                            <div key={entry.id} className="flex items-center justify-between px-2 py-1.5 bg-blue-50 rounded border border-blue-200 text-xs">
-                              <div className="flex items-center gap-2">
-                                <span className="font-bold">{getCurrencySymbol(entry.currency)}{entry.amount.toFixed(2)}</span>
-                                <span className="text-muted-foreground">{getMethodLabel(entry.method)}</span>
-                                {entry.currency !== 'EUR' && (
-                                  <span className="text-muted-foreground">= €{entry.eurEquivalent.toFixed(2)}</span>
-                                )}
-                              </div>
-                              <button onClick={() => removeCompactEntry({ entries: mediaPaymentEntries, setEntries: setMediaPaymentEntries, setActiveCurrency: setMediaActivePayCurrency, setActiveMethod: setMediaActivePayMethod, setActiveAmount: setMediaActivePayAmount, activeCurrency: mediaActivePayCurrency, activeMethod: mediaActivePayMethod, activeAmount: mediaActivePayAmount, inputRef: mediaPayAmountInputRef }, entry.id)} className="p-0.5 text-red-500 hover:bg-red-100 rounded">
-                                <X className="h-3 w-3" />
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-
-                      {/* Remaining info */}
-                      {mediaRemaining > 0.01 ? (
-                        <div className="p-2 rounded-lg bg-orange-50 border border-orange-200">
-                          <div className="flex items-center justify-between text-xs font-medium text-orange-700 mb-1">
-                            <span>Kalan:</span>
-                            <span className="font-bold">€{mediaRemaining.toFixed(2)}</span>
-                          </div>
-                          <div className="flex flex-wrap gap-x-2 text-[10px] text-orange-600">
-                            {CURRENCIES.filter(c => c.value !== 'EUR').map(c => {
-                              const equiv = convertFromEUR(mediaRemaining, c.value)
-                              return equiv > 0 ? (
-                                <span key={c.value}>{c.symbol}{equiv.toFixed(2)}</span>
-                              ) : null
-                            })}
-                          </div>
-                        </div>
-                      ) : mediaPaidEUR > 0 ? (
-                        <div className="p-2 rounded-lg bg-green-50 border border-green-200 text-xs font-medium text-green-700 flex items-center gap-1">
-                          <Check className="h-3.5 w-3.5" />
-                          Tutar tamam
-                          {mediaRemaining < -0.01 && (
-                            <span className="ml-1 text-[10px] opacity-70">(Para üstü: €{Math.abs(mediaRemaining).toFixed(2)})</span>
-                          )}
-                        </div>
-                      ) : null}
-
-                      {/* Currency payment buttons */}
-                      {mediaRemaining > 0.01 && (
-                        <>
-                          {mediaActivePayCurrency ? (
-                            <div className="p-2 bg-gray-50 rounded-lg border space-y-2">
-                              <div className="flex items-center gap-1.5">
-                                <span className="text-sm font-bold w-8">{getCurrencySymbol(mediaActivePayCurrency)}</span>
-                                <Input
-                                  ref={mediaPayAmountInputRef}
-                                  type="number"
-                                  inputMode="decimal"
-                                  step="0.01"
-                                  min="0"
-                                  value={mediaActivePayAmount}
-                                  onChange={(e) => setMediaActivePayAmount(e.target.value)}
-                                  placeholder="0.00"
-                                  className="h-8 text-sm font-medium flex-1"
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter') addCompactEntry({ entries: mediaPaymentEntries, setEntries: setMediaPaymentEntries, setActiveCurrency: setMediaActivePayCurrency, setActiveMethod: setMediaActivePayMethod, setActiveAmount: setMediaActivePayAmount, activeCurrency: mediaActivePayCurrency, activeMethod: mediaActivePayMethod, activeAmount: mediaActivePayAmount, inputRef: mediaPayAmountInputRef })
-                                    if (e.key === 'Escape') setMediaActivePayCurrency(null)
-                                  }}
-                                />
-                                <button
-                                  onClick={() => addCompactEntry({ entries: mediaPaymentEntries, setEntries: setMediaPaymentEntries, setActiveCurrency: setMediaActivePayCurrency, setActiveMethod: setMediaActivePayMethod, setActiveAmount: setMediaActivePayAmount, activeCurrency: mediaActivePayCurrency, activeMethod: mediaActivePayMethod, activeAmount: mediaActivePayAmount, inputRef: mediaPayAmountInputRef })}
-                                  disabled={!mediaActivePayAmount || parseFloat(mediaActivePayAmount) <= 0}
-                                  className="px-2 py-1.5 bg-green-600 text-white rounded text-xs font-medium hover:bg-green-700 disabled:opacity-40 disabled:cursor-not-allowed"
-                                >
-                                  <Check className="h-3.5 w-3.5" />
-                                </button>
-                                <button
-                                  onClick={() => setMediaActivePayCurrency(null)}
-                                  className="p-1.5 text-gray-500 hover:bg-gray-200 rounded"
-                                >
-                                  <X className="h-3.5 w-3.5" />
-                                </button>
-                              </div>
-                              {/* Method selector */}
-                              <div className="flex gap-1">
-                                {getAvailableMethods(mediaActivePayCurrency).map(m => (
-                                  <button
-                                    key={m}
-                                    onClick={() => setMediaActivePayMethod(m)}
-                                    className={`flex-1 px-2 py-1 rounded text-[11px] font-medium border transition-colors ${
-                                      mediaActivePayMethod === m
-                                        ? 'bg-primary text-white border-primary'
-                                        : 'bg-white text-gray-600 hover:bg-gray-100'
-                                    }`}
-                                  >
-                                    {m === 'CASH' && <Banknote className="h-3 w-3 inline mr-0.5" />}
-                                    {m === 'CREDIT_CARD' && <CreditCard className="h-3 w-3 inline mr-0.5" />}
-                                    {m === 'TRANSFER' && <Building className="h-3 w-3 inline mr-0.5" />}
-                                    {getMethodLabel(m)}
-                                  </button>
-                                ))}
-                              </div>
-                              {/* EUR equivalent preview */}
-                              {mediaActivePayCurrency !== 'EUR' && parseFloat(mediaActivePayAmount) > 0 && (
-                                <p className="text-[10px] text-muted-foreground">
-                                  = €{convertToEUR(parseFloat(mediaActivePayAmount), mediaActivePayCurrency).toFixed(2)}
-                                </p>
-                              )}
-                            </div>
-                          ) : (
-                            /* Currency buttons grid */
-                            <div className="grid grid-cols-5 gap-1">
-                              {CURRENCIES.map(c => {
-                                const amountInCurrency = convertFromEUR(mediaRemaining, c.value)
-                                const symbolColor: Record<Currency, string> = {
-                                  EUR: 'text-blue-600',
-                                  USD: 'text-green-600',
-                                  GBP: 'text-purple-600',
-                                  RUB: 'text-red-600',
-                                  TRY: 'text-orange-600',
-                                }
-                                return (
-                                  <button
-                                    key={c.value}
-                                    onClick={() => openCompactCurrencyPay({ entries: mediaPaymentEntries, setEntries: setMediaPaymentEntries, setActiveCurrency: setMediaActivePayCurrency, setActiveMethod: setMediaActivePayMethod, setActiveAmount: setMediaActivePayAmount, activeCurrency: mediaActivePayCurrency, activeMethod: mediaActivePayMethod, activeAmount: mediaActivePayAmount, inputRef: mediaPayAmountInputRef }, c.value, mediaTotalEUR)}
-                                    className="flex flex-col items-center p-2 rounded-lg border bg-white hover:bg-gray-50 hover:border-gray-400 transition-colors active:scale-95"
-                                  >
-                                    <span className={`text-base font-bold ${symbolColor[c.value]}`}>{c.symbol}</span>
-                                    <span className="text-[10px] font-medium text-muted-foreground">{amountInCurrency.toFixed(c.value === 'RUB' ? 0 : 2)}</span>
-                                  </button>
-                                )
-                              })}
-                            </div>
-                          )}
-                        </>
-                      )}
-
-                      <Button
-                        className="w-full mt-1 bg-green-600 hover:bg-green-700"
-                        disabled={processingPayment || !mediaValid}
-                        onClick={handleMediaPayment}
-                      >
-                        {processingPayment ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : <Check className="w-4 h-4 mr-2" />}
-                        Ödeme Al
-                      </Button>
+              {/* Payment section — Kiosk style */}
+              <div className="border-t pt-6">
+                {(mediaSentToCashier || hasUnpaidMediaSale) ? (
+                  <div className="space-y-4">
+                    <div className="bg-blue-50 border-2 border-blue-300 rounded-xl p-6 text-center">
+                      <CheckCircle className="w-12 h-12 text-blue-600 mx-auto mb-3" />
+                      <p className="text-lg font-bold text-blue-700">Kasaya Yönlendirildi</p>
+                      <p className="text-sm text-blue-600 mt-1">
+                        Müşteriye borç yazıldı — kasada ödeme bekliyor
+                      </p>
                     </div>
-                  )
-                })()}
+
+                    {/* Download link + QR — visible after sent to cashier */}
+                    <div className="bg-green-50 border border-green-200 rounded-xl p-5 text-center">
+                      <p className="font-semibold text-green-700 mb-3">Müşteri İndirme Linki</p>
+                      <div className="flex items-center gap-2 mb-4">
+                        <code className="bg-white px-3 py-2 rounded-lg flex-1 text-sm border truncate">
+                          {typeof window !== 'undefined' ? getCustomerPageUrl(customer.displayId) : `https://skytrackyp.com/c/${customer.displayId}`}
+                        </code>
+                        <Button variant="outline" size="sm" onClick={handleCopyLink}>
+                          Kopyala
+                        </Button>
+                      </div>
+                      <div className="flex justify-center">
+                        <Button variant="outline" size="lg" onClick={() => setShowQrModal(true)} className="gap-2">
+                          <QrCode className="w-6 h-6" />
+                          QR Kodu Göster
+                        </Button>
+                      </div>
+                      <p className="text-xs text-green-600 mt-3">
+                        Ödeme yapıldıktan sonra müşteri bu linkten foto/videolarını indirebilir
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <p className="text-lg font-bold text-center">Foto/Video Ücreti</p>
+
+                    {/* Price input — large centered */}
+                    <div className="flex items-center justify-center gap-3">
+                      <Input
+                        type="number"
+                        value={mediaPrice}
+                        onChange={(e) => setMediaPrice(e.target.value)}
+                        className="w-32 h-14 text-2xl font-bold text-center"
+                        inputMode="decimal"
+                      />
+                      <span className="text-2xl font-bold text-muted-foreground">
+                        {CURRENCIES.find(c => c.value === mediaCurrency)?.symbol || '€'}
+                      </span>
+                    </div>
+
+                    {/* EUR / TRY equivalent */}
+                    {mediaCurrency !== 'EUR' && parseFloat(mediaPrice) > 0 && (
+                      <p className="text-sm text-muted-foreground text-center">
+                        ≈ €{convertToEUR(parseFloat(mediaPrice), mediaCurrency).toFixed(2)}
+                      </p>
+                    )}
+                    {mediaCurrency === 'EUR' && eurTryRate > 0 && parseFloat(mediaPrice) > 0 && (
+                      <p className="text-sm text-muted-foreground text-center">
+                        ≈ ₺{(parseFloat(mediaPrice) * eurTryRate).toFixed(0)}
+                      </p>
+                    )}
+
+                    {/* Currency selector — large colorful kiosk buttons */}
+                    <div className="grid grid-cols-5 gap-2">
+                      {CURRENCIES.map(c => {
+                        const colorMap: Record<Currency, { active: string; idle: string; text: string }> = {
+                          EUR: { active: 'bg-blue-600 border-blue-600 text-white shadow-blue-200', idle: 'bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100', text: 'text-blue-600' },
+                          USD: { active: 'bg-green-600 border-green-600 text-white shadow-green-200', idle: 'bg-green-50 border-green-200 text-green-700 hover:bg-green-100', text: 'text-green-600' },
+                          GBP: { active: 'bg-purple-600 border-purple-600 text-white shadow-purple-200', idle: 'bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100', text: 'text-purple-600' },
+                          RUB: { active: 'bg-red-600 border-red-600 text-white shadow-red-200', idle: 'bg-red-50 border-red-200 text-red-700 hover:bg-red-100', text: 'text-red-600' },
+                          TRY: { active: 'bg-orange-600 border-orange-600 text-white shadow-orange-200', idle: 'bg-orange-50 border-orange-200 text-orange-700 hover:bg-orange-100', text: 'text-orange-600' },
+                        }
+                        const colors = colorMap[c.value]
+                        const isActive = mediaCurrency === c.value
+                        return (
+                          <button
+                            key={c.value}
+                            onClick={() => setMediaCurrency(c.value)}
+                            className={`flex flex-col items-center py-3 px-2 rounded-xl border-2 font-bold transition-all active:scale-95 ${
+                              isActive ? `${colors.active} shadow-lg` : colors.idle
+                            }`}
+                          >
+                            <span className="text-2xl">{c.symbol}</span>
+                            <span className="text-[10px] mt-0.5 font-medium opacity-80">{c.label}</span>
+                          </button>
+                        )
+                      })}
+                    </div>
+
+                    <Button
+                      className="w-full h-14 text-lg bg-blue-600 hover:bg-blue-700 rounded-xl"
+                      disabled={processingPayment || isNaN(parseFloat(mediaPrice)) || parseFloat(mediaPrice) <= 0}
+                      onClick={handleMediaPayment}
+                    >
+                      {processingPayment ? <RefreshCw className="w-5 h-5 mr-2 animate-spin" /> : <ShoppingCart className="w-5 h-5 mr-2" />}
+                      Kasaya Yönlendir
+                    </Button>
+                    <p className="text-xs text-muted-foreground text-center">
+                      Müşteriye borç yazılacak — kasada ödeme sonrası indirme aktif olacak
+                    </p>
+                  </div>
+                )}
               </div>
 
-              {/* Download link (disabled) */}
-              <div className="bg-gray-100 p-3 rounded-lg text-center text-muted-foreground">
-                <Download className="w-5 h-5 inline mr-2" />
-                Müşteri İndirme Linki — Ödeme sonrası aktif olacak
-              </div>
             </div>
           )}
 
@@ -1657,15 +1569,10 @@ Bu belgeyi imzalayarak asagidaki hususlari kabul ve beyan ederim:
                 </div>
 
                 {!isDelivered ? (
-                  <Button
-                    className="mt-3 w-full"
-                    variant="outline"
-                    onClick={handleMarkDelivered}
-                    disabled={markingDelivered}
-                  >
-                    {markingDelivered ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : <Check className="w-4 h-4 mr-2" />}
-                    Teslim Edildi Olarak İşaretle
-                  </Button>
+                  <div className="mt-3 text-center text-orange-600 text-sm">
+                    <Clock className="w-4 h-4 inline mr-1" />
+                    Müşteri henüz indirmedi
+                  </div>
                 ) : (
                   <div className="mt-3 text-center text-green-600 font-medium">
                     <Check className="w-4 h-4 inline mr-1" />
@@ -1746,7 +1653,7 @@ Bu belgeyi imzalayarak asagidaki hususlari kabul ve beyan ederim:
                         <td className="py-2 text-right">
                           {sale.paymentStatus === 'PAID' ? (
                             <span className="text-xs text-green-600 font-medium">Ödendi</span>
-                          ) : (
+                          ) : canCollectPayment ? (
                             <div className="flex gap-1 justify-end">
                               <button
                                 onClick={() => handlePaySingleSale(sale.id, 'CASH')}
@@ -1761,6 +1668,8 @@ Bu belgeyi imzalayarak asagidaki hususlari kabul ve beyan ederim:
                                 Kart
                               </button>
                             </div>
+                          ) : (
+                            <span className="text-xs text-orange-600 font-medium">Ödenmedi</span>
                           )}
                         </td>
                       </tr>
@@ -1787,13 +1696,19 @@ Bu belgeyi imzalayarak asagidaki hususlari kabul ve beyan ederim:
                 </div>
               </div>
 
-              {totalOwed > 0 && (
+              {totalOwed > 0 && canCollectPayment && (
                 <Button
                   className="w-full mt-4 bg-red-600 hover:bg-red-700"
                   onClick={() => setShowDebtModal(true)}
                 >
                   Tüm Borcu Tahsil Et (€{totalOwed.toFixed(2)})
                 </Button>
+              )}
+              {totalOwed > 0 && !canCollectPayment && (
+                <div className="mt-4 p-3 bg-orange-50 border border-orange-200 rounded-lg text-center">
+                  <p className="text-sm text-orange-700 font-medium">€{totalOwed.toFixed(2)} ödenmemiş borç</p>
+                  <p className="text-xs text-orange-500 mt-1">Tahsilat kasada yapılacak</p>
+                </div>
               )}
             </>
           ) : (

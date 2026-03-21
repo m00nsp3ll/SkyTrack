@@ -227,7 +227,8 @@ export function Sidebar({ onNavigate }: SidebarProps) {
   return (
     <aside
       className={cn(
-        'bg-white border-r border-gray-200 h-screen flex flex-col transition-all duration-300',
+        'bg-white border-r border-gray-200 flex flex-col transition-all duration-300',
+        'h-[100dvh]',
         isCollapsed ? 'w-16' : 'w-64'
       )}
     >
@@ -308,8 +309,8 @@ export function Sidebar({ onNavigate }: SidebarProps) {
         ))}
       </nav>
 
-      {/* Logout */}
-      <div className="p-2 border-t border-gray-200">
+      {/* Logout — pb-6 for Android/iOS safe area so it doesn't overlap back button */}
+      <div className="p-2 pb-6 border-t border-gray-200" style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))' }}>
         <Button
           variant="ghost"
           className={cn(

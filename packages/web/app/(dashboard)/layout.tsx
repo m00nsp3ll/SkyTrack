@@ -102,7 +102,7 @@ export default function DashboardLayout({
       {sidebarOpen && (
         <div className="fixed inset-0 z-50 md:hidden">
           <div className="fixed inset-0 bg-black/50" onClick={() => setSidebarOpen(false)} />
-          <div className="fixed left-0 top-0 h-full w-64 overflow-hidden">
+          <div className="fixed left-0 top-0 w-64 overflow-y-auto" style={{ height: '100dvh', paddingBottom: 'env(safe-area-inset-bottom, 48px)' }}>
             <Sidebar onNavigate={() => setSidebarOpen(false)} />
           </div>
         </div>

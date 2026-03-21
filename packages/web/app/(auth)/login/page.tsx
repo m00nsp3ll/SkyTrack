@@ -12,8 +12,22 @@ export default function LoginPage() {
   const router = useRouter()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
+  const [rememberMe, setRememberMe] = useState(true)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
+
+  // Load saved credentials on mount
+  useEffect(() => {
+    const saved = localStorage.getItem('savedCredentials')
+    if (saved) {
+      try {
+        const { username: savedUser, password: savedPass } = JSON.parse(saved)
+        setUsername(savedUser || '')
+        setPassword(savedPass || '')
+        setRememberMe(true)
+      } catch {}
+    }
+  }, [])
 
   useEffect(() => {
     // Redirect www to non-www to keep localStorage consistent
@@ -69,6 +83,13 @@ export default function LoginPage() {
         localStorage.setItem('permissions', JSON.stringify(permissions))
       }
 
+      // Save or clear credentials based on "Beni Hatırla"
+      if (rememberMe) {
+        localStorage.setItem('savedCredentials', JSON.stringify({ username, password }))
+      } else {
+        localStorage.removeItem('savedCredentials')
+      }
+
       // Redirect based on role
       if (user.role === 'PILOT') {
         router.replace('/pilot')
@@ -119,6 +140,18 @@ export default function LoginPage() {
                 placeholder="Şifrenizi girin"
                 required
               />
+            </div>
+            <div className="flex items-center space-x-2">
+              <input
+                id="rememberMe"
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer"
+              />
+              <Label htmlFor="rememberMe" className="text-sm text-muted-foreground cursor-pointer select-none">
+                Beni Hatırla
+              </Label>
             </div>
             {error && (
               <div className="text-sm text-destructive bg-destructive/10 p-3 rounded-md">

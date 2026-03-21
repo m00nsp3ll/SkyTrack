@@ -2,6 +2,9 @@ import dotenv from 'dotenv';
 // Load .env FIRST before any other imports that might need env vars
 dotenv.config({ path: '../../.env' });
 
+// Set timezone to Turkey — all new Date() calls will use TR time
+process.env.TZ = 'Europe/Istanbul';
+
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';

@@ -444,7 +444,12 @@ export default function DailyReportPage() {
                     <tr key={sale.id} className="border-b hover:bg-gray-50">
                       <td className="py-3">
                         {sale.customer ? (
-                          <span className="text-sm font-medium">{sale.customer.displayId}</span>
+                          <Link
+                            href={`/admin/customers/${sale.customer.id}`}
+                            className="text-sm font-medium text-primary hover:underline cursor-pointer"
+                          >
+                            {sale.customer.displayId}
+                          </Link>
                         ) : (
                           <span className="text-sm text-muted-foreground">-</span>
                         )}
@@ -470,16 +475,29 @@ export default function DailyReportPage() {
                       <td className="py-3 text-center text-sm">{sale.quantity}</td>
                       <td className="py-3 text-right">
                         <div>
-                          <span className="font-medium">{fmtEUR(sale.totalAmountEUR || sale.totalPrice)}</span>
-                          {sale.paymentDetails && sale.paymentDetails.length > 0 && (
-                            <div className="text-xs text-muted-foreground mt-0.5">
-                              {sale.paymentDetails.map((pd: any, i: number) => (
-                                <span key={i}>
-                                  {i > 0 && ' + '}
-                                  {fmtAmount(pd.amount, pd.currency)}
-                                </span>
-                              ))}
-                            </div>
+                          {sale.paymentDetails && sale.paymentDetails.length > 0 ? (
+                            <>
+                              <span className="font-medium">
+                                {sale.paymentDetails.map((pd: any, i: number) => (
+                                  <span key={i}>
+                                    {i > 0 && ' + '}
+                                    {fmtAmount(pd.amount, pd.currency)}
+                                  </span>
+                                ))}
+                              </span>
+                              {sale.primaryCurrency !== 'EUR' && (
+                                <div className="text-xs text-muted-foreground mt-0.5">
+                                  ≈ {fmtEUR(sale.totalAmountEUR || sale.totalPrice)}
+                                </div>
+                              )}
+                            </>
+                          ) : (
+                            <span className="font-medium">
+                              {sale.primaryCurrency && sale.primaryCurrency !== 'EUR'
+                                ? fmtAmount(sale.totalPrice, sale.primaryCurrency)
+                                : fmtEUR(sale.totalAmountEUR || sale.totalPrice)
+                              }
+                            </span>
                           )}
                         </div>
                       </td>

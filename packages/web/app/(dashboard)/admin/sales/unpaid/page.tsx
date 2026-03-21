@@ -23,6 +23,7 @@ interface Sale {
   quantity: number
   totalPrice: number
   totalAmountEUR?: number
+  primaryCurrency?: string
   createdAt: string
   soldBy: {
     id: string
@@ -247,7 +248,10 @@ export default function UnpaidSalesPage() {
                               </div>
                             </div>
                             <div className="flex items-center gap-3">
-                              <span className="font-medium text-red-600">€{(sale.totalAmountEUR || sale.totalPrice).toFixed(2)}</span>
+                              <span className="font-medium text-red-600">
+                                {sale.primaryCurrency === 'USD' ? '$' : sale.primaryCurrency === 'GBP' ? '£' : sale.primaryCurrency === 'RUB' ? '₽' : sale.primaryCurrency === 'TRY' ? '₺' : '€'}
+                                {sale.totalPrice.toFixed(2)}
+                              </span>
                             </div>
                           </div>
                         ))}

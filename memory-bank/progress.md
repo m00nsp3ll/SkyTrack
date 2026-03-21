@@ -145,6 +145,20 @@
 - [x] Healthcheck ve hata yönetimi
 - [x] Log dosyaları (/tmp/skytrack-*.log)
 - [x] Process ID takibi
+- [x] Homebrew postgresql@16 port çakışması düzeltmesi (start-all.sh'a otomatik durdurma eklendi)
+- [x] docker-compose postgres:16 → postgres:14 (uyumluluk)
+
+### Sistem Düzeltmeleri (2026-03-21)
+- [x] Timezone düzeltmesi: `process.env.TZ = 'Europe/Istanbul'` — günlük rapor yeni güne doğru geçiyor
+- [x] POS para birimi kayıt hatası: $100 USD → €86.67 yerine doğru $100 kaydediliyor
+- [x] UNPAID satışlar artık EUR'a zorlanmıyor (orijinal para birimi korunuyor)
+- [x] Bulk pay / single pay: gerçek ödeme para biriminden EUR/TRY hesabı
+- [x] Foto/Video "Kasaya Yönlendir" sistemi: UNPAID sale oluşturur, kasa ödemeleri alır
+- [x] canCollectPayment: sadece ADMIN ve OFFICE_STAFF tahsilat yapabilir
+- [x] Müşteri download sayfası 10 dil desteği (/c/[displayId]) + RTL
+- [x] Risk formu PDF: TR, EN, RU, DE, FR dillerinde üretim
+- [x] Beni Hatırla login özelliği (default seçili, 1 ay credentials saklar)
+- [x] Mobile sidebar safe area düzeltmesi (Android nav bar üstüne binen buton)
 
 ### Medya Yönetimi
 - [x] Medya yükleme sistemi

@@ -31,7 +31,7 @@ router.post('/', authenticate, asyncHandler(async (req: AuthRequest, res: any) =
       let finalItemType = itemType;
       let finalItemName = itemName;
       let finalUnitPrice = unitPrice;
-      let productCurrency: Currency = 'EUR';
+      let productCurrency: Currency = currency; // Use the payment currency, not hardcoded EUR
 
       if (productId) {
         const product = await tx.product.findUnique({ where: { id: productId } });
@@ -72,7 +72,7 @@ router.post('/', authenticate, asyncHandler(async (req: AuthRequest, res: any) =
           totalPrice,
           totalAmountEUR: eurAmount,
           totalAmountTRY: tryAmount,
-          primaryCurrency: isSplitPayment ? currency : (paymentStatus === 'UNPAID' ? 'EUR' : currency),
+          primaryCurrency: currency,
           isSplitPayment,
           paymentStatus: paymentStatus || 'UNPAID',
           paymentMethod: paymentStatus === 'PAID' ? (paymentMethod || 'CASH') : null,
@@ -483,12 +483,14 @@ router.patch('/:id/payment', authenticate, asyncHandler(async (req: AuthRequest,
     throw new AppError('Satış bulunamadı', 404, 'SALE_NOT_FOUND');
   }
 
-  const cur: Currency = payCurrency || 'EUR';
+  // Use payment currency if provided, otherwise use the sale's original currency
+  const cur: Currency = payCurrency || (existing.primaryCurrency as Currency) || 'EUR';
   const method = paymentMethod || 'CASH';
 
-  // Calculate EUR/TRY amounts if not already set
-  const totalAmountEUR = existing.totalAmountEUR || convertAmount(existing.totalPrice, cur, 'EUR').converted;
-  const totalAmountTRY = existing.totalAmountTRY || convertAmount(existing.totalPrice, cur, 'TRY').converted;
+  // Recalculate amounts based on actual payment currency
+  const payAmount = existing.totalPrice; // original price in original currency
+  const totalAmountEUR = cur === 'EUR' ? payAmount : convertAmount(payAmount, cur, 'EUR').converted;
+  const totalAmountTRY = cur === 'TRY' ? payAmount : convertAmount(payAmount, cur, 'TRY').converted;
 
   const sale = await prisma.sale.update({
     where: { id },
@@ -514,7 +516,7 @@ router.patch('/:id/payment', authenticate, asyncHandler(async (req: AuthRequest,
       data: {
         saleId: id,
         currency: cur,
-        amount: existing.totalPrice,
+        amount: payAmount,
         amountInEUR: totalAmountEUR,
         amountInTRY: totalAmountTRY,
         exchangeRate: rateInfo.rate,
@@ -522,6 +524,17 @@ router.patch('/:id/payment', authenticate, asyncHandler(async (req: AuthRequest,
         paymentMethod: method,
       },
     });
+
+    // If this is a Foto/Video sale, mark media folder as PAID so customer can download
+    if (existing.itemType === 'Foto/Video' && existing.customerId) {
+      await prisma.mediaFolder.updateMany({
+        where: { customerId: existing.customerId },
+        data: {
+          paymentStatus: 'PAID',
+          paymentAmount: totalAmountEUR,
+        },
+      });
+    }
   }
 
   res.json({
@@ -562,26 +575,29 @@ router.post('/bulk-pay/:customerId', authenticate, asyncHandler(async (req: Auth
   // Update all unpaid sales and create payment details
   await prisma.$transaction(async (tx) => {
     for (const sale of unpaidSales) {
-      const totalAmountEUR = sale.totalAmountEUR || convertAmount(sale.totalPrice, 'EUR', 'EUR').converted;
-      const totalAmountTRY = sale.totalAmountTRY || convertAmount(sale.totalPrice, 'EUR', 'TRY').converted;
+      // Use payment currency if provided, otherwise keep sale's original currency
+      const saleCur: Currency = cur || (sale.primaryCurrency as Currency) || 'EUR';
+      const payAmount = sale.totalPrice;
+      const totalAmountEUR = saleCur === 'EUR' ? payAmount : convertAmount(payAmount, saleCur, 'EUR').converted;
+      const totalAmountTRY = saleCur === 'TRY' ? payAmount : convertAmount(payAmount, saleCur, 'TRY').converted;
 
       await tx.sale.update({
         where: { id: sale.id },
         data: {
           paymentStatus: 'PAID',
           paymentMethod: method,
-          primaryCurrency: cur,
+          primaryCurrency: saleCur,
           totalAmountEUR,
           totalAmountTRY,
         },
       });
 
-      const rateInfo = getRate(cur, 'EUR');
+      const rateInfo = getRate(saleCur, 'EUR');
       await tx.paymentDetail.create({
         data: {
           saleId: sale.id,
-          currency: cur,
-          amount: sale.totalPrice,
+          currency: saleCur,
+          amount: payAmount,
           amountInEUR: totalAmountEUR,
           amountInTRY: totalAmountTRY,
           exchangeRate: rateInfo.rate,
@@ -589,6 +605,17 @@ router.post('/bulk-pay/:customerId', authenticate, asyncHandler(async (req: Auth
           paymentMethod: method,
         },
       });
+
+      // If this is a Foto/Video sale, mark media folder as PAID
+      if (sale.itemType === 'Foto/Video' && sale.customerId) {
+        await tx.mediaFolder.updateMany({
+          where: { customerId: sale.customerId },
+          data: {
+            paymentStatus: 'PAID',
+            paymentAmount: totalAmountEUR,
+          },
+        });
+      }
     }
   });
 

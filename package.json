@@ -24,9 +24,13 @@
     "db:studio": "npm run db:studio -w packages/api"
   },
   "devDependencies": {
-    "concurrently": "^8.2.2"
+    "concurrently": "^8.2.2",
+    "prisma": "6.19.2"
   },
   "engines": {
     "node": ">=20.0.0"
+  },
+  "dependencies": {
+    "@prisma/client": "6.19.2"
   }
 }

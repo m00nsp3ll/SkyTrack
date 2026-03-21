@@ -14,7 +14,7 @@ wait_for_port() {
     local name=$2
     local max=$3
     for i in $(seq 1 $max); do
-        if lsof -i :$port | grep -q LISTEN; then
+        if lsof -i :$port 2>/dev/null | grep -q LISTEN; then
             return 0
         fi
         sleep 1
@@ -22,6 +22,29 @@ wait_for_port() {
     done
     return 1
 }
+
+# --- 0. Eski Process'leri Temizle ---
+echo "🧹 Eski process'ler temizleniyor..."
+lsof -ti :3000 2>/dev/null | xargs kill -9 2>/dev/null
+lsof -ti :3001 2>/dev/null | xargs kill -9 2>/dev/null
+pkill -f "tsx watch" 2>/dev/null
+pkill -f "next dev" 2>/dev/null
+pkill -f "node server.js" 2>/dev/null
+pkill -f "cloudflared tunnel" 2>/dev/null
+sleep 1
+echo "✅ Temizlendi"
+echo ""
+
+# --- 0b. Homebrew PostgreSQL Kontrolü ---
+# Homebrew PostgreSQL port 5432'yi kapar ve Docker container'a bağlantıyı engeller
+if brew services list 2>/dev/null | grep -q "postgresql.*started"; then
+    PG_SERVICE=$(brew services list 2>/dev/null | grep "postgresql.*started" | awk '{print $1}')
+    echo "⚠️  Homebrew $PG_SERVICE port 5432'yi kullanıyor, durduruluyor..."
+    brew services stop "$PG_SERVICE" > /dev/null 2>&1
+    sleep 2
+    echo "✅ Homebrew $PG_SERVICE durduruldu"
+    echo ""
+fi
 
 # --- 1. Docker Desktop ---
 echo "🐳 Docker kontrol ediliyor..."
@@ -50,7 +73,7 @@ echo ""
 
 # --- 2. PostgreSQL + Redis ---
 echo "📦 PostgreSQL ve Redis başlatılıyor..."
-docker-compose up -d
+docker-compose up -d 2>&1 | grep -v "^$"
 
 # PostgreSQL'e bağlanana kadar bekle (max 60 sn)
 echo -n "⏳ PostgreSQL bekleniyor"
@@ -113,6 +136,13 @@ echo ""
 
 # --- 4. Next.js Web ---
 echo "🌐 Next.js Web başlatılıyor..."
+
+# Eski .next cache'i bozuksa temizle
+if [ -f packages/web/.next/server/webpack-runtime.js ] && ! node -e "require('./packages/web/.next/server/webpack-runtime.js')" 2>/dev/null; then
+    echo "   ⚠️  Bozuk .next cache temizleniyor..."
+    rm -rf packages/web/.next
+fi
+
 npm run dev:web:https > /tmp/skytrack-web.log 2>&1 &
 WEB_PID=$!
 
@@ -154,6 +184,16 @@ fi
 echo "✅ Tunnel hazır (PID: $TUNNEL_PID)"
 echo ""
 
+# --- 6. Sayfaları Ön-Derle ---
+echo "📄 Sayfalar ön-derleniyor..."
+sleep 3
+curl -sk https://localhost:3000/ > /dev/null 2>&1 &
+curl -sk https://localhost:3000/login > /dev/null 2>&1 &
+curl -sk https://localhost:3000/admin > /dev/null 2>&1 &
+sleep 8
+echo "✅ Ana sayfalar derlendi"
+echo ""
+
 # --- Final Rapor ---
 echo "════════════════════════════════════════════════════════"
 echo "  SkyTrack Başarıyla Başlatıldı!"
@@ -169,7 +209,7 @@ echo ""
 echo "🌐 Erişim:"
 echo "   • https://skytrackyp.com"
 echo "   • https://api.skytrackyp.com"
-echo "   • https://192.168.1.11:3000 (LAN)"
+echo "   • https://localhost:3000 (Local)"
 echo ""
 echo "🔐 Giriş:"
 echo "   • Admin: admin / admin123"

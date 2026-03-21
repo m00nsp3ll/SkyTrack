@@ -269,6 +269,7 @@ router.post('/', authenticate, requireRole('ADMIN', 'OFFICE_STAFF'), asyncHandle
         phone: customer.phone,
         signatureData,
         waiverSignedAt: customer.waiverSignedAt!,
+        language: customer.language || 'tr',
       });
 
       // Update customer with PDF path
@@ -374,6 +375,7 @@ router.get('/:id/waiver-pdf', asyncHandler(async (req: AuthRequest, res: any) =>
           phone: customer.phone,
           signatureData: customer.signatureData,
           waiverSignedAt: customer.waiverSignedAt,
+          language: customer.language || 'tr',
         });
       } catch (error) {
         throw new AppError('PDF oluşturulamadı', 500, 'PDF_GENERATION_ERROR');
@@ -503,6 +505,7 @@ router.get('/public/:displayId', asyncHandler(async (req: AuthRequest, res: any)
     data: {
       displayId: customer.displayId,
       firstName: customer.firstName,
+      language: customer.language || 'tr',
       status: customer.status,
       pilot: customer.assignedPilot,
       flight: flight ? {
