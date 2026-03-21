@@ -826,20 +826,7 @@ router.patch('/:id/status', authenticate, asyncHandler(async (req: AuthRequest, 
         // FCM to admin: Flight started
         // (Pilot already knows - they triggered the action)
       } else if (status === 'COMPLETED') {
-        // FCM to pilot: Flight completed successfully
-        getNotificationConfig('flight_completed').then(config => {
-          if (config?.enabled) {
-            sendNativeToPilot(updatedFlight.pilot.id, {
-              title: config.title || '✅ Uçuş Tamamlandı',
-              body: config.body ? config.body.replace('{customer}', eventData.customer.name).replace('{displayId}', eventData.customer.displayId).replace('{duration}', String(updatedFlight.durationMinutes || 0)) : `${eventData.customer.name} (${eventData.customer.displayId}) - ${updatedFlight.durationMinutes || 0}dk`,
-              data: {
-                type: 'flight_completed',
-                flightId: updatedFlight.id,
-                customerId: eventData.customer.displayId,
-              },
-            }).catch(err => console.error('FCM flight completed error:', err));
-          }
-        });
+        // Pilot triggered this action — no FCM notification needed
       }
 
       // Check if pilot is approaching/reached limit

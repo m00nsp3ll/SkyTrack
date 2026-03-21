@@ -398,7 +398,6 @@ export const pilotQueueService = {
       });
 
       // Invalidate caches (both old and new pilot)
-      const oldPilotId = customer.flights[0].pilotId;
       await cache.pilotQueue.invalidate();
       await cache.pilot.invalidate(pilot.id);
       if (oldPilotId !== pilot.id) {

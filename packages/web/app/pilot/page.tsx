@@ -505,7 +505,7 @@ export default function PilotPanel() {
                             ) : (
                               <>
                                 <CheckCircle className="h-5 w-5 mr-2" />
-                                Uçuş Tamamlandı
+                                Güvenli İniş
                               </>
                             )}
                           </Button>
