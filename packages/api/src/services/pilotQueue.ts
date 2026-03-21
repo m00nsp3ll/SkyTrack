@@ -274,7 +274,13 @@ export const pilotQueueService = {
   ): Promise<Pilot | null> {
     const customer = await prisma.customer.findUnique({
       where: { id: customerId },
-      include: { flights: { where: { status: 'ASSIGNED' } } },
+      include: {
+        flights: {
+          where: { status: { in: ['ASSIGNED', 'PICKED_UP', 'IN_FLIGHT'] } },
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+        },
+      },
     });
 
     if (!customer) {
@@ -391,19 +397,34 @@ export const pilotQueueService = {
         }
       });
 
-      // Invalidate caches
+      // Invalidate caches (both old and new pilot)
+      const oldPilotId = customer.flights[0].pilotId;
       await cache.pilotQueue.invalidate();
       await cache.pilot.invalidate(pilot.id);
+      if (oldPilotId !== pilot.id) {
+        await cache.pilot.invalidate(oldPilotId);
+      }
 
       // Notify via Socket.IO
       if (io) {
+        // Notify new pilot — trigger panel refresh
         io.to(`pilot:${pilot.id}`).emit('customer:assigned', {
           customer: {
             id: customerId,
             displayId: customer.displayId,
-            name: `${customer.firstName} ${customer.lastName}`,
+            firstName: customer.firstName,
+            lastName: customer.lastName,
+            weight: customer.weight,
           },
         });
+
+        // Notify old pilot — they lost the customer, refresh their panel
+        if (oldPilotId !== pilot.id) {
+          io.to(`pilot:${oldPilotId}`).emit('flight:updated', {});
+        }
+
+        // Notify admins so the main board updates
+        io.to('admin').emit('customer:updated', { customerId });
 
         // Send notification to new pilot
         const customerName = `${customer.firstName} ${customer.lastName}`;
