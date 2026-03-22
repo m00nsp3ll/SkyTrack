@@ -527,19 +527,28 @@ export default function PilotPanel() {
             Tamamlanan Uçuşlar ({completedFlights.length})
           </h2>
           <div className="space-y-2">
-            {completedFlights.slice(0, 5).map((flight) => (
+            {[...completedFlights].reverse().slice(0, 5).map((flight, index) => {
+              const flightNumber = completedFlights.length - index
+              return (
               <Card key={flight.id} className="bg-green-50">
                 <CardContent className="p-3">
                   <div className="flex items-center justify-between mb-2">
                     <div>
                       <p className="font-medium">
                         {flight.customer.firstName} {flight.customer.lastName}
+                        <span className="text-xs text-muted-foreground ml-1">· {flight.customer.weight} kg</span>
                       </p>
                       <p className="text-xs text-muted-foreground">
                         {flight.customer.displayId}
+                        <span className="ml-2">
+                          {new Date(flight.createdAt).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
+                        </span>
                       </p>
                     </div>
-                    <CheckCircle className="h-5 w-5 text-green-600" />
+                    <div className="flex items-center gap-1">
+                      <span className="text-xs font-bold text-green-700">{flightNumber}.</span>
+                      <CheckCircle className="h-5 w-5 text-green-600" />
+                    </div>
                   </div>
                   <Button
                     variant="outline"
@@ -555,7 +564,8 @@ export default function PilotPanel() {
                   </Button>
                 </CardContent>
               </Card>
-            ))}
+              )
+            })}
           </div>
         </div>
       )}

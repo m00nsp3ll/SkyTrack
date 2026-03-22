@@ -71,6 +71,7 @@ model User {
   username          String             @unique
   name              String?
   passwordHash      String             @map("password_hash")
+  plainPassword     String?            @map("plain_password")
   role              UserRole
   isActive          Boolean            @default(true) @map("is_active")
   pilotId           String?            @unique @map("pilot_id")

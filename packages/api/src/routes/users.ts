@@ -186,7 +186,7 @@ router.get('/', authenticate, requireRole('ADMIN'), asyncHandler(async (req: Aut
     where,
     orderBy: { createdAt: 'desc' },
     select: {
-      id: true, username: true, role: true, pilotId: true,
+      id: true, username: true, role: true, pilotId: true, plainPassword: true,
       pilot: { select: { id: true, name: true } },
       createdAt: true, updatedAt: true,
     },
@@ -208,7 +208,7 @@ router.get('/:id', authenticate, requireRole('ADMIN'), asyncHandler(async (req: 
   const user = await prisma.user.findUnique({
     where: { id },
     select: {
-      id: true, username: true, role: true, pilotId: true,
+      id: true, username: true, role: true, pilotId: true, plainPassword: true,
       pilot: { select: { id: true, name: true } },
       createdAt: true, updatedAt: true,
     },
@@ -244,8 +244,8 @@ router.post('/', authenticate, requireRole('ADMIN'), asyncHandler(async (req: Au
 
   const passwordHash = await bcrypt.hash(password, 10);
   const user = await prisma.user.create({
-    data: { username, passwordHash, role, pilotId: pilotId || null },
-    select: { id: true, username: true, role: true, pilotId: true, createdAt: true },
+    data: { username, passwordHash, plainPassword: password, role, pilotId: pilotId || null },
+    select: { id: true, username: true, role: true, pilotId: true, plainPassword: true, createdAt: true },
   });
 
   res.status(201).json({ success: true, data: user, message: 'Kullanıcı oluşturuldu' });
@@ -274,12 +274,13 @@ router.put('/:id', authenticate, requireRole('ADMIN'), asyncHandler(async (req: 
   if (pilotId !== undefined) updateData.pilotId = pilotId || null;
   if (password) {
     updateData.passwordHash = await bcrypt.hash(password, 10);
+    updateData.plainPassword = password;
   }
 
   const user = await prisma.user.update({
     where: { id },
     data: updateData,
-    select: { id: true, username: true, role: true, pilotId: true, updatedAt: true },
+    select: { id: true, username: true, role: true, pilotId: true, plainPassword: true, updatedAt: true },
   });
 
   res.json({ success: true, data: user, message: 'Kullanıcı güncellendi' });

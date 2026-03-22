@@ -1008,6 +1008,28 @@ router.get(
     const latestFlight = customer.flights[0];
     const mediaFolder = latestFlight?.mediaFolder;
 
+    // Calculate sorti number: how many completed flights the pilot had up to and including this flight
+    let sortiNumber: number | null = null;
+    if (latestFlight) {
+      const flightDate = new Date(latestFlight.createdAt);
+      const dayStart = new Date(flightDate);
+      dayStart.setHours(0, 0, 0, 0);
+      const dayEnd = new Date(flightDate);
+      dayEnd.setHours(23, 59, 59, 999);
+      sortiNumber = await prisma.flight.count({
+        where: {
+          pilotId: latestFlight.pilotId,
+          createdAt: { gte: dayStart, lte: latestFlight.createdAt },
+        },
+      });
+    }
+
+    // Check for unpaid Foto/Video sale
+    const unpaidMediaSale = await prisma.sale.findFirst({
+      where: { customerId: customer.id, itemType: 'Foto/Video', paymentStatus: 'UNPAID' },
+      select: { id: true },
+    });
+
     res.json({
       success: true,
       data: {
@@ -1020,6 +1042,7 @@ router.get(
           id: latestFlight.id,
           status: latestFlight.status,
           pilotName: latestFlight.pilot.name,
+          sortiNumber,
           assignedAt: latestFlight.createdAt,
           pickupAt: (latestFlight as any).pickupAt,
           takeoffAt: latestFlight.takeoffAt,
@@ -1034,6 +1057,7 @@ router.get(
           paymentStatus: mediaFolder.paymentStatus,
           deliveryStatus: mediaFolder.deliveryStatus,
         } : null,
+        hasPendingMediaSale: !!unpaidMediaSale,
       },
     });
   })

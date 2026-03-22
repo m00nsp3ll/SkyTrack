@@ -160,6 +160,24 @@
 - [x] Beni Hatırla login özelliği (default seçili, 1 ay credentials saklar)
 - [x] Mobile sidebar safe area düzeltmesi (Android nav bar üstüne binen buton)
 
+### Medya POS & Dashboard Güncellemeleri (2026-03-22)
+- [x] Medya klasör yolları UUID'den doğru formata düzeltildi (media/DD-MM-YYYY/PilotAdi/X.Sorti/DisplayId)
+- [x] /admin/media/pos — "HAVADAKI MÜŞTERİLER" aktif uçuş barı kaldırıldı
+- [x] /admin/media/pos — Manuel para birimi butonları her zaman renkli
+- [x] /admin/media/pos — Boş ekran: SkyTrack logosu + büyük renkli QR Tara butonu
+- [x] /admin/media/pos — Çift QR tarayıcı hatası düzeltildi (scannerRef guard)
+- [x] /admin/media/pos — Arama barı renklendirildi (beyaz, mavi aksan)
+- [x] /admin/media/pos — Sağ panel 4 adımlı durum: Ödeme bekleniyor → Ödeme yapıldı → İndirmeye hazır → İndirildi
+- [x] /admin/media/pos — QR kodu isPaid olunca otomatik yükleniyor (useEffect)
+- [x] /admin/media/pos — isSentToCashier: sentToCashier || hasPendingMediaSale (sayfa yenilemede kalıcı)
+- [x] /admin/media — Kasa raporu modal'dan inline karta taşındı (bar chart yanında)
+- [x] /admin/media — Default filtre "Bugün" + gün bazlı date picker eklendi
+- [x] /admin/media — Teslim toggle (DELIVERED/READY) düzeltildi (await + error alert)
+- [x] /c/[displayId] — Uçak ikonu → SkyTrack logosu
+- [x] /c/[displayId] — hasPendingPayment: UNPAID satış varsa "Ödeme Bekleniyor" ekranı
+- [x] API: GET /api/media/:customerId — hasPendingMediaSale alanı eklendi
+- [x] API: GET /api/customers/public/:displayId — hasPendingPayment alanı eklendi
+
 ### Medya Yönetimi
 - [x] Medya yükleme sistemi
 - [x] Medya klasör tarama

@@ -39,6 +39,7 @@ interface User {
   role: 'ADMIN' | 'OFFICE_STAFF' | 'PILOT' | 'MEDIA_SELLER' | 'CUSTOM'
   isActive: boolean
   pilotId: string | null
+  plainPassword: string | null
   pilot: { id: string; name: string } | null
   createdAt: string
   _count: {
@@ -232,6 +233,7 @@ export default function StaffPage() {
   const openAddModal = () => {
     setEditingUser(null)
     setFormData({ username: '', password: '', role: 'OFFICE_STAFF', pilotId: '' })
+    setShowPassword(false)
     setShowModal(true)
   }
 
@@ -239,10 +241,11 @@ export default function StaffPage() {
     setEditingUser(user)
     setFormData({
       username: user.username,
-      password: '',
+      password: user.plainPassword || '',
       role: user.role,
       pilotId: user.pilotId || '',
     })
+    setShowPassword(false)
     setShowModal(true)
   }
 
@@ -938,18 +941,20 @@ export default function StaffPage() {
                     type={showPassword ? 'text' : 'password'}
                     value={formData.password}
                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    placeholder="••••••••"
+                    placeholder={editingUser ? 'Değiştirmek için yeni şifre gir' : '••••••••'}
                     required={!editingUser}
                   />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="absolute right-0 top-0"
-                    onClick={() => setShowPassword(!showPassword)}
-                  >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </Button>
+                  {formData.password && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-0 top-0"
+                      onClick={() => setShowPassword(!showPassword)}
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </Button>
+                  )}
                 </div>
               </div>
 

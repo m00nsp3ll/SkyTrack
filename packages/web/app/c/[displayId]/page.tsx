@@ -31,6 +31,7 @@ interface CustomerData {
     fileCount: number
     deliveryStatus: string
     canDownload: boolean
+    hasPendingPayment: boolean
   } | null
 }
 
@@ -540,8 +541,8 @@ export default function CustomerDownloadPage() {
     <div className="min-h-screen bg-gradient-to-b from-sky-100 to-sky-50 p-4" dir={isRtl ? 'rtl' : 'ltr'}>
       <div className="max-w-md mx-auto space-y-4">
         <div className="text-center pt-8 pb-4">
-          <div className="inline-block bg-white rounded-full p-4 shadow-lg mb-4">
-            <Plane className="w-12 h-12 text-sky-600" />
+          <div className="inline-block mb-4">
+            <img src="/skytrack-logo.png" alt="SkyTrack" className="w-20 h-20 rounded-2xl shadow-lg object-cover" />
           </div>
           <h1 className="text-2xl font-bold text-gray-800">{txt.title}</h1>
           <p className="text-gray-600">{txt.subtitle}</p>
@@ -622,7 +623,7 @@ export default function CustomerDownloadPage() {
                       {txt.zipNote}
                     </p>
                   </>
-                ) : data.media && data.media.fileCount > 0 ? (
+                ) : data.media && (data.media.fileCount > 0 || data.media.hasPendingPayment) ? (
                   <>
                     <div className="inline-block bg-orange-100 rounded-full p-4 mb-4">
                       <Lock className="w-10 h-10 text-orange-600" />

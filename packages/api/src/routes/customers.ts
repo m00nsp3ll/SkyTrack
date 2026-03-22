@@ -468,6 +468,7 @@ router.get('/public/:displayId', asyncHandler(async (req: AuthRequest, res: any)
       displayId: true,
       firstName: true,
       status: true,
+      language: true,
       assignedPilot: {
         select: { id: true, name: true },
       },
@@ -500,6 +501,18 @@ router.get('/public/:displayId', asyncHandler(async (req: AuthRequest, res: any)
   const flight = customer.flights[0] || null;
   const mediaFolder = flight?.mediaFolder || null;
 
+  // Check if there is an unpaid Foto/Video sale for this customer
+  const unpaidMediaSale = await prisma.sale.findFirst({
+    where: {
+      customerId: customer.id,
+      itemType: 'Foto/Video',
+      paymentStatus: 'UNPAID',
+    },
+    select: { id: true },
+  });
+
+  const hasPendingPayment = !!unpaidMediaSale;
+
   res.json({
     success: true,
     data: {
@@ -513,10 +526,11 @@ router.get('/public/:displayId', asyncHandler(async (req: AuthRequest, res: any)
         takeoffAt: flight.takeoffAt,
         landingAt: flight.landingAt,
       } : null,
-      media: mediaFolder ? {
-        fileCount: mediaFolder.fileCount,
-        deliveryStatus: mediaFolder.deliveryStatus,
-        canDownload: mediaFolder.paymentStatus === 'PAID' || mediaFolder.deliveryStatus === 'DELIVERED',
+      media: (mediaFolder || hasPendingPayment) ? {
+        fileCount: mediaFolder?.fileCount ?? 0,
+        deliveryStatus: mediaFolder?.deliveryStatus ?? 'PENDING',
+        canDownload: mediaFolder?.paymentStatus === 'PAID' || mediaFolder?.deliveryStatus === 'DELIVERED',
+        hasPendingPayment,
       } : null,
     },
   });

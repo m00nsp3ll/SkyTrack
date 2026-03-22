@@ -1,79 +1,58 @@
 # Active Context - SkyTrack
 
-## Son Çalışma Oturumu: 2026-03-21 (Oturum 29)
+## Son Çalışma Oturumu: 2026-03-22 (Oturum 30)
 
 ### Yapılan İşler
 
-1. **Sistem Düzeltmesi (Port Çakışması)** ✅
-   - PostgreSQL port 5432 çakışması: Homebrew postgresql@16 Docker'ı engelliyordu
-   - `start-all.sh` güncellendi: Homebrew PG otomatik durdurulur, eski process temizlenir
-   - `docker-compose.yml`: postgres:16-alpine → postgres:14-alpine
-   - `.env`: DATABASE_URL'den connection_limit parametreleri kaldırıldı
-   - Tüm demo data (38 pilot, 17 ürün, kullanıcılar) git seed'den geri yüklendi
+1. **Medya Klasör Yolları Düzeltmesi** ✅
+   - Eski UUID formatındaki klasör yolları (`media/pilot_<uuid>/customer_<uuid>`) doğru formata çevrildi
+   - Doğru format: `media/DD-MM-YYYY/PilotName/X.Sorti/DisplayId`
+   - `packages/api/scripts/fix-folder-paths.ts` scripti oluşturuldu ve çalıştırıldı (4 kayıt güncellendi)
+   - `packages/api/scripts/create-media-folders.ts` scripti: fiziksel klasörler oluşturuldu
 
-2. **Mobile Sidebar Safe Area Düzeltmesi** ✅
-   - Android navigation bar üzerine binen "Çıkış Yap" butonu düzeltildi
-   - `Sidebar.tsx`: paddingBottom: max(1.5rem, env(safe-area-inset-bottom))
-   - `Header.tsx`: paddingTop: env(safe-area-inset-top)
-   - `layout.tsx`: Mobile sidebar height: 100dvh + safe area padding
+2. **Medya POS Sayfası Büyük Güncellemesi** ✅
+   - "HAVADAKI MÜŞTERİLER" aktif uçuş barı kaldırıldı
+   - Manuel para birimi butonları her zaman renkli (önceden seçili olmayan soluktu)
+   - Boş ekran: kamera ikonu yerine SkyTrack logosu + büyük renkli QR Tara butonu
+   - Çift QR tarayıcı hatası düzeltildi: `if (scannerRef.current) return` guard eklendi
+   - Arama barı renklendirildi: beyaz arka plan, `border-blue-200`, mavi Ara butonu
+   - Sağ panel 4 adımlı durum göstergesi: "Ödeme bekleniyor → Ödeme yapıldı → İndirmeye hazır → İndirildi"
+   - QR kodu ödeme onaylandığında otomatik yükleniyor (`useEffect` ile `isPaid` tetiklenir)
 
-3. **"Beni Hatırla" Login Özelliği** ✅
-   - Default seçili checkbox, 1 ay boyunca credentials localStorage'da saklar
-   - `login/page.tsx`: savedCredentials key'i, checkbox UI eklendi
+3. **"Kasaya Yönlendir" Sistemi Düzeltmesi** ✅
+   - UNPAID satış oluşturur (`POST /api/sales` → `paymentStatus: 'UNPAID'`)
+   - `sentToCashier` state + `hasPendingMediaSale` API alanı ile UI güncelleniyor
+   - `isSentToCashier = sentToCashier || hasPendingMediaSale` (sayfa yenilemede de devam eder)
+   - Müşteri (`/c/[displayId]`) sayfasında "Ödeme Bekleniyor" ekranı gösterilir
+   - Hata mesajı: `err.response?.data?.message || err.response?.data?.error?.message`
 
-4. **Foto/Video Kasaya Yönlendirme Sistemi** ✅
-   - Foto/Video satış elemanı ödeme alamaz, sadece "Kasaya Yönlendir" yapar
-   - UNPAID satış oluşturulur, kasa ödemeyi kendi POS'undan alır
-   - Çoklu para birimi kiosk UI: EUR/USD/GBP/RUB/TRY büyük renkli butonlar
-   - Kasaya yönlendirme sonrası: download link + QR butonu gösterilir
-   - `canCollectPayment`: sadece ADMIN ve OFFICE_STAFF tahsilat yapabilir
+4. **Medya Dashboard (`/admin/media`) Güncellemeleri** ✅
+   - Kasa raporu modal'dan inline karta taşındı (bar chart'ın yanında `lg:col-span-2`)
+   - Default filtre: "Bugün" + yanında gün bazlı date picker
+   - `selectedDate` state (today'e initialize) + `getDateParams` güncellendi
+   - Teslim toggle (`handleDeliveryToggle`): `await` eklendi, hata alert'i düzeltildi
+   - Pilot özeti ve müşteri tablosu boş görünme sorunu: date picker ile çözüldü
 
-5. **Müşteri Download Sayfası 10 Dil Desteği** ✅
-   - `/c/[displayId]` sayfası müşterinin kayıt dilinde gösterilir
-   - AR ve FA için RTL layout desteği
-   - Auto-download döngüsü kaldırıldı (sadece butonla indirme)
-   - Teslim edildi otomatik: indirme tamamlandığında işaretlenir
+5. **Müşteri Download Sayfası (`/c/[displayId]`)** ✅
+   - Uçak ikonu → SkyTrack logosu (w-20 h-20, rounded-2xl)
+   - `hasPendingPayment` alanı eklendi (UNPAID satış varsa "Ödeme Bekleniyor" göster)
+   - Render koşulu: `data.media && (data.media.fileCount > 0 || data.media.hasPendingPayment)`
 
-6. **Risk Formu PDF Çok Dil** ✅
-   - `waiverPdf.ts`: TR, EN, RU, DE, FR dillerinde PDF üretimi
-   - ASCII transliteration (pdfkit Helvetica font uyumlu)
-   - Diğer diller EN'e fallback yapar
-
-7. **Kasa Raporu Para Birimi Düzeltmesi** ✅
-   - Saatlik rapor timezone düzeltmesi: `process.env.TZ = 'Europe/Istanbul'`
-   - Günlük rapor yeni güne doğru geçer (Türkiye saatine göre)
-   - İşlem listesinde orijinal para birimi önce, EUR karşılığı alt satırda
-
-8. **POS Para Birimi Kayıt Hatası Düzeltmesi** ✅
-   - $100 USD → €86.67 kaydediliyor hatasını düzeltildi
-   - `sales.ts` create: `productCurrency` artık `currency` parametresini kullanır (hardcoded EUR değil)
-   - `unitPrice: priceNum` (orijinal para birimi miktarı, EUR'a çevrilmemiş)
-   - UNPAID satışlar artık EUR'a zorlanmıyor
-   - Bulk pay ve single pay: gerçek ödeme para birimimden EUR/TRY hesabı
-
-9. **Kod Temizliği** ✅
-   - `customers/[id]/page.tsx`: handleMarkDelivered, socket state, setPosFavorites, markingDelivered, getAvailableCurrencies kaldırıldı
-   - Socket import'tan `Socket` type kaldırıldı
+6. **API Güncellemeleri** ✅
+   - `GET /api/media/:customerId`: `hasPendingMediaSale` alanı eklendi
+   - `GET /api/customers/public/:displayId`: `hasPendingPayment` alanı eklendi
 
 ### Değiştirilen Dosyalar
 
 | Dosya | İşlem |
 |-------|-------|
-| `scripts/start-all.sh` | Homebrew PG durdurma, process temizleme eklendi |
-| `docker-compose.yml` | postgres:16 → postgres:14 |
-| `.env` | DATABASE_URL parametreleri temizlendi |
-| `packages/web/app/(auth)/login/page.tsx` | Beni Hatırla checkbox (default checked) |
-| `packages/web/components/layout/Sidebar.tsx` | Safe area inset bottom |
-| `packages/web/components/layout/Header.tsx` | Safe area inset top |
-| `packages/web/app/(dashboard)/layout.tsx` | Mobile sidebar 100dvh |
-| `packages/web/app/(dashboard)/admin/customers/[id]/page.tsx` | Kasaya yönlendir, çoklu para birimi, kod temizliği |
-| `packages/web/app/c/[displayId]/page.tsx` | 10 dil, RTL, auto-download kaldırıldı |
-| `packages/web/app/(dashboard)/admin/sales/daily/page.tsx` | Orijinal para birimi gösterimi |
-| `packages/web/app/(dashboard)/admin/sales/unpaid/page.tsx` | primaryCurrency gösterimi |
-| `packages/api/src/routes/sales.ts` | Para birimi kayıt hatası düzeltmesi |
-| `packages/api/src/routes/customers.ts` | language API'ye eklendi |
-| `packages/api/src/services/waiverPdf.ts` | 5 dil PDF desteği |
-| `packages/api/src/index.ts` | TZ = Europe/Istanbul |
+| `packages/web/app/(dashboard)/admin/media/pos/page.tsx` | Büyük güncelleme (aktif bar kaldırma, QR otomatik yükleme, 4 adım durum, renklendirme) |
+| `packages/web/app/(dashboard)/admin/media/page.tsx` | Kasa raporu inline, date picker, delivery toggle düzeltmesi |
+| `packages/web/app/c/[displayId]/page.tsx` | SkyTrack logosu, hasPendingPayment eklendi |
+| `packages/api/src/routes/media.ts` | hasPendingMediaSale eklendi |
+| `packages/api/src/routes/customers.ts` | hasPendingPayment eklendi (public endpoint) |
+| `packages/api/scripts/fix-folder-paths.ts` | Oluşturuldu, tek seferlik çalıştırıldı |
+| `packages/api/scripts/create-media-folders.ts` | Oluşturuldu, tek seferlik çalıştırıldı |
 
 ### Sonraki Adımlar
 

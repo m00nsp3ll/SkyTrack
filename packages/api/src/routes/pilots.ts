@@ -245,11 +245,11 @@ router.get('/:id/panel', authenticate, asyncHandler(async (req: AuthRequest, res
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  const todayFlights = await prisma.flight.findMany({
+  // Active flights: no date filter — a reassigned flight may have been created yesterday
+  const activeFlights = await prisma.flight.findMany({
     where: {
       pilotId: id,
-      createdAt: { gte: today },
-      status: { not: 'CANCELLED' },
+      status: { in: ['ASSIGNED', 'PICKED_UP', 'IN_FLIGHT'] },
     },
     include: {
       customer: {
@@ -267,9 +267,28 @@ router.get('/:id/panel', authenticate, asyncHandler(async (req: AuthRequest, res
     orderBy: { createdAt: 'asc' },
   });
 
-  // Separate by status
-  const activeFlights = todayFlights.filter(f => ['ASSIGNED', 'PICKED_UP', 'IN_FLIGHT'].includes(f.status));
-  const completedFlights = todayFlights.filter(f => f.status === 'COMPLETED');
+  // Completed flights: only today (for daily stats)
+  const completedFlights = await prisma.flight.findMany({
+    where: {
+      pilotId: id,
+      status: 'COMPLETED',
+      createdAt: { gte: today },
+    },
+    include: {
+      customer: {
+        select: {
+          id: true,
+          displayId: true,
+          firstName: true,
+          lastName: true,
+          phone: true,
+          weight: true,
+          createdAt: true,
+        },
+      },
+    },
+    orderBy: { createdAt: 'asc' },
+  });
 
   // Calculate ACTUAL completed flight count for today
   const actualDailyFlightCount = completedFlights.length;
