@@ -9,6 +9,7 @@ import { cache } from '../services/cache.js';
 import { displayIdService } from '../services/displayId.js';
 import { generateWaiverPdf, getWaiverPdfPath, waiverPdfExists } from '../services/waiverPdf.js';
 import { getLocalIP } from '../utils/networkUtils.js';
+import { qnap } from '../services/qnapService.js';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -52,6 +53,8 @@ router.get('/', authenticate, asyncHandler(async (req: AuthRequest, res: any) =>
   const {
     status,
     date,
+    from,
+    to,
     search,
     cursor,
     limit = '20',
@@ -67,15 +70,19 @@ router.get('/', authenticate, asyncHandler(async (req: AuthRequest, res: any) =>
     where.status = status;
   }
 
-  // Filter by date (only if explicitly provided)
-  let startOfDay: Date | null = null;
-  let endOfDay: Date | null = null;
-
-  if (date) {
+  // Filter by date range (from/to takes precedence over date)
+  // process.env.TZ = 'Europe/Istanbul' is set in index.ts, so setHours() uses Turkey time
+  if (from || to) {
+    const fromDate = from ? new Date(from as string) : new Date(0);
+    if (from) fromDate.setHours(0, 0, 0, 0);
+    const toDate = to ? new Date(to as string) : new Date();
+    toDate.setHours(23, 59, 59, 999);
+    where.createdAt = { gte: fromDate, lte: toDate };
+  } else if (date) {
     const filterDate = new Date(date as string);
-    startOfDay = new Date(filterDate);
+    const startOfDay = new Date(filterDate);
     startOfDay.setHours(0, 0, 0, 0);
-    endOfDay = new Date(filterDate);
+    const endOfDay = new Date(filterDate);
     endOfDay.setHours(23, 59, 59, 999);
     where.createdAt = { gte: startOfDay, lte: endOfDay };
   }
@@ -297,6 +304,21 @@ router.post('/', authenticate, requireRole('ADMIN', 'OFFICE_STAFF'), asyncHandle
       assignedPilot: { select: { id: true, name: true } },
     },
   });
+
+  // QNAP NAS'ta müşteri klasörü oluştur (hata olsa da kayıt devam eder)
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const pilotName = updatedCustomer?.assignedPilot?.name || 'Pilot_Yok';
+    const folderPath = await qnap.createCustomerFolder(today, pilotName, customer.displayId);
+    if (folderPath) {
+      await prisma.customer.update({
+        where: { id: customer.id },
+        data: { mediaFolderPath: folderPath },
+      });
+    }
+  } catch (err) {
+    console.error('[QNAP] Klasör oluşturma hatası, kayıt devam ediyor:', err);
+  }
 
   res.status(201).json({
     success: true,

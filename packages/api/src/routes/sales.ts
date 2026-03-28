@@ -487,10 +487,15 @@ router.patch('/:id/payment', authenticate, asyncHandler(async (req: AuthRequest,
   const cur: Currency = payCurrency || (existing.primaryCurrency as Currency) || 'EUR';
   const method = paymentMethod || 'CASH';
 
-  // Recalculate amounts based on actual payment currency
-  const payAmount = existing.totalPrice; // original price in original currency
-  const totalAmountEUR = cur === 'EUR' ? payAmount : convertAmount(payAmount, cur, 'EUR').converted;
-  const totalAmountTRY = cur === 'TRY' ? payAmount : convertAmount(payAmount, cur, 'TRY').converted;
+  // totalAmountEUR/TRY are based on the product's original pricing — do NOT recalculate
+  // based on payment currency (e.g. paying 60.57 GBP for a 70 EUR product should keep EUR=70)
+  const totalAmountEUR = existing.totalAmountEUR ?? existing.totalPrice;
+  const totalAmountTRY = existing.totalAmountTRY ?? 0;
+
+  // The actual amount paid in the chosen currency: convert from EUR to payment currency
+  const payAmount = cur === 'EUR'
+    ? totalAmountEUR
+    : convertAmount(totalAmountEUR, 'EUR', cur).converted;
 
   const sale = await prisma.sale.update({
     where: { id },
@@ -577,9 +582,12 @@ router.post('/bulk-pay/:customerId', authenticate, asyncHandler(async (req: Auth
     for (const sale of unpaidSales) {
       // Use payment currency if provided, otherwise keep sale's original currency
       const saleCur: Currency = cur || (sale.primaryCurrency as Currency) || 'EUR';
-      const payAmount = sale.totalPrice;
-      const totalAmountEUR = saleCur === 'EUR' ? payAmount : convertAmount(payAmount, saleCur, 'EUR').converted;
-      const totalAmountTRY = saleCur === 'TRY' ? payAmount : convertAmount(payAmount, saleCur, 'TRY').converted;
+      // Keep EUR/TRY amounts from original pricing — do NOT recalculate based on payment currency
+      const totalAmountEUR = sale.totalAmountEUR ?? sale.totalPrice;
+      const totalAmountTRY = sale.totalAmountTRY ?? 0;
+      const payAmount = saleCur === 'EUR'
+        ? totalAmountEUR
+        : convertAmount(totalAmountEUR, 'EUR', saleCur).converted;
 
       await tx.sale.update({
         where: { id: sale.id },

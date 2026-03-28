@@ -31,6 +31,7 @@ import pushRoutes from './routes/push.js';
 import fcmRoutes from './routes/fcm.js';
 import currencyRoutes from './routes/currency.js';
 import networkRoutes from './routes/network.js';
+import nasRoutes from './routes/nas.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { setupSocket } from './socket/index.js';
 import { setupCronJobs } from './cron/dailyReset.js';
@@ -156,6 +157,7 @@ app.use('/api/push', pushRoutes);
 app.use('/api/fcm', fcmRoutes);
 app.use('/api/currency', currencyRoutes);
 app.use('/api/network', networkRoutes);
+app.use('/api/nas', nasRoutes);
 
 // Error handler
 app.use(errorHandler);

@@ -287,6 +287,62 @@ router.get('/pilots', authenticate, asyncHandler(async (req: AuthRequest, res: a
   });
 }));
 
+// GET /api/reports/pilots/:pilotId/flights - Pilot flight detail
+router.get('/pilots/:pilotId/flights', authenticate, asyncHandler(async (req: AuthRequest, res: any) => {
+  const { pilotId } = req.params;
+  const { from, to } = req.query;
+
+  const fromDate = from ? new Date(from as string) : new Date(new Date().setDate(new Date().getDate() - 30));
+  fromDate.setHours(0, 0, 0, 0);
+  const toDate = to ? new Date(to as string) : new Date();
+  toDate.setHours(23, 59, 59, 999);
+
+  const pilot = await prisma.pilot.findUnique({
+    where: { id: pilotId },
+    select: { id: true, name: true },
+  });
+
+  if (!pilot) {
+    throw new AppError('Pilot bulunamadı', 404);
+  }
+
+  const flights = await prisma.flight.findMany({
+    where: {
+      pilotId,
+      status: { in: ['COMPLETED', 'CANCELLED'] },
+      createdAt: { gte: fromDate, lte: toDate },
+    },
+    select: {
+      id: true,
+      status: true,
+      takeoffAt: true,
+      landingAt: true,
+      durationMinutes: true,
+      createdAt: true,
+      customer: {
+        select: {
+          id: true,
+          displayId: true,
+          firstName: true,
+          lastName: true,
+          weight: true,
+          phone: true,
+        },
+      },
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+
+  res.json({
+    success: true,
+    data: {
+      pilot,
+      flights,
+      dateRange: { from: fromDate, to: toDate },
+    },
+  });
+}));
+
 // GET /api/reports/revenue - Revenue report
 router.get('/revenue', authenticate, asyncHandler(async (req: AuthRequest, res: any) => {
   const { from, to } = req.query;

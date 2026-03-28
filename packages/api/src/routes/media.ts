@@ -1586,13 +1586,47 @@ router.post(
           },
         },
       },
-    });
+    }) as any;
 
     if (!customer) {
       throw new AppError('Müşteri bulunamadı', 404, 'CUSTOMER_NOT_FOUND');
     }
 
-    // Get folder path from mediaFolders or flight's mediaFolder
+    // NAS yolu varsa SMB ile aç (ofis bilgisayarı NAS'a mount edilmiş)
+    const nasPath = (customer as any).mediaFolderPath;
+    if (nasPath) {
+      // NAS path: /share/skytrack-media/2026-03-28/PilotAdi/A0043
+      // SMB path: smb://192.168.1.111/skytrack-media/2026-03-28/PilotAdi/A0043
+      const nasBase = process.env.QNAP_MEDIA_PATH || '/share/skytrack-media';
+      const relativePart = nasPath.replace(nasBase, '');
+      const nasHost = process.env.QNAP_SSH_HOST || '192.168.1.111';
+      const smbPath = `smb://${nasHost}/skytrack-media${relativePart}`;
+
+      const platform = process.platform;
+      const command = platform === 'darwin'
+        ? `open "${smbPath}"`
+        : platform === 'win32'
+        ? `explorer "${smbPath.replace('smb://', '\\\\').replace(/\//g, '\\')}"`
+        : `xdg-open "${smbPath}"`;
+
+      exec(command, (error) => {
+        if (error) {
+          console.error('Failed to open NAS folder:', error);
+          return res.status(500).json({
+            success: false,
+            error: { message: 'NAS klasörü açılamadı: ' + smbPath },
+          });
+        }
+        res.json({
+          success: true,
+          data: { path: smbPath, type: 'nas' },
+          message: 'NAS klasörü açıldı',
+        });
+      });
+      return;
+    }
+
+    // NAS yolu yoksa eski lokal yolu kullan
     let folderPath = customer.mediaFolders[0]?.folderPath ||
                      customer.flights[0]?.mediaFolder?.folderPath;
 
@@ -1600,17 +1634,14 @@ router.post(
       throw new AppError('Medya klasörü bulunamadı', 404, 'FOLDER_NOT_FOUND');
     }
 
-    // Make absolute path - use process.cwd() which is packages/api when running dev
     const absolutePath = path.resolve(process.cwd(), folderPath);
 
-    // Check if folder exists
     try {
       await fs.access(absolutePath);
     } catch {
       throw new AppError('Klasör bulunamadı: ' + absolutePath, 404, 'FOLDER_NOT_EXISTS');
     }
 
-    // Open in Finder (macOS) or file explorer (Windows/Linux)
     const platform = process.platform;
     let command: string;
 

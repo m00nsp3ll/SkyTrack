@@ -1,13 +1,13 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import {
   Users,
-  Plane,
   Clock,
   TrendingUp,
   RefreshCw,
@@ -24,11 +24,6 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  RadarChart,
-  PolarGrid,
-  PolarAngleAxis,
-  PolarRadiusAxis,
-  Radar,
 } from 'recharts'
 
 interface PilotStats {
@@ -55,20 +50,41 @@ interface ReportData {
   dateRange: { from: string; to: string }
 }
 
+type QuickFilter = 'today' | 'week' | 'month' | 'custom'
+
+function getQuickDates(filter: QuickFilter): { from: string; to: string } {
+  const today = new Date()
+  const to = today.toISOString().split('T')[0]
+  if (filter === 'today') {
+    return { from: to, to }
+  }
+  if (filter === 'week') {
+    const d = new Date(today)
+    d.setDate(d.getDate() - 6)
+    return { from: d.toISOString().split('T')[0], to }
+  }
+  if (filter === 'month') {
+    const d = new Date(today)
+    d.setDate(1)
+    return { from: d.toISOString().split('T')[0], to }
+  }
+  // custom — caller handles
+  const d = new Date(today)
+  d.setDate(d.getDate() - 30)
+  return { from: d.toISOString().split('T')[0], to }
+}
+
 export default function PilotPerformanceReport() {
   const [data, setData] = useState<ReportData | null>(null)
   const [loading, setLoading] = useState(true)
-  const [dateFrom, setDateFrom] = useState(() => {
-    const d = new Date()
-    d.setDate(d.getDate() - 30)
-    return d.toISOString().split('T')[0]
-  })
-  const [dateTo, setDateTo] = useState(() => new Date().toISOString().split('T')[0])
+  const [quickFilter, setQuickFilter] = useState<QuickFilter>('month')
+  const [dateFrom, setDateFrom] = useState(() => getQuickDates('month').from)
+  const [dateTo, setDateTo] = useState(() => getQuickDates('month').to)
 
-  const fetchData = async () => {
+  const fetchData = async (from: string, to: string) => {
     setLoading(true)
     try {
-      const res = await reportsApi.getPilots(dateFrom, dateTo)
+      const res = await reportsApi.getPilots(from, to)
       setData(res.data.data)
     } catch (error) {
       console.error('Rapor hatası:', error)
@@ -78,11 +94,22 @@ export default function PilotPerformanceReport() {
   }
 
   useEffect(() => {
-    fetchData()
+    fetchData(dateFrom, dateTo)
   }, [])
 
+  const applyQuickFilter = (filter: QuickFilter) => {
+    setQuickFilter(filter)
+    if (filter !== 'custom') {
+      const { from, to } = getQuickDates(filter)
+      setDateFrom(from)
+      setDateTo(to)
+      fetchData(from, to)
+    }
+  }
+
   const handleFilter = () => {
-    fetchData()
+    setQuickFilter('custom')
+    fetchData(dateFrom, dateTo)
   }
 
   const formatDate = (dateStr: string) => {
@@ -101,7 +128,6 @@ export default function PilotPerformanceReport() {
   const balanceStatus =
     balanceScore >= 80 ? 'excellent' : balanceScore >= 60 ? 'good' : 'poor'
 
-  // Prepare chart data
   const flightChartData = data?.pilots.map((p) => ({
     name: p.name,
     flights: p.totalFlights,
@@ -113,13 +139,11 @@ export default function PilotPerformanceReport() {
     avgDuration: p.avgDuration,
   })) || []
 
-  // Radar chart data for top 5 pilots
-  const radarData = data?.pilots.slice(0, 5).map((p) => ({
-    pilot: p.name,
-    flights: p.totalFlights,
-    duration: p.avgDuration,
-    days: p.activeDays,
-  })) || []
+  const quickButtons: { label: string; value: QuickFilter }[] = [
+    { label: 'Bugün', value: 'today' },
+    { label: 'Bu Hafta', value: 'week' },
+    { label: 'Bu Ay', value: 'month' },
+  ]
 
   return (
     <div className="space-y-6">
@@ -135,19 +159,31 @@ export default function PilotPerformanceReport() {
             )}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Quick filter buttons */}
+          {quickButtons.map((btn) => (
+            <Button
+              key={btn.value}
+              variant={quickFilter === btn.value ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => applyQuickFilter(btn.value)}
+            >
+              {btn.label}
+            </Button>
+          ))}
+          <span className="text-muted-foreground text-sm">|</span>
           <Input
             type="date"
             value={dateFrom}
-            onChange={(e) => setDateFrom(e.target.value)}
-            className="w-40"
+            onChange={(e) => { setDateFrom(e.target.value); setQuickFilter('custom') }}
+            className="w-38"
           />
           <span className="text-muted-foreground">-</span>
           <Input
             type="date"
             value={dateTo}
-            onChange={(e) => setDateTo(e.target.value)}
-            className="w-40"
+            onChange={(e) => { setDateTo(e.target.value); setQuickFilter('custom') }}
+            className="w-38"
           />
           <Button onClick={handleFilter}>Filtrele</Button>
         </div>
@@ -222,7 +258,6 @@ export default function PilotPerformanceReport() {
 
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Flight Count Chart */}
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">Pilot Bazında Uçuş Sayısı</CardTitle>
@@ -247,7 +282,6 @@ export default function PilotPerformanceReport() {
           </CardContent>
         </Card>
 
-        {/* Average Duration Chart */}
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">Ortalama Uçuş Süresi (dk)</CardTitle>
@@ -299,20 +333,19 @@ export default function PilotPerformanceReport() {
                 {data?.pilots.map((pilot, index) => (
                   <tr key={pilot.id} className="border-b hover:bg-gray-50">
                     <td className="py-3 px-2">
-                      {index === 0 && (
-                        <span className="text-yellow-500 text-lg">🥇</span>
-                      )}
-                      {index === 1 && (
-                        <span className="text-gray-400 text-lg">🥈</span>
-                      )}
-                      {index === 2 && (
-                        <span className="text-amber-600 text-lg">🥉</span>
-                      )}
-                      {index > 2 && (
-                        <span className="text-muted-foreground">{index + 1}</span>
-                      )}
+                      {index === 0 && <span className="text-yellow-500 text-lg">🥇</span>}
+                      {index === 1 && <span className="text-gray-400 text-lg">🥈</span>}
+                      {index === 2 && <span className="text-amber-600 text-lg">🥉</span>}
+                      {index > 2 && <span className="text-muted-foreground">{index + 1}</span>}
                     </td>
-                    <td className="py-3 px-2 font-medium">{pilot.name}</td>
+                    <td className="py-3 px-2 font-medium">
+                      <Link
+                        href={`/admin/reports/pilots/${pilot.id}`}
+                        className="text-blue-600 hover:underline"
+                      >
+                        {pilot.name}
+                      </Link>
+                    </td>
                     <td className="py-3 px-2 text-center">
                       <span className="font-bold text-blue-600">{pilot.totalFlights}</span>
                     </td>

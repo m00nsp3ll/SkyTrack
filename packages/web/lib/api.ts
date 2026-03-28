@@ -304,6 +304,8 @@ export const reportsApi = {
   getDashboardRecent: () => api.get('/reports/dashboard/recent'),
   getPilots: (from?: string, to?: string) =>
     api.get('/reports/pilots', { params: { from, to } }),
+  getPilotFlights: (pilotId: string, from?: string, to?: string) =>
+    api.get(`/reports/pilots/${pilotId}/flights`, { params: { from, to } }),
   getRevenue: (from?: string, to?: string) =>
     api.get('/reports/revenue', { params: { from, to } }),
   getCustomers: (from?: string, to?: string) =>

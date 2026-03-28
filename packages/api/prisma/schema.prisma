@@ -126,6 +126,7 @@ model Customer {
   kvkkConsent      Boolean        @default(false) @map("kvkk_consent")
   kvkkConsentAt    DateTime?      @map("kvkk_consent_at")
   waiverPdfPath    String?        @map("waiver_pdf_path")
+  mediaFolderPath  String?        @map("media_folder_path")
   language         String         @default("tr")
   assignedPilotId  String?        @map("assigned_pilot_id")
   assignedPilot    Pilot?         @relation(fields: [assignedPilotId], references: [id])

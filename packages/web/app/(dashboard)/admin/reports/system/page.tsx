@@ -17,8 +17,10 @@ import {
   Camera,
   AlertTriangle,
   CheckCircle,
+  XCircle,
+  Wifi,
 } from 'lucide-react'
-import { reportsApi } from '@/lib/api'
+import { reportsApi, api } from '@/lib/api'
 
 interface SystemData {
   disk: {
@@ -53,6 +55,9 @@ export default function SystemMonitorPage() {
   const [data, setData] = useState<SystemData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [nasStatus, setNasStatus] = useState<{ connected: boolean; message: string } | null>(null)
+  const [nasDisk, setNasDisk] = useState<{ total: string; used: string; available: string; percent: string } | null>(null)
+  const [nasLoading, setNasLoading] = useState(false)
 
   const fetchData = async () => {
     setLoading(true)
@@ -72,9 +77,26 @@ export default function SystemMonitorPage() {
     }
   }
 
+  const fetchNasStatus = async () => {
+    setNasLoading(true)
+    try {
+      const [statusRes, diskRes] = await Promise.allSettled([
+        api.get('/nas/status'),
+        api.get('/nas/disk-usage'),
+      ])
+      if (statusRes.status === 'fulfilled') setNasStatus(statusRes.value.data.data)
+      else setNasStatus({ connected: false, message: 'NAS API isteği başarısız' })
+      if (diskRes.status === 'fulfilled') setNasDisk(diskRes.value.data.data)
+    } catch {
+      setNasStatus({ connected: false, message: 'NAS bağlantı hatası' })
+    } finally {
+      setNasLoading(false)
+    }
+  }
+
   useEffect(() => {
     fetchData()
-    // Refresh every minute
+    fetchNasStatus()
     const interval = setInterval(fetchData, 60000)
     return () => clearInterval(interval)
   }, [])
@@ -114,7 +136,7 @@ export default function SystemMonitorPage() {
             {data?.timestamp && new Date(data.timestamp).toLocaleString('tr-TR')}
           </p>
         </div>
-        <Button onClick={fetchData} variant="outline" size="sm">
+        <Button onClick={() => { fetchData(); fetchNasStatus() }} variant="outline" size="sm">
           <RefreshCw className="h-4 w-4 mr-2" />
           Yenile
         </Button>
@@ -278,6 +300,91 @@ export default function SystemMonitorPage() {
                 </div>
               </div>
             </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* NAS Durumu */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Server className="h-5 w-5" />
+              NAS Durumu — QNAP TS-873A
+            </CardTitle>
+            <Button onClick={fetchNasStatus} variant="outline" size="sm" disabled={nasLoading}>
+              <RefreshCw className={`h-4 w-4 mr-2 ${nasLoading ? 'animate-spin' : ''}`} />
+              Test Et
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Bağlantı Durumu */}
+          {nasStatus ? (
+            <div className={`flex items-center gap-3 p-3 rounded-lg ${
+              nasStatus.connected ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'
+            }`}>
+              {nasStatus.connected ? (
+                <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0" />
+              ) : (
+                <XCircle className="h-5 w-5 text-red-600 flex-shrink-0" />
+              )}
+              <div>
+                <p className={`font-semibold text-sm ${nasStatus.connected ? 'text-green-700' : 'text-red-700'}`}>
+                  {nasStatus.connected ? 'SSH Bağlantısı Aktif' : 'Bağlantı Hatası'}
+                </p>
+                <p className="text-xs text-muted-foreground">{nasStatus.message}</p>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center gap-3 p-3 rounded-lg bg-gray-50 border">
+              <Wifi className="h-5 w-5 text-gray-400" />
+              <p className="text-sm text-muted-foreground">Test edilmedi — "Test Et" butonuna tıklayın</p>
+            </div>
+          )}
+
+          {/* Disk Kullanımı */}
+          {nasDisk && (
+            <div className="space-y-2">
+              <div className="grid grid-cols-3 gap-3 text-center">
+                <div className="p-2 bg-gray-50 rounded-lg">
+                  <p className="text-lg font-bold">{nasDisk.total}</p>
+                  <p className="text-xs text-muted-foreground">Toplam</p>
+                </div>
+                <div className="p-2 bg-blue-50 rounded-lg">
+                  <p className="text-lg font-bold text-blue-700">{nasDisk.used}</p>
+                  <p className="text-xs text-blue-600">Kullanılan</p>
+                </div>
+                <div className="p-2 bg-green-50 rounded-lg">
+                  <p className="text-lg font-bold text-green-700">{nasDisk.available}</p>
+                  <p className="text-xs text-green-600">Boş</p>
+                </div>
+              </div>
+              <div>
+                <div className="flex justify-between text-xs text-muted-foreground mb-1">
+                  <span>Doluluk</span>
+                  <span className="font-semibold">{nasDisk.percent}</span>
+                </div>
+                <div className="w-full bg-gray-100 rounded-full h-2">
+                  <div
+                    className={`h-2 rounded-full transition-all ${
+                      parseInt(nasDisk.percent) > 80 ? 'bg-red-500' :
+                      parseInt(nasDisk.percent) > 60 ? 'bg-yellow-500' :
+                      'bg-green-500'
+                    }`}
+                    style={{ width: nasDisk.percent }}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* NAS Bilgileri */}
+          <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+            <span>IP: <span className="font-mono text-foreground">192.168.1.111</span></span>
+            <span>Bağlantı: <span className="font-mono text-foreground">SSH :22</span></span>
+            <span>Medya Yolu: <span className="font-mono text-foreground">/share/skytrack-media</span></span>
+            <span>Depolama: <span className="font-mono text-foreground">2×4TB NVMe + 5×24TB HDD</span></span>
           </div>
         </CardContent>
       </Card>

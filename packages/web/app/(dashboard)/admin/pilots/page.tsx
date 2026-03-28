@@ -258,10 +258,6 @@ export default function PilotsPage() {
                               <Phone className="h-3 w-3" />
                               {pilot.phone}
                             </span>
-                            <span className="flex items-center gap-1">
-                              <Plane className="h-3 w-3" />
-                              {pilot._count?.flights || 0} toplam uçuş
-                            </span>
                           </div>
                         </div>
 
@@ -328,10 +324,6 @@ export default function PilotsPage() {
                               <Phone className="h-3 w-3" />
                               {pilot.phone}
                             </span>
-                            <span className="flex items-center gap-1">
-                              <Plane className="h-3 w-3" />
-                              {pilot._count?.flights || 0} toplam uçuş
-                            </span>
                           </div>
                         </div>
 
@@ -389,10 +381,6 @@ export default function PilotsPage() {
                             <span className="flex items-center gap-1">
                               <Phone className="h-3 w-3" />
                               {pilot.phone}
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <Plane className="h-3 w-3" />
-                              {pilot._count?.flights || 0} toplam uçuş
                             </span>
                           </div>
                         </div>

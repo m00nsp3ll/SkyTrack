@@ -40,20 +40,38 @@ const roleColors: Record<string, { bg: string; text: string }> = {
   PILOT: { bg: 'bg-green-100', text: 'text-green-700' },
 }
 
+type QuickFilter = 'today' | 'week' | 'month' | 'custom'
+
+function getQuickDates(filter: QuickFilter): { from: string; to: string } {
+  const today = new Date()
+  const to = today.toISOString().split('T')[0]
+  if (filter === 'today') return { from: to, to }
+  if (filter === 'week') {
+    const d = new Date(today)
+    d.setDate(d.getDate() - 6)
+    return { from: d.toISOString().split('T')[0], to }
+  }
+  if (filter === 'month') {
+    const d = new Date(today)
+    d.setDate(1)
+    return { from: d.toISOString().split('T')[0], to }
+  }
+  const d = new Date(today)
+  d.setDate(d.getDate() - 30)
+  return { from: d.toISOString().split('T')[0], to }
+}
+
 export default function CashierReportPage() {
   const [data, setData] = useState<CashierReportData | null>(null)
   const [loading, setLoading] = useState(true)
-  const [dateFrom, setDateFrom] = useState(() => {
-    const d = new Date()
-    d.setDate(d.getDate() - 30)
-    return d.toISOString().split('T')[0]
-  })
-  const [dateTo, setDateTo] = useState(() => new Date().toISOString().split('T')[0])
+  const [quickFilter, setQuickFilter] = useState<QuickFilter>('today')
+  const [dateFrom, setDateFrom] = useState(() => getQuickDates('today').from)
+  const [dateTo, setDateTo] = useState(() => getQuickDates('today').to)
 
-  const fetchData = async () => {
+  const fetchData = async (from = dateFrom, to = dateTo) => {
     setLoading(true)
     try {
-      const res = await api.get(`/reports/staff-sales?from=${dateFrom}&to=${dateTo}`)
+      const res = await api.get(`/reports/staff-sales?from=${from}&to=${to}`)
       setData(res.data.data)
     } catch (error) {
       console.error('Rapor hatası:', error)
@@ -67,7 +85,16 @@ export default function CashierReportPage() {
   }, [])
 
   const handleFilter = () => {
-    fetchData()
+    setQuickFilter('custom')
+    fetchData(dateFrom, dateTo)
+  }
+
+  const applyQuickFilter = (filter: QuickFilter) => {
+    setQuickFilter(filter)
+    const { from, to } = getQuickDates(filter)
+    setDateFrom(from)
+    setDateTo(to)
+    fetchData(from, to)
   }
 
   const formatCurrency = (value: number) => {
@@ -110,22 +137,44 @@ export default function CashierReportPage() {
             )}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant={quickFilter === 'today' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => applyQuickFilter('today')}
+          >
+            Bugün
+          </Button>
+          <Button
+            variant={quickFilter === 'week' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => applyQuickFilter('week')}
+          >
+            Bu Hafta
+          </Button>
+          <Button
+            variant={quickFilter === 'month' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => applyQuickFilter('month')}
+          >
+            Bu Ay
+          </Button>
+          <span className="text-muted-foreground text-sm">|</span>
           <Input
             type="date"
             value={dateFrom}
-            onChange={(e) => setDateFrom(e.target.value)}
+            onChange={(e) => { setDateFrom(e.target.value); setQuickFilter('custom') }}
             className="w-40"
           />
           <span className="text-muted-foreground">-</span>
           <Input
             type="date"
             value={dateTo}
-            onChange={(e) => setDateTo(e.target.value)}
+            onChange={(e) => { setDateTo(e.target.value); setQuickFilter('custom') }}
             className="w-40"
           />
           <Button onClick={handleFilter}>Filtrele</Button>
-          <Button variant="outline" onClick={fetchData}>
+          <Button variant="outline" onClick={() => fetchData(dateFrom, dateTo)}>
             <RefreshCw className="h-4 w-4" />
           </Button>
         </div>
