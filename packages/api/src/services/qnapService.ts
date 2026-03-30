@@ -1,4 +1,5 @@
 import { Client } from 'ssh2';
+import fs from 'fs';
 
 class QnapService {
   private sshConfig = {
@@ -151,6 +152,75 @@ class QnapService {
     } catch (err: any) {
       return { connected: false, message: `NAS bağlantı hatası: ${err.message}` };
     }
+  }
+
+  async uploadFile(localPath: string, remoteRelativePath: string): Promise<boolean> {
+    const remotePath = `${this.mediaPath}/${remoteRelativePath}`;
+    const remoteDir = remotePath.substring(0, remotePath.lastIndexOf('/'));
+
+    try {
+      await this.execSSH(`mkdir -p "${remoteDir}" && chmod -R 777 "${remoteDir}"`);
+    } catch (err: any) {
+      console.error(`[QNAP] Klasör oluşturma hatası: ${err.message}`);
+      return false;
+    }
+
+    // SFTP subsystem disabled on QNAP — stream file via SSH exec + stdin
+    return new Promise((resolve) => {
+      const conn = new Client();
+      const fileBuffer = fs.readFileSync(localPath);
+
+      const timeout = setTimeout(() => {
+        conn.end();
+        console.error('[QNAP] Dosya yükleme timeout');
+        resolve(false);
+      }, 30000);
+
+      conn.on('ready', () => {
+        conn.exec(`cat > "${remotePath}"`, (err, stream) => {
+          if (err) {
+            clearTimeout(timeout);
+            conn.end();
+            console.error(`[QNAP] exec hatası: ${err.message}`);
+            return resolve(false);
+          }
+          stream.on('close', (code: number) => {
+            clearTimeout(timeout);
+            conn.end();
+            if (code === 0 || code === null) {
+              console.log(`[QNAP] Dosya yüklendi: ${remotePath}`);
+              resolve(true);
+            } else {
+              console.error(`[QNAP] Yükleme başarısız, kod: ${code}`);
+              resolve(false);
+            }
+          });
+          // QNAP SSH may not fire 'close' — resolve on stdin finish
+          stream.stdin.on('finish', () => {
+            setTimeout(() => {
+              clearTimeout(timeout);
+              conn.end();
+              console.log(`[QNAP] Dosya yüklendi: ${remotePath}`);
+              resolve(true);
+            }, 500);
+          });
+          stream.stdin.end(fileBuffer);
+        });
+      });
+
+      conn.on('error', (err) => {
+        clearTimeout(timeout);
+        console.error(`[QNAP] Bağlantı hatası: ${err.message}`);
+        resolve(false);
+      });
+
+      conn.connect(this.sshConfig);
+    });
+  }
+
+  async backupWaiverPdf(localPdfPath: string, date: string, displayId: string, filename: string): Promise<boolean> {
+    const remoteRelativePath = `Risk_Formlari/${date}/${displayId}/${filename}`;
+    return this.uploadFile(localPdfPath, remoteRelativePath);
   }
 
   async getDiskUsage(): Promise<{ total: string; used: string; available: string; percent: string } | null> {

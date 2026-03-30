@@ -123,8 +123,9 @@
 - [x] Invalid token auto-delete (sendNativeNotification hata yakalama)
 - [x] NotificationsPage localStorage serialize fix (templateIconMap)
 - [x] iOS uygulama projesi oluşturuldu, cihazda çalıştırıldı (Capacitor + Firebase FCM)
-- [x] iOS LaunchScreen storyboard kaldırıldı (Xcode 26 uyumsuzluğu → UILaunchScreen dict)
-- [x] iOS SplashScreen plugin kaldırıldı (runtime storyboard crash)
+- [x] iOS LaunchScreen storyboard düzeltildi (logo + "Alanya Paragliding" + "Coded by Harun S.")
+- [x] iOS SplashScreen plugin eklendi (@capacitor/splash-screen)
+- [x] iOS splash: koyu lacivert arka plan, ortada SkyTrack logosu, üstte başlık, altta copyright
 - [x] iOS kamera/mikrofon/galeri izinleri eklendi
 - [x] iOS IPA çıkarma hazır (Archive → Ad Hoc → Export)
 - [x] iOS FCM token → backend kayıt düzeltmesi (AppDelegate → WebView JS bridge + native event fallback)

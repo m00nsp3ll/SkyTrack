@@ -13,15 +13,27 @@ const config: CapacitorConfig = {
   ios: {
     contentInset: 'automatic',
     allowsLinkPreview: false,
-    backgroundColor: '#2563eb'
+    backgroundColor: '#1a3a6b'
   },
   plugins: {
     PushNotifications: {
       presentationOptions: ['badge', 'sound', 'alert']
     },
     StatusBar: {
-      style: 'dark',
-      backgroundColor: '#2563eb'
+      style: 'light',
+      backgroundColor: '#1a3a6b'
+    },
+    SplashScreen: {
+      launchShowDuration: 3000,
+      launchAutoHide: true,
+      backgroundColor: '#1a3a6b',
+      androidSplashResourceName: 'splash',
+      androidScaleType: 'CENTER_CROP',
+      showSpinner: false,
+      splashFullScreen: true,
+      splashImmersive: true,
+      iosSpinnerStyle: 'small',
+      spinnerColor: '#1a3a6b'
     }
   }
 };

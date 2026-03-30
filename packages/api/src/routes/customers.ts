@@ -284,6 +284,15 @@ router.post('/', authenticate, requireRole('ADMIN', 'OFFICE_STAFF'), asyncHandle
         where: { id: customer.id },
         data: { waiverPdfPath },
       });
+
+      // Backup PDF to NAS (async, non-blocking)
+      if (waiverPdfPath) {
+        const today = new Date().toISOString().split('T')[0];
+        const filename = path.basename(waiverPdfPath);
+        qnap.backupWaiverPdf(waiverPdfPath, today, customer.displayId, filename).catch((err: any) => {
+          console.error('[QNAP] Risk formu yedekleme hatası:', err);
+        });
+      }
     } catch (pdfError) {
       console.error('Error generating waiver PDF:', pdfError);
     }
