@@ -1565,8 +1565,10 @@ router.post(
 
     const nasBase = process.env.QNAP_MEDIA_PATH || '/share/skytrack-media';
     const nasIp = process.env.QNAP_LAN_IP || '192.168.1.105';
-    // /share/skytrack-media/2026-03-28/Pilot/A0001 → skytrack-media/2026-03-28/Pilot/A0001
-    const relativePart = nasPath.replace(`${nasBase}/`, '');
+    // folderPath olarak "media/01-04-2026/Pilot/A0001" veya "/share/skytrack-media/..." gelebilir
+    let relativePart = nasPath.replace(`${nasBase}/`, '');
+    // "media/" prefix'ini de temizle
+    relativePart = relativePart.replace(/^media\//, '');
     const smbPath = `smb://${nasIp}/skytrack-media/${relativePart}`;
 
     res.json({ success: true, data: { smbPath }, message: 'SMB path hazır' });
