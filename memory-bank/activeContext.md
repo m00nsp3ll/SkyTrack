@@ -1,6 +1,59 @@
 # Active Context - SkyTrack
 
-## Son Çalışma Oturumu: 2026-03-30 (Oturum 33)
+## Son Çalışma Oturumu: 2026-04-01 (Oturum 34)
+
+### Yapılan İşler
+
+1. **NAS Dual-Mode SSH** ✅
+   - production (NODE_ENV=production) → skytrack.myqnapcloud.com:2222 (External)
+   - development (NODE_ENV=development) → 192.168.1.109:22 (LAN)
+   - qnapService.ts: sshConfig getter ile otomatik seçim
+
+2. **NAS Klasör Açma — SMB** ✅
+   - API artık exec/open komutu çalıştırmıyor
+   - /api/media/:id/open-folder → { smbPath: "smb://192.168.1.109/skytrack-media/..." } döndürüyor
+   - /api/media/pilot/:id/open-folder → aynı şekilde smbPath döndürüyor
+   - Web: window.open(smbPath), başarısız olursa prompt() ile kopyalanabilir yol
+   - Her zaman lokal IP (QNAP_LAN_IP) kullanılıyor — ofis işlemi olduğu için
+   - child_process/exec kaldırıldı (güvenlik + mimari)
+
+3. **Production Deploy — VDS (dehost.com.tr)** ⏳
+   - Sunucu: 5.10.220.205, Ubuntu 24.04 LTS
+   - PostgreSQL + Redis native kuruldu (Docker yok)
+   - Node.js 20, PM2, Nginx, Certbot hazır
+   - Repo: github.com/m00nsp3ll/SkyTrack (public)
+   - TypeScript build hataları düzeltildi (CommonJS, ES2020, tip uyumsuzlukları)
+   - @types/archiver, @types/web-push eklendi
+   - tsconfig.json: strict=false, noImplicitAny=false, CommonJS modüle geçildi
+   - Eksik: .env oluşturma, migration, PM2 başlatma, Nginx config, SSL
+
+### Değiştirilen Dosyalar (Oturum 34)
+
+| Dosya | İşlem |
+|-------|-------|
+| packages/api/src/services/qnapService.ts | Dual-mode SSH, getConnectionInfo(), smbPath desteği |
+| packages/api/src/routes/nas.ts | testConnection response'a mode+host eklendi |
+| packages/api/src/routes/media.ts | open-folder: exec kaldırıldı, smbPath döndürülüyor |
+| packages/api/src/routes/flights.ts | Sale.items → include kaldırıldı (alan yok) |
+| packages/api/src/services/cache.ts | Redis constructor düzeltildi |
+| packages/api/src/services/media.ts | bigint + number fix (Number() cast) |
+| packages/api/src/index.ts | server.listen tip cast |
+| packages/api/tsconfig.json | CommonJS/ES2020, strict=false |
+| packages/api/package.json | @types/archiver, @types/web-push eklendi |
+| packages/web/app/(dashboard)/admin/nas/page.tsx | mode+host API'den gösteriliyor |
+| packages/web/app/(dashboard)/admin/customers/[id]/page.tsx | handleOpenFolder → smbPath |
+| packages/web/app/(dashboard)/admin/media/pos/page.tsx | handleOpenFolder → smbPath |
+| packages/web/app/(dashboard)/admin/media/page.tsx | handleOpenFolder/Pilot → smbPath |
+
+### Sonraki Adımlar (Deploy)
+
+- [ ] Sunucuda .env oluştur (packages/api/.env)
+- [ ] npx prisma migrate deploy
+- [ ] PM2 ile API + Web başlat
+- [ ] Nginx config (skytrackyp.com + api.skytrackyp.com)
+- [ ] SSL (certbot)
+- [ ] Cloudflare DNS → 5.10.220.205
+
 
 ### Yapılan İşler
 

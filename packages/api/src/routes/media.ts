@@ -3,7 +3,6 @@ import { PrismaClient } from '@prisma/client';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs/promises';
-import { exec } from 'child_process';
 import archiver from 'archiver';
 import { asyncHandler, AppError } from '../middleware/errorHandler.js';
 import { authenticate, requireRole, AuthRequest } from '../middleware/auth.js';
@@ -651,7 +650,7 @@ router.get(
   })
 );
 
-// POST /api/media/pilot/:pilotId/open-folder - Open pilot's date folder in Finder
+// POST /api/media/pilot/:pilotId/open-folder - Pilot klasörü SMB path döndür
 router.post(
   '/pilot/:pilotId/open-folder',
   authenticate,
@@ -667,42 +666,12 @@ router.post(
     const targetDate = date || new Date().toISOString().split('T')[0];
     const safePilotName = sanitizePilotName(pilot.name);
     const folderDate = formatDateForFolder(targetDate);
-    const folderPath = path.join(MEDIA_BASE_PATH, folderDate, safePilotName);
-    const absolutePath = path.resolve(process.cwd(), folderPath);
+    const nasIp = process.env.QNAP_LAN_IP || '192.168.1.109';
 
-    // Try to find the folder, create if not exists
-    try {
-      await fs.access(absolutePath);
-    } catch {
-      // Pilot folder doesn't exist — try parent date folder
-      const dateFolderPath = path.resolve(process.cwd(), path.join(MEDIA_BASE_PATH, folderDate));
-      try {
-        await fs.access(dateFolderPath);
-        // Date folder exists but pilot folder doesn't — open date folder
-        const platform = process.platform;
-        const command = platform === 'darwin' ? `open "${dateFolderPath}"` : platform === 'win32' ? `explorer "${dateFolderPath}"` : `xdg-open "${dateFolderPath}"`;
-        exec(command, (error) => {
-          if (error) {
-            return res.status(500).json({ success: false, error: { message: 'Klasör açılamadı' } });
-          }
-          res.json({ success: true, message: 'Tarih klasörü açıldı (pilot klasörü henüz yok)', data: { path: dateFolderPath } });
-        });
-        return;
-      } catch {
-        // Date folder also doesn't exist — create pilot folder and open it
-        await fs.mkdir(absolutePath, { recursive: true });
-      }
-    }
+    // smb://192.168.1.109/skytrack-media/2026-03-28/Ahmet_Yilmaz
+    const smbPath = `smb://${nasIp}/skytrack-media/${folderDate}/${safePilotName}`;
 
-    const platform = process.platform;
-    const command = platform === 'darwin' ? `open "${absolutePath}"` : platform === 'win32' ? `explorer "${absolutePath}"` : `xdg-open "${absolutePath}"`;
-
-    exec(command, (error) => {
-      if (error) {
-        return res.status(500).json({ success: false, error: { message: 'Klasör açılamadı' } });
-      }
-      res.json({ success: true, message: 'Klasör açıldı', data: { path: absolutePath } });
-    });
+    res.json({ success: true, data: { smbPath }, message: 'SMB path hazır' });
   })
 );
 
@@ -1563,27 +1532,21 @@ router.delete(
   })
 );
 
-// POST /api/media/:customerId/open-folder - Open media folder in Finder (macOS)
+// POST /api/media/:customerId/open-folder - Müşteri klasörü SMB path döndür
 router.post(
   '/:customerId/open-folder',
   authenticate,
   asyncHandler(async (req: AuthRequest, res: any) => {
     const { customerId } = req.params;
 
-    // Get customer with media folder
     const customer = await prisma.customer.findUnique({
       where: { id: customerId },
       include: {
-        mediaFolders: {
-          orderBy: { createdAt: 'desc' },
-          take: 1,
-        },
+        mediaFolders: { orderBy: { createdAt: 'desc' }, take: 1 },
         flights: {
           orderBy: { createdAt: 'desc' },
           take: 1,
-          include: {
-            mediaFolder: true,
-          },
+          include: { mediaFolder: true },
         },
       },
     }) as any;
@@ -1592,82 +1555,21 @@ router.post(
       throw new AppError('Müşteri bulunamadı', 404, 'CUSTOMER_NOT_FOUND');
     }
 
-    // NAS yolu varsa SMB ile aç (ofis bilgisayarı NAS'a mount edilmiş)
-    const nasPath = (customer as any).mediaFolderPath;
-    if (nasPath) {
-      // NAS path: /share/skytrack-media/2026-03-28/PilotAdi/A0043
-      // SMB path: smb://192.168.1.111/skytrack-media/2026-03-28/PilotAdi/A0043
-      const nasBase = process.env.QNAP_MEDIA_PATH || '/share/skytrack-media';
-      const relativePart = nasPath.replace(nasBase, '');
-      const nasHost = process.env.QNAP_SSH_HOST || '192.168.1.111';
-      const smbPath = `smb://${nasHost}/skytrack-media${relativePart}`;
+    const nasPath = (customer as any).mediaFolderPath ||
+                    customer.mediaFolders[0]?.folderPath ||
+                    customer.flights[0]?.mediaFolder?.folderPath;
 
-      const platform = process.platform;
-      const command = platform === 'darwin'
-        ? `open "${smbPath}"`
-        : platform === 'win32'
-        ? `explorer "${smbPath.replace('smb://', '\\\\').replace(/\//g, '\\')}"`
-        : `xdg-open "${smbPath}"`;
-
-      exec(command, (error) => {
-        if (error) {
-          console.error('Failed to open NAS folder:', error);
-          return res.status(500).json({
-            success: false,
-            error: { message: 'NAS klasörü açılamadı: ' + smbPath },
-          });
-        }
-        res.json({
-          success: true,
-          data: { path: smbPath, type: 'nas' },
-          message: 'NAS klasörü açıldı',
-        });
-      });
-      return;
-    }
-
-    // NAS yolu yoksa eski lokal yolu kullan
-    let folderPath = customer.mediaFolders[0]?.folderPath ||
-                     customer.flights[0]?.mediaFolder?.folderPath;
-
-    if (!folderPath) {
+    if (!nasPath) {
       throw new AppError('Medya klasörü bulunamadı', 404, 'FOLDER_NOT_FOUND');
     }
 
-    const absolutePath = path.resolve(process.cwd(), folderPath);
+    const nasBase = process.env.QNAP_MEDIA_PATH || '/share/skytrack-media';
+    const nasIp = process.env.QNAP_LAN_IP || '192.168.1.109';
+    // /share/skytrack-media/2026-03-28/Pilot/A0001 → skytrack-media/2026-03-28/Pilot/A0001
+    const relativePart = nasPath.replace(`${nasBase}/`, '');
+    const smbPath = `smb://${nasIp}/skytrack-media/${relativePart}`;
 
-    try {
-      await fs.access(absolutePath);
-    } catch {
-      throw new AppError('Klasör bulunamadı: ' + absolutePath, 404, 'FOLDER_NOT_EXISTS');
-    }
-
-    const platform = process.platform;
-    let command: string;
-
-    if (platform === 'darwin') {
-      command = `open "${absolutePath}"`;
-    } else if (platform === 'win32') {
-      command = `explorer "${absolutePath}"`;
-    } else {
-      command = `xdg-open "${absolutePath}"`;
-    }
-
-    exec(command, (error) => {
-      if (error) {
-        console.error('Failed to open folder:', error);
-        return res.status(500).json({
-          success: false,
-          error: { message: 'Klasör açılamadı' },
-        });
-      }
-
-      res.json({
-        success: true,
-        message: 'Klasör açıldı',
-        data: { path: absolutePath },
-      });
-    });
+    res.json({ success: true, data: { smbPath }, message: 'SMB path hazır' });
   })
 );
 

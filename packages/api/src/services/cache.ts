@@ -9,7 +9,6 @@ let redisAvailable = false;
 try {
   redis = new Redis(REDIS_URL, {
     maxRetriesPerRequest: 3,
-    retryDelayOnFailover: 100,
     enableReadyCheck: true,
     lazyConnect: true,
   });

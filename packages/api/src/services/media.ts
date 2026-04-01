@@ -243,7 +243,7 @@ export async function getTodayMediaStats(): Promise<{
   const delivered = folders.filter(f => f.deliveryStatus === 'DELIVERED').length;
   const pending = folders.filter(f => f.paymentStatus === 'PENDING').length;
   const totalFiles = folders.reduce((sum, f) => sum + f.fileCount, 0);
-  const totalSize = folders.reduce((sum, f) => sum + f.totalSizeBytes, 0);
+  const totalSize = folders.reduce((sum, f) => sum + Number(f.totalSizeBytes), 0);
 
   return { uploaded, paid, delivered, pending, totalFiles, totalSize };
 }

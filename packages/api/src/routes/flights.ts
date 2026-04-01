@@ -350,11 +350,6 @@ router.get('/:id', authenticate, asyncHandler(async (req: AuthRequest, res: any)
       customerId: flight.customerId,
       createdAt: { gte: flightDate, lt: nextDay },
     },
-    include: {
-      items: {
-        include: { product: true },
-      },
-    },
   });
 
   // Build timeline

@@ -2,12 +2,19 @@ import { Client } from 'ssh2';
 import fs from 'fs';
 
 class QnapService {
-  private sshConfig = {
-    host: process.env.QNAP_SSH_HOST || '192.168.1.111',
-    port: parseInt(process.env.QNAP_SSH_PORT || '22'),
-    username: process.env.QNAP_SSH_USER || 'admin',
-    password: process.env.QNAP_SSH_PASSWORD || '',
-  };
+  private get sshConfig() {
+    const isProduction = process.env.NODE_ENV === 'production';
+    return {
+      host: isProduction
+        ? (process.env.QNAP_SSH_HOST_EXTERNAL || 'skytrack.myqnapcloud.com')
+        : (process.env.QNAP_SSH_HOST_LOCAL || '192.168.1.109'),
+      port: isProduction
+        ? parseInt(process.env.QNAP_SSH_PORT_EXTERNAL || '2222')
+        : parseInt(process.env.QNAP_SSH_PORT_LOCAL || '22'),
+      username: process.env.QNAP_SSH_USER || 'admin',
+      password: process.env.QNAP_SSH_PASSWORD || '',
+    };
+  }
 
   private mediaPath = process.env.QNAP_MEDIA_PATH || '/share/skytrack-media';
 
@@ -145,12 +152,19 @@ class QnapService {
     }
   }
 
-  async testConnection(): Promise<{ connected: boolean; message: string }> {
+  getConnectionInfo(): { mode: 'LAN' | 'External'; host: string; port: number } {
+    const cfg = this.sshConfig;
+    const mode = process.env.NODE_ENV === 'production' ? 'External' : 'LAN';
+    return { mode, host: cfg.host, port: cfg.port };
+  }
+
+  async testConnection(): Promise<{ connected: boolean; message: string; mode: 'LAN' | 'External'; host: string }> {
+    const { mode, host } = this.getConnectionInfo();
     try {
       const output = await this.execSSH('echo "connected" && hostname');
-      return { connected: true, message: `NAS bağlantısı başarılı: ${output}` };
+      return { connected: true, message: `NAS bağlantısı başarılı: ${output}`, mode, host };
     } catch (err: any) {
-      return { connected: false, message: `NAS bağlantı hatası: ${err.message}` };
+      return { connected: false, message: `NAS bağlantı hatası: ${err.message}`, mode, host };
     }
   }
 

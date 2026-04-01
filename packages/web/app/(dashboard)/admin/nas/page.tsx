@@ -16,6 +16,8 @@ import {
 interface NasStatus {
   connected: boolean
   message: string
+  mode: 'LAN' | 'External'
+  host: string
 }
 
 interface DiskUsage {
@@ -70,7 +72,8 @@ export default function NasPage() {
             NAS Yönetimi
           </h1>
           <p className="text-muted-foreground">
-            QNAP TS-873A — {process.env.NEXT_PUBLIC_QNAP_HOST || '192.168.1.111'}
+            QNAP TS-873A
+            {status && ` — ${status.host} (${status.mode === 'LAN' ? 'LAN' : 'Harici'})`}
           </p>
         </div>
         <Button onClick={handleRefreshAll} disabled={loadingStatus || loadingDisk}>
@@ -192,7 +195,7 @@ export default function NasPage() {
             </div>
             <div className="flex justify-between py-2 border-b">
               <span className="text-muted-foreground">Lokal IP</span>
-              <span className="font-mono">192.168.1.111</span>
+              <span className="font-mono">192.168.1.109</span>
             </div>
             <div className="flex justify-between py-2 border-b">
               <span className="text-muted-foreground">Medya Yolu</span>

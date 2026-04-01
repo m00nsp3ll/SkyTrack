@@ -171,7 +171,7 @@ startCronJobs();
 
 // Start server on all interfaces (0.0.0.0) for LAN access
 const protocol = httpsServer ? 'https' : 'http';
-server.listen(SERVER_PORT, '0.0.0.0', () => {
+(server as any).listen(SERVER_PORT, '0.0.0.0', () => {
   const currentIP = getCurrentIP();
   console.log(`🚀 SkyTrack API running at ${protocol}://${currentIP}:${SERVER_PORT}`);
   console.log(`🌐 Web App: https://${currentIP}:${WEB_PORT}`);
