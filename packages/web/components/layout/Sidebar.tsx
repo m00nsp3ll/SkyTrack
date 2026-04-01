@@ -228,7 +228,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
     <aside
       className={cn(
         'bg-white border-r border-gray-200 flex flex-col transition-all duration-300',
-        'h-full',
+        'sticky top-0 h-screen',
         isCollapsed ? 'w-16' : 'w-64'
       )}
     >
@@ -263,15 +263,15 @@ export function Sidebar({ onNavigate }: SidebarProps) {
           <div key={group.title} className="mb-1">
             {/* Group Title */}
             {!isCollapsed && (
-              <div className="px-3 py-1">
-                <span className={cn('text-[9px] font-bold tracking-wider', group.titleColor)}>
+              <div className="px-4 py-1.5">
+                <span className={cn('text-[10px] font-bold tracking-wider', group.titleColor)}>
                   {group.title}
                 </span>
               </div>
             )}
 
             {/* Group Items */}
-            <ul className="px-2 space-y-0">
+            <ul className="px-2 space-y-0.5">
               {group.items.map((item) => {
                 const Icon = item.icon
                 const active = isActive(item.href)
@@ -283,7 +283,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
                       onClick={onNavigate}
                       title={isCollapsed ? item.label : undefined}
                       className={cn(
-                        'flex items-center gap-2 px-2 py-1.5 rounded-md text-xs font-medium transition-colors',
+                        'flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors',
                         active
                           ? `${item.activeBg} ${item.activeText}`
                           : `text-gray-600 ${item.hoverBg} hover:text-gray-900`,
@@ -291,7 +291,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
                       )}
                     >
                       <Icon className={cn(
-                        'h-4 w-4 flex-shrink-0',
+                        'h-5 w-5 flex-shrink-0',
                         active ? item.activeText : item.color
                       )} />
                       {!isCollapsed && <span className="truncate">{item.label}</span>}
@@ -303,7 +303,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
 
             {/* Divider between groups */}
             {groupIndex < filteredGroups.length - 1 && (
-              <div className="mx-3 my-1 border-b border-gray-100" />
+              <div className="mx-4 my-2 border-b border-gray-100" />
             )}
           </div>
         ))}
