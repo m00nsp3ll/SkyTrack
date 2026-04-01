@@ -1,6 +1,7 @@
 import dotenv from 'dotenv';
+import path from 'path';
 // Load .env FIRST before any other imports that might need env vars
-dotenv.config({ path: '../../.env' });
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 // Set timezone to Turkey — all new Date() calls will use TR time
 process.env.TZ = 'Europe/Istanbul';
@@ -16,7 +17,6 @@ import { createServer } from 'http';
 import { createServer as createHttpsServer } from 'https';
 import { Server } from 'socket.io';
 import fs from 'fs';
-import path from 'path';
 
 import authRoutes from './routes/auth.js';
 import pilotsRoutes from './routes/pilots.js';
