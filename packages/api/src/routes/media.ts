@@ -1165,7 +1165,7 @@ router.get(
         flights: {
           orderBy: { createdAt: 'desc' },
           take: 1,
-          include: { mediaFolder: true },
+          include: { mediaFolder: true, pilot: true },
         },
       },
     });
@@ -1185,20 +1185,113 @@ router.get(
       });
     }
 
-    const files = await listMediaFiles(mediaFolder.folderPath);
+    // NAS üzerinden dosya listele
+    const pilotName = customer.flights[0]?.pilot?.name || '';
+    const originalPilotFolder = pilotName.replace(/\s+/g, '_');
+    const displayId = customer.displayId;
+    const folderPath = mediaFolder.folderPath;
+    const relativePath = folderPath.replace(/^media\//, '');
+    const mediaExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.mp4', '.mov', '.avi', '.mkv', '.webm', '.heic', '.heif'];
 
-    // Convert file paths to URLs
-    const serverIp = process.env.SERVER_IP || 'localhost';
-    const filesWithUrls = files.map((file) => ({
-      ...file,
-      url: `http://${serverIp}/media/${path.relative(MEDIA_BASE_PATH, file.path)}`,
-    }));
+    // Tarihi çıkar
+    let dateIso = '';
+    const isoMatch = relativePath.match(/^(\d{4}-\d{2}-\d{2})/);
+    const ddMatch = relativePath.match(/^(\d{2})-(\d{2})-(\d{4})/);
+    if (isoMatch) dateIso = isoMatch[1];
+    else if (ddMatch) dateIso = `${ddMatch[3]}-${ddMatch[2]}-${ddMatch[1]}`;
+    else dateIso = new Date().toISOString().split('T')[0];
+
+    const { sanitizePilotName: spn } = await import('../services/media.js');
+    const sanitizedPilot = spn(pilotName);
+
+    const pathsToTry = [
+      `${dateIso}/${originalPilotFolder}/${displayId}`,
+      `${dateIso}/${sanitizedPilot}/${displayId}`,
+      `${dateIso}/${originalPilotFolder}`,
+      `${dateIso}/${sanitizedPilot}`,
+      relativePath,
+    ];
+
+    let nasFiles: Array<{ name: string; size: number; isFolder: boolean; modified: string }> = [];
+    let foundPath = '';
+
+    for (const tryPath of pathsToTry) {
+      try {
+        const exists = await qnap.folderExists(tryPath);
+        if (!exists) continue;
+
+        const hasDisplayId = tryPath.includes(displayId);
+        if (hasDisplayId) {
+          nasFiles = await qnap.listFilesDetailed(tryPath);
+          foundPath = tryPath;
+          // Alt klasörlerdeki dosyaları da ekle
+          for (const sub of nasFiles.filter(f => f.isFolder)) {
+            try {
+              const subFiles = await qnap.listFilesDetailed(`${tryPath}/${sub.name}`);
+              nasFiles.push(...subFiles.filter(f => !f.isFolder));
+            } catch { /* */ }
+          }
+          break;
+        } else {
+          // Pilot klasöründe displayId klasörünü ara
+          const items = await qnap.listFilesDetailed(tryPath);
+          if (items.find(f => f.isFolder && f.name === displayId)) {
+            nasFiles = await qnap.listFilesDetailed(`${tryPath}/${displayId}`);
+            foundPath = `${tryPath}/${displayId}`;
+            for (const sub of nasFiles.filter(f => f.isFolder)) {
+              try {
+                const subFiles = await qnap.listFilesDetailed(`${foundPath}/${sub.name}`);
+                nasFiles.push(...subFiles.filter(f => !f.isFolder));
+              } catch { /* */ }
+            }
+            break;
+          }
+          // Sorti klasörlerinde ara
+          for (const sf of items.filter(f => f.isFolder && f.name.includes('Sorti'))) {
+            try {
+              const sfExists = await qnap.folderExists(`${tryPath}/${sf.name}/${displayId}`);
+              if (sfExists) {
+                nasFiles = await qnap.listFilesDetailed(`${tryPath}/${sf.name}/${displayId}`);
+                foundPath = `${tryPath}/${sf.name}/${displayId}`;
+                break;
+              }
+            } catch { /* */ }
+          }
+          if (nasFiles.length > 0) break;
+        }
+      } catch { /* */ }
+    }
+
+    // Medya dosyalarını filtrele ve formata dönüştür
+    const mimeTypes: Record<string, string> = {
+      '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png',
+      '.gif': 'image/gif', '.webp': 'image/webp', '.heic': 'image/heic', '.heif': 'image/heif',
+      '.mp4': 'video/mp4', '.mov': 'video/quicktime', '.avi': 'video/x-msvideo',
+      '.mkv': 'video/x-matroska', '.webm': 'video/webm',
+    };
+
+    const filesWithUrls = nasFiles
+      .filter(f => !f.isFolder && mediaExtensions.some(ext => f.name.toLowerCase().endsWith(ext)))
+      .map(f => {
+        const ext = path.extname(f.name).toLowerCase();
+        const mimeType = mimeTypes[ext] || 'application/octet-stream';
+        return {
+          filename: f.name,
+          originalName: f.name,
+          path: `${foundPath}/${f.name}`,
+          size: f.size,
+          mimeType,
+          type: mimeType.startsWith('video/') ? 'video' : 'photo',
+          createdAt: f.modified || new Date().toISOString(),
+          url: '',
+        };
+      });
 
     res.json({
       success: true,
       data: {
         files: filesWithUrls,
-        totalSize: files.reduce((sum, f) => sum + f.size, 0),
+        totalSize: filesWithUrls.reduce((sum, f) => sum + f.size, 0),
         paymentStatus: mediaFolder.paymentStatus,
         deliveryStatus: mediaFolder.deliveryStatus,
       },
