@@ -34,8 +34,10 @@ yarn-error.log*
 Thumbs.db
 
 # Media storage (user uploads)
-media/
-!media/.gitkeep
+/media/
+!/media/.gitkeep
+packages/api/media/
+!packages/api/media/.gitkeep
 
 # Prisma
 packages/api/prisma/*.db
