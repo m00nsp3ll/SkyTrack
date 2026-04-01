@@ -159,7 +159,7 @@ export default function StaffSalesPage() {
       <div className="flex items-center justify-center h-96">
         <div className="text-center">
           <p className="text-muted-foreground">Veri yüklenemedi</p>
-          <Button onClick={fetchData} className="mt-4">Tekrar Dene</Button>
+          <Button onClick={() => fetchData()} className="mt-4">Tekrar Dene</Button>
         </div>
       </div>
     )
