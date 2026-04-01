@@ -181,10 +181,7 @@ export default function MediaDashboardPage() {
       const res = await mediaApi.openFolder(customerId)
       const smbPath = res.data?.data?.smbPath
       if (!smbPath) throw new Error('SMB path alınamadı')
-      const opened = window.open(smbPath, '_blank')
-      if (!opened) {
-        prompt('Tarayıcınız SMB linkini desteklemiyor. Aşağıdaki yolu Finder/Explorer\'a yapıştırın:', smbPath)
-      }
+      window.location.href = smbPath
     } catch (e: any) {
       alert(e.response?.data?.error?.message || e.message || 'Klasör açılamadı')
     }
@@ -197,10 +194,7 @@ export default function MediaDashboardPage() {
       const res = await mediaApi.openPilotFolder(pilotId, date)
       const smbPath = res.data?.data?.smbPath
       if (!smbPath) throw new Error('SMB path alınamadı')
-      const opened = window.open(smbPath, '_blank')
-      if (!opened) {
-        prompt('Tarayıcınız SMB linkini desteklemiyor. Aşağıdaki yolu Finder/Explorer\'a yapıştırın:', smbPath)
-      }
+      window.location.href = smbPath
     } catch (e: any) {
       alert(e.response?.data?.error?.message || e.message || 'Klasör açılamadı')
     }

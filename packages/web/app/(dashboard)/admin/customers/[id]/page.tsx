@@ -624,10 +624,7 @@ Bu belgeyi imzalayarak asagidaki hususlari kabul ve beyan ederim:
       const res = await api.post(`/media/${customer.id}/open-folder`)
       const smbPath = res.data?.data?.smbPath
       if (!smbPath) throw new Error('SMB path alınamadı')
-      const opened = window.open(smbPath, '_blank')
-      if (!opened) {
-        prompt('Tarayıcınız SMB linkini desteklemiyor. Aşağıdaki yolu Finder/Explorer\'a yapıştırın:', smbPath)
-      }
+      window.location.href = smbPath
     } catch (error: any) {
       alert(error.response?.data?.error?.message || error.message || 'Klasör açılamadı')
     } finally {

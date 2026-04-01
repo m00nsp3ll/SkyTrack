@@ -258,7 +258,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
       </div>
 
       {/* Navigation */}
-      <nav className="sidebar-nav flex-1 overflow-y-auto py-2" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' } as React.CSSProperties}>
+      <nav className="flex-1 overflow-y-auto py-2">
         {filteredGroups.map((group, groupIndex) => (
           <div key={group.title} className="mb-1">
             {/* Group Title */}

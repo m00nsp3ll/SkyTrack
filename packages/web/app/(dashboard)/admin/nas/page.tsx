@@ -195,7 +195,7 @@ export default function NasPage() {
             </div>
             <div className="flex justify-between py-2 border-b">
               <span className="text-muted-foreground">Lokal IP</span>
-              <span className="font-mono">192.168.1.109</span>
+              <span className="font-mono">192.168.1.105</span>
             </div>
             <div className="flex justify-between py-2 border-b">
               <span className="text-muted-foreground">Medya Yolu</span>

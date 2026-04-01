@@ -360,10 +360,7 @@ export default function MediaPosPage() {
       const res = await api.post(`/media/${customerMedia.customer.id}/open-folder`)
       const smbPath = res.data?.data?.smbPath
       if (!smbPath) throw new Error('SMB path alınamadı')
-      const opened = window.open(smbPath, '_blank')
-      if (!opened) {
-        prompt('Tarayıcınız SMB linkini desteklemiyor. Aşağıdaki yolu Finder/Explorer\'a yapıştırın:', smbPath)
-      }
+      window.location.href = smbPath
     } catch (err: any) {
       alert(err.response?.data?.error?.message || err.message || 'Klasör açılamadı')
     } finally {

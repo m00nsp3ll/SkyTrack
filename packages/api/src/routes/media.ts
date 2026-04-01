@@ -666,9 +666,9 @@ router.post(
     const targetDate = date || new Date().toISOString().split('T')[0];
     const safePilotName = sanitizePilotName(pilot.name);
     const folderDate = formatDateForFolder(targetDate);
-    const nasIp = process.env.QNAP_LAN_IP || '192.168.1.109';
+    const nasIp = process.env.QNAP_LAN_IP || '192.168.1.105';
 
-    // smb://192.168.1.109/skytrack-media/2026-03-28/Ahmet_Yilmaz
+    // smb://192.168.1.105/skytrack-media/2026-03-28/Ahmet_Yilmaz
     const smbPath = `smb://${nasIp}/skytrack-media/${folderDate}/${safePilotName}`;
 
     res.json({ success: true, data: { smbPath }, message: 'SMB path hazır' });
@@ -1564,7 +1564,7 @@ router.post(
     }
 
     const nasBase = process.env.QNAP_MEDIA_PATH || '/share/skytrack-media';
-    const nasIp = process.env.QNAP_LAN_IP || '192.168.1.109';
+    const nasIp = process.env.QNAP_LAN_IP || '192.168.1.105';
     // /share/skytrack-media/2026-03-28/Pilot/A0001 → skytrack-media/2026-03-28/Pilot/A0001
     const relativePart = nasPath.replace(`${nasBase}/`, '');
     const smbPath = `smb://${nasIp}/skytrack-media/${relativePart}`;

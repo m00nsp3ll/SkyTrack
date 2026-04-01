@@ -7,7 +7,7 @@ class QnapService {
     return {
       host: isProduction
         ? (process.env.QNAP_SSH_HOST_EXTERNAL || 'skytrack.myqnapcloud.com')
-        : (process.env.QNAP_SSH_HOST_LOCAL || '192.168.1.109'),
+        : (process.env.QNAP_SSH_HOST_LOCAL || '192.168.1.105'),
       port: isProduction
         ? parseInt(process.env.QNAP_SSH_PORT_EXTERNAL || '2222')
         : parseInt(process.env.QNAP_SSH_PORT_LOCAL || '22'),

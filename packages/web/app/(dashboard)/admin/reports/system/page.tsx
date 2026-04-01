@@ -381,7 +381,7 @@ export default function SystemMonitorPage() {
 
           {/* NAS Bilgileri */}
           <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
-            <span>IP: <span className="font-mono text-foreground">192.168.1.111</span></span>
+            <span>IP: <span className="font-mono text-foreground">192.168.1.105</span></span>
             <span>Bağlantı: <span className="font-mono text-foreground">SSH :22</span></span>
             <span>Medya Yolu: <span className="font-mono text-foreground">/share/skytrack-media</span></span>
             <span>Depolama: <span className="font-mono text-foreground">2×4TB NVMe + 5×24TB HDD</span></span>
