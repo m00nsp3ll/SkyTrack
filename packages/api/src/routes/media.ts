@@ -933,30 +933,91 @@ router.post(
     }
 
     // NAS üzerinden SSH ile dosya tara
+    // DB'deki path: media/DD-MM-YYYY/SANITIZED_PILOT/X.Sorti/DISPLAYID
+    // NAS'taki path: YYYY-MM-DD/ORIGINAL_PILOT/DISPLAYID (elle oluşturulan)
     let relativePath = folderPath.replace(/^media\//, '');
     let processed = 0;
     let totalSize = 0;
     const errors: string[] = [];
+    const mediaExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.mp4', '.mov', '.avi', '.mkv', '.webm', '.heic', '.heif'];
 
-    try {
-      const files = await qnap.listFilesDetailed(relativePath);
-      const mediaExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.mp4', '.mov', '.avi', '.mkv', '.webm'];
-      const mediaFiles = files.filter(f => !f.isFolder && mediaExtensions.some(ext => f.name.toLowerCase().endsWith(ext)));
-      processed = mediaFiles.length;
-      totalSize = mediaFiles.reduce((sum, f) => sum + f.size, 0);
+    // Tarih formatını DD-MM-YYYY → YYYY-MM-DD'ye çevir (NAS formatı)
+    const ddmmyyyyMatch = relativePath.match(/^(\d{2})-(\d{2})-(\d{4})/);
+    const altRelativePath = ddmmyyyyMatch
+      ? relativePath.replace(/^(\d{2})-(\d{2})-(\d{4})/, '$3-$2-$1')
+      : null;
 
-      // Alt klasörleri de tara (GoPro klasörleri vb.)
-      const subFolders = files.filter(f => f.isFolder);
-      for (const sub of subFolders) {
-        try {
-          const subFiles = await qnap.listFilesDetailed(`${relativePath}/${sub.name}`);
-          const subMedia = subFiles.filter(f => !f.isFolder && mediaExtensions.some(ext => f.name.toLowerCase().endsWith(ext)));
-          processed += subMedia.length;
-          totalSize += subMedia.reduce((sum, f) => sum + f.size, 0);
-        } catch { /* alt klasör okunamadı */ }
-      }
-    } catch (err: any) {
-      errors.push(`NAS dosya tarama hatası: ${err.message}`);
+    // Müşteri displayId'sini al
+    const displayId = customer.displayId;
+    const pilotName = latestFlight.pilot?.name || '';
+
+    // NAS'ta dosya aramak için birden fazla path dene
+    const pathsToTry = [relativePath];
+    if (altRelativePath) pathsToTry.push(altRelativePath);
+
+    // Pilot adı orijinal haliyle de dene (NAS'ta Türkçe karakterli olabilir)
+    if (pilotName && altRelativePath) {
+      const originalPilotFolder = pilotName.replace(/\s+/g, '_');
+      // YYYY-MM-DD/ORIGINAL_PILOT/DISPLAYID
+      pathsToTry.push(`${ddmmyyyyMatch![3]}-${ddmmyyyyMatch![2]}-${ddmmyyyyMatch![1]}/${originalPilotFolder}/${displayId}`);
+      // Sorti klasörsüz de dene
+      pathsToTry.push(`${ddmmyyyyMatch![3]}-${ddmmyyyyMatch![2]}-${ddmmyyyyMatch![1]}/${originalPilotFolder}`);
+    }
+
+    for (const tryPath of pathsToTry) {
+      try {
+        const exists = await qnap.folderExists(tryPath);
+        if (!exists) continue;
+
+        // displayId ile eşleşen klasörü bul veya doğrudan dosyaları listele
+        const files = await qnap.listFilesDetailed(tryPath);
+
+        // Eğer displayId klasörüne bakıyorsak doğrudan dosyaları say
+        const hasDisplayIdInPath = tryPath.includes(displayId);
+
+        if (hasDisplayIdInPath) {
+          const mediaFiles = files.filter((f: any) => !f.isFolder && mediaExtensions.some(ext => f.name.toLowerCase().endsWith(ext)));
+          processed += mediaFiles.length;
+          totalSize += mediaFiles.reduce((sum: number, f: any) => sum + f.size, 0);
+          // Alt klasörleri de tara
+          for (const sub of files.filter((f: any) => f.isFolder)) {
+            try {
+              const subFiles = await qnap.listFilesDetailed(`${tryPath}/${sub.name}`);
+              const subMedia = subFiles.filter((f: any) => !f.isFolder && mediaExtensions.some(ext => f.name.toLowerCase().endsWith(ext)));
+              processed += subMedia.length;
+              totalSize += subMedia.reduce((sum: number, f: any) => sum + f.size, 0);
+            } catch { /* alt klasör okunamadı */ }
+          }
+        } else {
+          // Pilot klasöründeyiz — displayId ile eşleşen alt klasörü ara
+          const displayFolder = files.find((f: any) => f.isFolder && f.name === displayId);
+          if (displayFolder) {
+            const custFiles = await qnap.listFilesDetailed(`${tryPath}/${displayId}`);
+            const mediaFiles = custFiles.filter((f: any) => !f.isFolder && mediaExtensions.some(ext => f.name.toLowerCase().endsWith(ext)));
+            processed += mediaFiles.length;
+            totalSize += mediaFiles.reduce((sum: number, f: any) => sum + f.size, 0);
+            for (const sub of custFiles.filter((f: any) => f.isFolder)) {
+              try {
+                const subFiles = await qnap.listFilesDetailed(`${tryPath}/${displayId}/${sub.name}`);
+                const subMedia = subFiles.filter((f: any) => !f.isFolder && mediaExtensions.some(ext => f.name.toLowerCase().endsWith(ext)));
+                processed += subMedia.length;
+                totalSize += subMedia.reduce((sum: number, f: any) => sum + f.size, 0);
+              } catch { /* alt klasör okunamadı */ }
+            }
+          }
+          // Sorti klasörleri içinde de ara
+          for (const sortiFolder of files.filter((f: any) => f.isFolder && f.name.includes('Sorti'))) {
+            try {
+              const sortiFiles = await qnap.listFilesDetailed(`${tryPath}/${sortiFolder.name}/${displayId}`);
+              const mediaFiles = sortiFiles.filter((f: any) => !f.isFolder && mediaExtensions.some(ext => f.name.toLowerCase().endsWith(ext)));
+              processed += mediaFiles.length;
+              totalSize += mediaFiles.reduce((sum: number, f: any) => sum + f.size, 0);
+            } catch { /* Sorti/displayId bulunamadı */ }
+          }
+        }
+
+        if (processed > 0) break; // Dosya bulduysa diğer path'leri deneme
+      } catch { /* bu path'te bulunamadı, sonrakini dene */ }
     }
 
     // MediaFolder kaydını güncelle
