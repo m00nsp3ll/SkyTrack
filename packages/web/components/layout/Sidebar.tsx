@@ -228,7 +228,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
     <aside
       className={cn(
         'bg-white border-r border-gray-200 flex flex-col transition-all duration-300',
-        'h-[100dvh]',
+        'h-full',
         isCollapsed ? 'w-16' : 'w-64'
       )}
     >

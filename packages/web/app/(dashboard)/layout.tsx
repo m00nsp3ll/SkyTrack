@@ -94,7 +94,7 @@ export default function DashboardLayout({
       <InAppNotificationBanner />
 
       {/* Desktop Sidebar */}
-      <div className="hidden md:block flex-shrink-0">
+      <div className="hidden md:block flex-shrink-0 h-screen">
         <Sidebar />
       </div>
 
