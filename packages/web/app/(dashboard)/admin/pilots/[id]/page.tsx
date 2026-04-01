@@ -58,6 +58,7 @@ interface Pilot {
     total: number
     completed: number
     inProgress: number
+    cancelled: number
   }
   filteredStats: {
     total: number
