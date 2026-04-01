@@ -12,7 +12,7 @@ self.addEventListener('push', (event) => {
   try {
     const data = event.data.json();
 
-    const options: NotificationOptions = {
+    const options: NotificationOptions & { vibrate?: number[] } = {
       body: data.body || '',
       icon: data.icon || '/icons/icon-192x192.png',
       badge: data.badge || '/icons/icon-72x72.png',
