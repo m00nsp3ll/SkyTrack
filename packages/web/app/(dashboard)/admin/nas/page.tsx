@@ -41,7 +41,7 @@ export default function NasPage() {
       setStatus(res.data.data)
       setLastChecked(new Date().toLocaleTimeString('tr-TR'))
     } catch (err) {
-      setStatus({ connected: false, message: 'API isteği başarısız' })
+      setStatus({ connected: false, message: 'API isteği başarısız', mode: 'LAN', host: '' })
     } finally {
       setLoadingStatus(false)
     }
