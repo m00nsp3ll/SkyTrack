@@ -69,8 +69,9 @@ self.addEventListener('notificationclose', (event) => {
 
 // Background sync for offline actions (optional)
 self.addEventListener('sync', (event) => {
-  if (event.tag === 'sync-pending-actions') {
-    event.waitUntil(syncPendingActions());
+  const syncEvent = event as any;
+  if (syncEvent.tag === 'sync-pending-actions') {
+    syncEvent.waitUntil(syncPendingActions());
   }
 });
 
