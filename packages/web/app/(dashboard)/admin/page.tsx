@@ -108,7 +108,7 @@ export default function AdminDashboard() {
   const [recentData, setRecentData] = useState<RecentData | null>(null)
   const [loading, setLoading] = useState(true)
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date())
-  const { socket, isConnected } = useSocket()
+  const { socket } = useSocket()
 
   const fetchData = useCallback(async () => {
     try {
@@ -194,7 +194,7 @@ export default function AdminDashboard() {
           <h1 className="text-2xl font-bold text-gray-900">Yönetim Paneli</h1>
           <p className="text-muted-foreground">
             Son güncelleme: {lastUpdate.toLocaleTimeString('tr-TR')}
-            {isConnected && (
+            {socket?.connected && (
               <span className="ml-2 inline-flex items-center">
                 <span className="h-2 w-2 rounded-full bg-green-500 mr-1 animate-pulse" />
                 Canlı
