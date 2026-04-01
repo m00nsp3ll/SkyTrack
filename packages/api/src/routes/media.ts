@@ -9,13 +9,13 @@ import { authenticate, requireRole, AuthRequest } from '../middleware/auth.js';
 import {
   getMediaFolderPath,
   ensureFolderStructure,
-  scanAndProcessFolder,
   listMediaFiles,
   getDiskStats,
   getTodayMediaStats,
   sanitizePilotName,
   formatDateForFolder,
 } from '../services/media.js';
+import { qnap } from '../services/qnapService.js';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -932,16 +932,62 @@ router.post(
       folderPath = getMediaFolderPath(today, pilotName, pilotFlightsToday, customer.displayId);
     }
 
-    // Ensure folder structure exists
-    await ensureFolderStructure(folderPath);
+    // NAS üzerinden SSH ile dosya tara
+    let relativePath = folderPath.replace(/^media\//, '');
+    let processed = 0;
+    let totalSize = 0;
+    const errors: string[] = [];
 
-    // Scan and process folder
-    const result = await scanAndProcessFolder(folderPath, customer.id, latestFlight.pilotId);
+    try {
+      const files = await qnap.listFilesDetailed(relativePath);
+      const mediaExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.mp4', '.mov', '.avi', '.mkv', '.webm'];
+      const mediaFiles = files.filter(f => !f.isFolder && mediaExtensions.some(ext => f.name.toLowerCase().endsWith(ext)));
+      processed = mediaFiles.length;
+      totalSize = mediaFiles.reduce((sum, f) => sum + f.size, 0);
+
+      // Alt klasörleri de tara (GoPro klasörleri vb.)
+      const subFolders = files.filter(f => f.isFolder);
+      for (const sub of subFolders) {
+        try {
+          const subFiles = await qnap.listFilesDetailed(`${relativePath}/${sub.name}`);
+          const subMedia = subFiles.filter(f => !f.isFolder && mediaExtensions.some(ext => f.name.toLowerCase().endsWith(ext)));
+          processed += subMedia.length;
+          totalSize += subMedia.reduce((sum, f) => sum + f.size, 0);
+        } catch { /* alt klasör okunamadı */ }
+      }
+    } catch (err: any) {
+      errors.push(`NAS dosya tarama hatası: ${err.message}`);
+    }
+
+    // MediaFolder kaydını güncelle
+    if (latestFlight.mediaFolder) {
+      await prisma.mediaFolder.update({
+        where: { id: latestFlight.mediaFolder.id },
+        data: {
+          fileCount: processed,
+          totalSizeBytes: BigInt(totalSize),
+        },
+      });
+    } else {
+      // MediaFolder yoksa oluştur
+      await prisma.mediaFolder.create({
+        data: {
+          customerId: customer.id,
+          pilotId: latestFlight.pilotId,
+          flightId: latestFlight.id,
+          folderPath,
+          fileCount: processed,
+          totalSizeBytes: BigInt(totalSize),
+          paymentStatus: 'PENDING',
+          deliveryStatus: 'PENDING',
+        },
+      });
+    }
 
     res.json({
       success: true,
-      data: result,
-      message: `${result.processed} dosya işlendi`,
+      data: { processed, totalSize, errors },
+      message: `${processed} dosya bulundu (NAS)`,
     });
   })
 );
