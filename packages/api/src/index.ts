@@ -293,20 +293,11 @@ lanApp.get('/api/media/:customerId/file/:filename', async (req, res) => {
   }
 });
 
-let lanServer;
-try {
-  const lanSslOptions = {
-    key: fs.readFileSync(path.join(certsPath, 'localhost.key')),
-    cert: fs.readFileSync(path.join(certsPath, 'localhost.crt')),
-  };
-  lanServer = createHttpsServer(lanSslOptions, lanApp);
-} catch {
-  lanServer = createServer(lanApp);
-  console.log('⚠️ LAN Download: SSL bulunamadı, HTTP fallback');
-}
+// LAN Download — always HTTP (no SSL errors on customer phones)
+const lanServer = createServer(lanApp);
 lanServer.listen(LAN_HTTPS_PORT, '0.0.0.0', () => {
   const currentIP = getCurrentIP();
-  console.log(`📡 LAN Download: https://${currentIP}:${LAN_HTTPS_PORT}`);
+  console.log(`📡 LAN Download: http://${currentIP}:${LAN_HTTPS_PORT}`);
 });
 
 export { app, io };

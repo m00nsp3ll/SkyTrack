@@ -454,17 +454,30 @@ export default function CustomerDownloadPage() {
     setApiUrl(getApiUrl())
   }, [])
 
+  // LAN detection via image trick — try to load a pixel from local server
   useEffect(() => {
-    if (!apiUrl) return
-    fetch(`${apiUrl}/network/discover`, { cache: 'no-store' })
-      .then(r => r.json())
-      .then(d => {
-        if (d.lanBaseUrl) setLanBaseUrl(d.lanBaseUrl)
-        if (d.isLan) setIsLan(true)
-        setConnectionChecked(true)
-      })
-      .catch(() => { setConnectionChecked(true) })
-  }, [apiUrl])
+    const LOCAL_IP = process.env.NEXT_PUBLIC_SERVER_IP || '192.168.1.11'
+    const LAN_PORT = '3080'
+    const lanUrl = `http://${LOCAL_IP}:${LAN_PORT}`
+
+    const img = new Image()
+    const timeout = setTimeout(() => {
+      img.src = '' // abort
+      setConnectionChecked(true)
+    }, 2000)
+
+    img.onload = () => {
+      clearTimeout(timeout)
+      setIsLan(true)
+      setLanBaseUrl(lanUrl)
+      setConnectionChecked(true)
+    }
+    img.onerror = () => {
+      clearTimeout(timeout)
+      setConnectionChecked(true)
+    }
+    img.src = `${lanUrl}/api/network/lan-check?t=${Date.now()}`
+  }, [])
 
   const fetchData = useCallback(async () => {
     if (!apiUrl) return
