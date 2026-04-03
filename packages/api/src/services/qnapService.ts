@@ -4,7 +4,8 @@ import fs from 'fs';
 class QnapService {
   private get sshConfig() {
     const isProduction = process.env.NODE_ENV === 'production';
-    return {
+    const keyPath = process.env.QNAP_SSH_KEY_PATH || '/root/.ssh/nas_key';
+    const config: any = {
       host: isProduction
         ? (process.env.QNAP_SSH_HOST_EXTERNAL || 'skytrack.myqnapcloud.com')
         : (process.env.QNAP_SSH_HOST_LOCAL || '192.168.1.105'),
@@ -12,8 +13,14 @@ class QnapService {
         ? parseInt(process.env.QNAP_SSH_PORT_EXTERNAL || '2222')
         : parseInt(process.env.QNAP_SSH_PORT_LOCAL || '22'),
       username: process.env.QNAP_SSH_USER || 'admin',
-      password: process.env.QNAP_SSH_PASSWORD || '',
     };
+    // Production'da key varsa kullan, yoksa şifre ile bağlan
+    if (isProduction && fs.existsSync(keyPath)) {
+      config.privateKey = fs.readFileSync(keyPath);
+    } else {
+      config.password = process.env.QNAP_SSH_PASSWORD || '';
+    }
+    return config;
   }
 
   private mediaPath = process.env.QNAP_MEDIA_PATH || '/share/skytrack-media';
