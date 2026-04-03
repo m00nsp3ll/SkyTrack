@@ -250,14 +250,17 @@ class QnapService {
     }
   }
 
-  // NAS'ta klasörü taşı
+  // NAS'ta klasörü taşı (Türkçe karakter uyumlu — wildcard ile)
   async moveFolder(fromRelativePath: string, toRelativePath: string): Promise<boolean> {
     try {
       const fromFull = `${this.mediaPath}/${fromRelativePath}`;
       const toFull = `${this.mediaPath}/${toRelativePath}`;
+      const fromDir = fromFull.substring(0, fromFull.lastIndexOf('/'));
+      const fromName = fromFull.substring(fromFull.lastIndexOf('/') + 1);
       const toDir = toFull.substring(0, toFull.lastIndexOf('/'));
-      await this.execSSH(`mkdir -p "${toDir}" && mv "${fromFull}" "${toFull}"`);
-      console.log(`[QNAP] Klasör taşındı: ${fromFull} → ${toFull}`);
+      // Türkçe karakterler shell'de bozulabilir — wildcard ile taşı
+      await this.execSSH(`mkdir -p "${toDir}" && cd "${fromDir}" && cp -r *"${fromName}"* "${toDir}/" && rm -rf *"${fromName}"*`);
+      console.log(`[QNAP] Klasör taşındı: ${fromFull} → ${toDir}`);
       return true;
     } catch (err: any) {
       console.error(`[QNAP] Klasör taşıma hatası: ${err.message}`);
