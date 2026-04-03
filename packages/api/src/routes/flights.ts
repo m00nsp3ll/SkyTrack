@@ -609,7 +609,7 @@ router.post('/:id/reassign', authenticate, requireRole('ADMIN'), asyncHandler(as
           data: { folderPath: `media/${newRelPath}`, pilotId },
         });
       }
-    } catch { /* NAS hatası uçuşu engellemesin */ }
+    } catch (err: any) { console.error('[Reassign] NAS klasör taşıma hatası:', err?.message); }
   }
 
   // Invalidate caches
