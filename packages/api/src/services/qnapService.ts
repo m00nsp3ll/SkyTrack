@@ -250,6 +250,21 @@ class QnapService {
     }
   }
 
+  // NAS'ta klasörü taşı
+  async moveFolder(fromRelativePath: string, toRelativePath: string): Promise<boolean> {
+    try {
+      const fromFull = `${this.mediaPath}/${fromRelativePath}`;
+      const toFull = `${this.mediaPath}/${toRelativePath}`;
+      const toDir = toFull.substring(0, toFull.lastIndexOf('/'));
+      await this.execSSH(`mkdir -p "${toDir}" && mv "${fromFull}" "${toFull}"`);
+      console.log(`[QNAP] Klasör taşındı: ${fromFull} → ${toFull}`);
+      return true;
+    } catch (err: any) {
+      console.error(`[QNAP] Klasör taşıma hatası: ${err.message}`);
+      return false;
+    }
+  }
+
   // Lokal dosyadan NAS'a yükle (PDF backup için)
   async uploadFile(localPath: string, remoteRelativePath: string): Promise<boolean> {
     const buffer = fs.readFileSync(localPath);

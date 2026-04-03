@@ -589,8 +589,28 @@ router.post('/:id/reassign', authenticate, requireRole('ADMIN'), asyncHandler(as
   const updatedFlight = await prisma.flight.update({
     where: { id },
     data: { pilotId },
-    include: { customer: true, pilot: true },
+    include: { customer: true, pilot: true, mediaFolder: true },
   });
+
+  // NAS'ta klasörü yeni pilot adına taşı
+  if ((updatedFlight as any).mediaFolder) {
+    try {
+      const mediaFolder = (updatedFlight as any).mediaFolder;
+      const oldPath = mediaFolder.folderPath.replace(/^media\//, '');
+      const dateMatch = oldPath.match(/^(\d{4}-\d{2}-\d{2})/);
+      if (dateMatch) {
+        const dateStr = dateMatch[1];
+        const safeName = newPilot.name.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_çÇğĞıİöÖşŞüÜ-]/g, '');
+        const newRelPath = `${dateStr}/${safeName}/${updatedFlight.customer.displayId}`;
+        const { qnap } = await import('../services/qnapService.js');
+        await qnap.moveFolder(oldPath, newRelPath);
+        await prisma.mediaFolder.update({
+          where: { id: mediaFolder.id },
+          data: { folderPath: `media/${newRelPath}`, pilotId },
+        });
+      }
+    } catch { /* NAS hatası uçuşu engellemesin */ }
+  }
 
   // Invalidate caches
   await cache.pilotQueue.invalidate();
