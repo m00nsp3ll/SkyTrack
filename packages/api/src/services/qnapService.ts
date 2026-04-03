@@ -168,7 +168,8 @@ class QnapService {
     }
   }
 
-  async uploadFile(localPath: string, remoteRelativePath: string): Promise<boolean> {
+  // Buffer'ı doğrudan NAS'a yükle (web upload için)
+  async uploadBuffer(buffer: Buffer, remoteRelativePath: string): Promise<boolean> {
     const remotePath = `${this.mediaPath}/${remoteRelativePath}`;
     const remoteDir = remotePath.substring(0, remotePath.lastIndexOf('/'));
 
@@ -179,16 +180,14 @@ class QnapService {
       return false;
     }
 
-    // SFTP subsystem disabled on QNAP — stream file via SSH exec + stdin
     return new Promise((resolve) => {
       const conn = new Client();
-      const fileBuffer = fs.readFileSync(localPath);
 
       const timeout = setTimeout(() => {
         conn.end();
         console.error('[QNAP] Dosya yükleme timeout');
         resolve(false);
-      }, 30000);
+      }, 60000);
 
       conn.on('ready', () => {
         conn.exec(`cat > "${remotePath}"`, (err, stream) => {
@@ -209,7 +208,6 @@ class QnapService {
               resolve(false);
             }
           });
-          // QNAP SSH may not fire 'close' — resolve on stdin finish
           stream.stdin.on('finish', () => {
             setTimeout(() => {
               clearTimeout(timeout);
@@ -218,7 +216,7 @@ class QnapService {
               resolve(true);
             }, 500);
           });
-          stream.stdin.end(fileBuffer);
+          stream.stdin.end(buffer);
         });
       });
 
@@ -230,6 +228,25 @@ class QnapService {
 
       conn.connect(this.sshConfig);
     });
+  }
+
+  // NAS'ta displayId klasörünü tüm tarih/pilot kombinasyonlarında ara
+  async findCustomerFolder(displayId: string): Promise<string | null> {
+    try {
+      const sorted = await this.execSSH(
+        `find "${this.mediaPath}" -maxdepth 4 -type d -name "${displayId}" 2>/dev/null | xargs ls -dt 2>/dev/null | head -1`
+      );
+      if (!sorted.trim()) return null;
+      return sorted.trim().replace(`${this.mediaPath}/`, '');
+    } catch {
+      return null;
+    }
+  }
+
+  // Lokal dosyadan NAS'a yükle (PDF backup için)
+  async uploadFile(localPath: string, remoteRelativePath: string): Promise<boolean> {
+    const buffer = fs.readFileSync(localPath);
+    return this.uploadBuffer(buffer, remoteRelativePath);
   }
 
   async backupWaiverPdf(localPdfPath: string, date: string, displayId: string, filename: string): Promise<boolean> {

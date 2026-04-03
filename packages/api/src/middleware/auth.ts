@@ -16,6 +16,11 @@ export interface AuthRequest extends Request {
 
 const JWT_SECRET = process.env.JWT_SECRET || 'skytrack-dev-secret';
 
+// Şifre hash'inden kısa bir versiyon türet (token geçersizleştirme için)
+function passwordVersion(hash: string): string {
+  return hash.slice(-8);
+}
+
 export const authenticate = async (
   req: AuthRequest,
   res: Response,
@@ -35,18 +40,29 @@ export const authenticate = async (
       userId: string;
       role: UserRole;
       pilotId?: string;
+      pv?: string;
     };
 
     const user = await prisma.user.findUnique({
       where: { id: decoded.userId },
-      select: { id: true, username: true, role: true, pilotId: true },
+      select: { id: true, username: true, role: true, pilotId: true, passwordHash: true },
     });
 
     if (!user) {
       throw new AppError('Kullanıcı bulunamadı', 401, 'UNAUTHORIZED');
     }
 
-    req.user = user;
+    // Şifre değişmişse eski tokenları geçersiz kıl
+    if (decoded.pv && decoded.pv !== passwordVersion(user.passwordHash)) {
+      throw new AppError('Oturum süresi doldu, tekrar giriş yapın', 401, 'TOKEN_EXPIRED');
+    }
+
+    req.user = {
+      id: user.id,
+      username: user.username,
+      role: user.role,
+      pilotId: user.pilotId,
+    };
     next();
   } catch (error) {
     if (error instanceof jwt.JsonWebTokenError) {
@@ -71,10 +87,10 @@ export const requireRole = (...allowedRoles: UserRole[]) => {
   };
 };
 
-export const generateToken = (user: { id: string; role: UserRole; pilotId?: string | null }) => {
-  return jwt.sign(
-    { userId: user.id, role: user.role, pilotId: user.pilotId },
-    JWT_SECRET,
-    { expiresIn: '30d' }
-  );
+export const generateToken = (user: { id: string; role: UserRole; pilotId?: string | null; passwordHash?: string }) => {
+  const payload: any = { userId: user.id, role: user.role, pilotId: user.pilotId };
+  if (user.passwordHash) {
+    payload.pv = passwordVersion(user.passwordHash);
+  }
+  return jwt.sign(payload, JWT_SECRET, { expiresIn: '30d' });
 };

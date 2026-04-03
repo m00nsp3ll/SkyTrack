@@ -48,7 +48,7 @@ router.post('/login', asyncHandler(async (req: AuthRequest, res: any) => {
     throw new AppError('Geçersiz kullanıcı adı veya şifre', 401, 'INVALID_CREDENTIALS');
   }
 
-  const token = generateToken(user);
+  const token = generateToken({ ...user, passwordHash: user.passwordHash });
 
   // Set HTTP-only cookie as backup auth mechanism
   res.cookie('token', token, {

@@ -77,6 +77,7 @@ model User {
   pilotId           String?            @unique @map("pilot_id")
   pilot             Pilot?             @relation(fields: [pilotId], references: [id])
   posCategories     Json?              @map("pos_categories")
+  passwordChangedAt DateTime?          @map("password_changed_at")
   sales             Sale[]
   pushSubscriptions PushSubscription[]
   fcmTokens         FcmToken[]

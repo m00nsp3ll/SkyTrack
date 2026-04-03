@@ -23,69 +23,7 @@ const prisma = new PrismaClient();
 const MEDIA_BASE_PATH = process.env.MEDIA_STORAGE_PATH || './media';
 
 // Multer configuration for file uploads
-const storage = multer.diskStorage({
-  destination: async (req, file, cb) => {
-    const { customerId } = req.params;
-
-    try {
-      // Get customer and their media folder
-      const customer = await prisma.customer.findUnique({
-        where: { id: customerId },
-        include: {
-          flights: {
-            orderBy: { createdAt: 'desc' },
-            take: 1,
-            include: {
-              pilot: true,
-              mediaFolder: true,
-            },
-          },
-        },
-      });
-
-      if (!customer) {
-        return cb(new Error('Müşteri bulunamadı'), '');
-      }
-
-      const latestFlight = customer.flights[0];
-      if (!latestFlight) {
-        return cb(new Error('Müşterinin uçuşu bulunamadı'), '');
-      }
-
-      let folderPath: string;
-
-      if (latestFlight.mediaFolder) {
-        folderPath = latestFlight.mediaFolder.folderPath;
-      } else {
-        // Create folder path with pilot name and sorti number
-        const today = new Date().toISOString().split('T')[0];
-        const pilotName = latestFlight.pilot?.name || 'unknown';
-        // Count completed flights for this pilot today to determine sorti number
-        const todayStart = new Date();
-        todayStart.setHours(0, 0, 0, 0);
-        const pilotFlightsToday = await prisma.flight.count({
-          where: {
-            pilotId: latestFlight.pilotId,
-            createdAt: { gte: todayStart },
-          },
-        });
-        const sortiNumber = pilotFlightsToday;
-        folderPath = getMediaFolderPath(today, pilotName, sortiNumber, customer.displayId);
-      }
-
-      await fs.mkdir(folderPath, { recursive: true });
-
-      cb(null, folderPath);
-    } catch (error) {
-      cb(error as Error, '');
-    }
-  },
-  filename: (req, file, cb) => {
-    // Preserve original filename (GoPro names like GOPR0001.MP4)
-    const sanitized = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
-    cb(null, sanitized);
-  },
-});
+const storage = multer.memoryStorage();
 
 const upload = multer({
   storage,
@@ -98,6 +36,8 @@ const upload = multer({
       'image/png',
       'image/gif',
       'image/webp',
+      'image/heic',
+      'image/heif',
       'video/mp4',
       'video/quicktime',
       'video/x-msvideo',
@@ -819,11 +759,11 @@ router.get(
 // DYNAMIC ROUTES (with :customerId parameter)
 // ==========================================
 
-// POST /api/media/upload/:customerId - Upload files for a customer
+// POST /api/media/upload/:customerId - Upload files for a customer (NAS üzerinden)
 router.post(
   '/upload/:customerId',
   authenticate,
-  upload.array('files', 50), // Max 50 files at once
+  upload.array('files', 50),
   asyncHandler(async (req: AuthRequest, res: any) => {
     const { customerId } = req.params;
     const files = req.files as Express.Multer.File[];
@@ -838,7 +778,7 @@ router.post(
         flights: {
           orderBy: { createdAt: 'desc' },
           take: 1,
-          include: { mediaFolder: true },
+          include: { pilot: true, mediaFolder: true },
         },
       },
     });
@@ -852,11 +792,51 @@ router.post(
       throw new AppError('Müşterinin uçuşu bulunamadı', 404, 'FLIGHT_NOT_FOUND');
     }
 
-    const folderPath = files[0].destination;
+    // NAS'ta hedef klasörü belirle
+    let nasRelativePath: string;
 
-    // Update media folder stats
-    const allFiles = await listMediaFiles(folderPath);
-    const totalSize = allFiles.reduce((sum, f) => sum + f.size, 0);
+    if (latestFlight.mediaFolder) {
+      // DB'deki folderPath'ten NAS relative path'ini çıkar
+      nasRelativePath = latestFlight.mediaFolder.folderPath.replace(/^media\//, '');
+    } else {
+      // NAS'ta displayId klasörünü ara
+      const found = await qnap.findCustomerFolder(customer.displayId);
+      if (found) {
+        nasRelativePath = found;
+      } else {
+        // Yoksa yeni klasör oluştur
+        const flightDate = latestFlight.createdAt.toISOString().split('T')[0];
+        const pilotName = latestFlight.pilot?.name || 'unknown';
+        const safePilot = pilotName.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_çÇğĞıİöÖşŞüÜ-]/g, '');
+        nasRelativePath = `${flightDate}/${safePilot}/${customer.displayId}`;
+      }
+    }
+
+    // Dosyaları NAS'a yükle
+    let uploaded = 0;
+    const errors: string[] = [];
+
+    for (const file of files) {
+      const remotePath = `${nasRelativePath}/${file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+      const ok = await qnap.uploadBuffer(file.buffer, remotePath);
+      if (ok) {
+        uploaded++;
+      } else {
+        errors.push(file.originalname);
+      }
+    }
+
+    if (uploaded === 0) {
+      throw new AppError('Dosyalar NAS\'a yüklenemedi', 500, 'UPLOAD_FAILED');
+    }
+
+    // NAS'taki dosya sayısını tara ve DB'yi güncelle
+    const nasFiles = await qnap.listFilesDetailed(nasRelativePath);
+    const mediaExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.mp4', '.mov', '.avi', '.mkv', '.webm', '.heic', '.heif'];
+    const mediaCount = nasFiles.filter(f => !f.isFolder && mediaExtensions.some(ext => f.name.toLowerCase().endsWith(ext))).length;
+    const totalSize = nasFiles.filter(f => !f.isFolder).reduce((s, f) => s + f.size, 0);
+
+    const folderPath = `media/${nasRelativePath}`;
 
     await prisma.mediaFolder.upsert({
       where: { flightId: latestFlight.id },
@@ -865,21 +845,22 @@ router.post(
         customerId: customer.id,
         pilotId: latestFlight.pilotId,
         folderPath,
-        fileCount: allFiles.length,
-        totalSizeBytes: totalSize,
+        fileCount: mediaCount,
+        totalSizeBytes: BigInt(totalSize),
+        paymentStatus: 'PENDING',
+        deliveryStatus: 'PENDING',
       },
       update: {
-        fileCount: allFiles.length,
-        totalSizeBytes: totalSize,
+        fileCount: mediaCount,
+        totalSizeBytes: BigInt(totalSize),
+        folderPath,
       },
     });
 
     res.json({
       success: true,
-      data: {
-        uploaded: files.length,
-      },
-      message: `${files.length} dosya yüklendi`,
+      data: { uploaded, errors },
+      message: `${uploaded} dosya NAS'a yüklendi`,
     });
   })
 );
@@ -914,74 +895,19 @@ router.post(
       throw new AppError('Müşterinin uçuşu bulunamadı', 404, 'FLIGHT_NOT_FOUND');
     }
 
-    let folderPath: string;
-
-    if (latestFlight.mediaFolder) {
-      folderPath = latestFlight.mediaFolder.folderPath;
-    } else {
-      const today = new Date().toISOString().split('T')[0];
-      const pilotName = latestFlight.pilot?.name || 'unknown';
-      const todayStart = new Date();
-      todayStart.setHours(0, 0, 0, 0);
-      const pilotFlightsToday = await prisma.flight.count({
-        where: {
-          pilotId: latestFlight.pilotId,
-          createdAt: { gte: todayStart },
-        },
-      });
-      folderPath = getMediaFolderPath(today, pilotName, pilotFlightsToday, customer.displayId);
-    }
-
-    // NAS üzerinden SSH ile dosya tara
-    // DB'deki path çeşitli formatlarda olabilir:
-    //   media/2026-04-01/pilot_UUID/customer_A0036
-    //   media/01-04-2026/BEDIRHAN_CELIK/7.Sorti/A0036
-    // NAS'taki gerçek path: 2026-04-01/BEDİRHAN_ÇELİK/A0036
-    let processed = 0;
-    let totalSize = 0;
-    const errors: string[] = [];
-    const mediaExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.mp4', '.mov', '.avi', '.mkv', '.webm', '.heic', '.heif'];
-
     const displayId = customer.displayId;
     const pilotName = latestFlight.pilot?.name || '';
-    const originalPilotFolder = pilotName.replace(/\s+/g, '_');
+    const mediaExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.mp4', '.mov', '.avi', '.mkv', '.webm', '.heic', '.heif'];
 
-    // Tarihi folderPath'ten çıkar (YYYY-MM-DD veya DD-MM-YYYY)
-    const relativePath = folderPath.replace(/^media\//, '');
-    let dateIso = ''; // YYYY-MM-DD format
-    const isoMatch = relativePath.match(/^(\d{4}-\d{2}-\d{2})/);
-    const ddMatch = relativePath.match(/^(\d{2})-(\d{2})-(\d{4})/);
-    if (isoMatch) {
-      dateIso = isoMatch[1];
-    } else if (ddMatch) {
-      dateIso = `${ddMatch[3]}-${ddMatch[2]}-${ddMatch[1]}`;
-    } else {
-      // Tarih bulunamazsa bugünün tarihini kullan
-      dateIso = new Date().toISOString().split('T')[0];
-    }
-
-    // NAS'ta denenecek path'ler (en spesifikten en genele)
-    const pathsToTry: string[] = [
-      `${dateIso}/${originalPilotFolder}/${displayId}`,
-      `${dateIso}/${originalPilotFolder}`,
-    ];
-
-    // Sanitized pilot adını da dene
-    const sanitizedPilot = (await import('../services/media.js')).sanitizePilotName(pilotName);
-    if (sanitizedPilot !== originalPilotFolder) {
-      pathsToTry.push(`${dateIso}/${sanitizedPilot}/${displayId}`);
-      pathsToTry.push(`${dateIso}/${sanitizedPilot}`);
-    }
-
-    // Orijinal relativePath'i de dene
-    pathsToTry.push(relativePath);
+    let processed = 0;
+    let totalSize = 0;
+    let foundNasPath = '';
 
     const scanFolder = async (scanPath: string) => {
       const files = await qnap.listFilesDetailed(scanPath);
       const mediaFiles = files.filter((f: any) => !f.isFolder && mediaExtensions.some(ext => f.name.toLowerCase().endsWith(ext)));
       let count = mediaFiles.length;
       let size = mediaFiles.reduce((sum: number, f: any) => sum + f.size, 0);
-      // Alt klasörleri de tara
       for (const sub of files.filter((f: any) => f.isFolder)) {
         try {
           const subFiles = await qnap.listFilesDetailed(`${scanPath}/${sub.name}`);
@@ -993,61 +919,93 @@ router.post(
       return { count, size };
     };
 
-    for (const tryPath of pathsToTry) {
-      try {
-        const exists = await qnap.folderExists(tryPath);
-        if (!exists) continue;
+    if (latestFlight.mediaFolder) {
+      // DB'deki folderPath'ten NAS path listesi oluştur
+      const folderPath = latestFlight.mediaFolder.folderPath;
+      const relativePath = folderPath.replace(/^media\//, '');
+      const originalPilotFolder = pilotName.replace(/\s+/g, '_');
 
-        const hasDisplayId = tryPath.includes(displayId);
+      let dateIso = '';
+      const isoMatch = relativePath.match(/^(\d{4}-\d{2}-\d{2})/);
+      const ddMatch = relativePath.match(/^(\d{2})-(\d{2})-(\d{4})/);
+      if (isoMatch) dateIso = isoMatch[1];
+      else if (ddMatch) dateIso = `${ddMatch[3]}-${ddMatch[2]}-${ddMatch[1]}`;
+      else dateIso = new Date().toISOString().split('T')[0];
 
-        if (hasDisplayId) {
-          // Doğrudan müşteri klasöründeyiz
-          const result = await scanFolder(tryPath);
-          processed += result.count;
-          totalSize += result.size;
-        } else {
-          // Pilot klasöründeyiz — displayId alt klasörünü ara
-          const files = await qnap.listFilesDetailed(tryPath);
-          // displayId ile eşleşen klasör
-          if (files.find((f: any) => f.isFolder && f.name === displayId)) {
-            const result = await scanFolder(`${tryPath}/${displayId}`);
+      const { sanitizePilotName: spn } = await import('../services/media.js');
+      const sanitizedPilot = spn(pilotName);
+
+      const pathsToTry: string[] = [
+        `${dateIso}/${originalPilotFolder}/${displayId}`,
+        `${dateIso}/${originalPilotFolder}`,
+        `${dateIso}/${sanitizedPilot}/${displayId}`,
+        `${dateIso}/${sanitizedPilot}`,
+        relativePath,
+      ];
+
+      for (const tryPath of pathsToTry) {
+        try {
+          const exists = await qnap.folderExists(tryPath);
+          if (!exists) continue;
+
+          if (tryPath.includes(displayId)) {
+            const result = await scanFolder(tryPath);
             processed += result.count;
             totalSize += result.size;
+            foundNasPath = tryPath;
+          } else {
+            const files = await qnap.listFilesDetailed(tryPath);
+            if (files.find((f: any) => f.isFolder && f.name === displayId)) {
+              const result = await scanFolder(`${tryPath}/${displayId}`);
+              processed += result.count;
+              totalSize += result.size;
+              foundNasPath = `${tryPath}/${displayId}`;
+            }
+            for (const sf of files.filter((f: any) => f.isFolder && f.name.includes('Sorti'))) {
+              try {
+                const sfExists = await qnap.folderExists(`${tryPath}/${sf.name}/${displayId}`);
+                if (sfExists) {
+                  const result = await scanFolder(`${tryPath}/${sf.name}/${displayId}`);
+                  processed += result.count;
+                  totalSize += result.size;
+                  foundNasPath = `${tryPath}/${sf.name}/${displayId}`;
+                }
+              } catch { /* */ }
+            }
           }
-          // Sorti klasörleri içinde de ara
-          for (const sf of files.filter((f: any) => f.isFolder && f.name.includes('Sorti'))) {
-            try {
-              const sfExists = await qnap.folderExists(`${tryPath}/${sf.name}/${displayId}`);
-              if (sfExists) {
-                const result = await scanFolder(`${tryPath}/${sf.name}/${displayId}`);
-                processed += result.count;
-                totalSize += result.size;
-              }
-            } catch { /* Sorti bulunamadı */ }
-          }
-        }
-
-        if (processed > 0) break;
-      } catch { /* bu path bulunamadı */ }
+          if (processed > 0) break;
+        } catch { /* bu path bulunamadı */ }
+      }
+    } else {
+      // DB'de mediaFolder kaydı yok — NAS'ta displayId klasörünü find ile ara
+      const found = await qnap.findCustomerFolder(displayId);
+      if (found) {
+        const result = await scanFolder(found);
+        processed = result.count;
+        totalSize = result.size;
+        foundNasPath = found;
+      }
     }
 
-    // MediaFolder kaydını güncelle
+    // MediaFolder kaydını oluştur/güncelle
+    const finalFolderPath = foundNasPath ? `media/${foundNasPath}` : (latestFlight.mediaFolder?.folderPath || `media/${new Date().toISOString().split('T')[0]}/${displayId}`);
+
     if (latestFlight.mediaFolder) {
       await prisma.mediaFolder.update({
         where: { id: latestFlight.mediaFolder.id },
         data: {
           fileCount: processed,
           totalSizeBytes: BigInt(totalSize),
+          ...(foundNasPath ? { folderPath: finalFolderPath } : {}),
         },
       });
-    } else {
-      // MediaFolder yoksa oluştur
+    } else if (processed > 0) {
       await prisma.mediaFolder.create({
         data: {
           customerId: customer.id,
           pilotId: latestFlight.pilotId,
           flightId: latestFlight.id,
-          folderPath,
+          folderPath: finalFolderPath,
           fileCount: processed,
           totalSizeBytes: BigInt(totalSize),
           paymentStatus: 'PENDING',
@@ -1058,7 +1016,7 @@ router.post(
 
     res.json({
       success: true,
-      data: { processed, totalSize, errors },
+      data: { processed, totalSize },
       message: `${processed} dosya bulundu (NAS)`,
     });
   })
