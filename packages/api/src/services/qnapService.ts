@@ -6,12 +6,10 @@ class QnapService {
     const isProduction = process.env.NODE_ENV === 'production';
     const keyPath = process.env.QNAP_SSH_KEY_PATH || '/root/.ssh/nas_key';
     const config: any = {
-      host: isProduction
+      host: process.env.QNAP_SSH_HOST || (isProduction
         ? (process.env.QNAP_SSH_HOST_EXTERNAL || 'skytrack.myqnapcloud.com')
-        : (process.env.QNAP_SSH_HOST_LOCAL || '192.168.1.105'),
-      port: isProduction
-        ? parseInt(process.env.QNAP_SSH_PORT_EXTERNAL || '2222')
-        : parseInt(process.env.QNAP_SSH_PORT_LOCAL || '22'),
+        : (process.env.QNAP_SSH_HOST_LOCAL || '192.168.1.105')),
+      port: parseInt(process.env.QNAP_SSH_PORT || (isProduction ? '2222' : '22')),
       username: process.env.QNAP_SSH_USER || 'admin',
     };
     // Production'da key varsa kullan, yoksa şifre ile bağlan
