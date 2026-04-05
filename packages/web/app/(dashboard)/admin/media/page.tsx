@@ -181,7 +181,7 @@ export default function MediaDashboardPage() {
       const res = await mediaApi.openFolder(customerId)
       const smbPath = res.data?.data?.smbPath
       if (!smbPath) throw new Error('SMB path alınamadı')
-      window.location.href = smbPath
+      window.open(smbPath)
     } catch (e: any) {
       alert(e.response?.data?.error?.message || e.message || 'Klasör açılamadı')
     }
@@ -194,7 +194,7 @@ export default function MediaDashboardPage() {
       const res = await mediaApi.openPilotFolder(pilotId, date)
       const smbPath = res.data?.data?.smbPath
       if (!smbPath) throw new Error('SMB path alınamadı')
-      window.location.href = smbPath
+      window.open(smbPath)
     } catch (e: any) {
       alert(e.response?.data?.error?.message || e.message || 'Klasör açılamadı')
     }

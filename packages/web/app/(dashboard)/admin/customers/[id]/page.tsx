@@ -624,7 +624,7 @@ Bu belgeyi imzalayarak asagidaki hususlari kabul ve beyan ederim:
       const res = await api.post(`/media/${customer.id}/open-folder`)
       const smbPath = res.data?.data?.smbPath
       if (!smbPath) throw new Error('SMB path alınamadı')
-      window.location.href = smbPath
+      window.open(smbPath)
     } catch (error: any) {
       alert(error.response?.data?.error?.message || error.message || 'Klasör açılamadı')
     } finally {

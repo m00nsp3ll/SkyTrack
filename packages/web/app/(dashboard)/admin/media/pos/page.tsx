@@ -360,7 +360,7 @@ export default function MediaPosPage() {
       const res = await api.post(`/media/${customerMedia.customer.id}/open-folder`)
       const smbPath = res.data?.data?.smbPath
       if (!smbPath) throw new Error('SMB path alınamadı')
-      window.location.href = smbPath
+      window.open(smbPath)
     } catch (err: any) {
       alert(err.response?.data?.error?.message || err.message || 'Klasör açılamadı')
     } finally {
