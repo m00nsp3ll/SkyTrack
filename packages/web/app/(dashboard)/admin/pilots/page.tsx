@@ -30,6 +30,7 @@ interface Pilot {
   maxDailyFlights: number
   queuePosition: number
   isActive: boolean
+  inQueue: boolean
   _count?: { flights: number }
 }
 
@@ -79,11 +80,9 @@ export default function PilotsPage() {
     return matchesSearch && matchesFilter
   })
 
-  // Single queue: AVAILABLE pilots first, then busy pilots (IN_FLIGHT, ON_BREAK etc.)
-  // Within each group, sorted by queuePosition
-  // Limit reached pilots shown separately at bottom
+  // Aktif sıradaki pilotlar (inQueue=true, limit dolmamış)
   const queuePilots = filteredPilots
-    .filter((p) => p.isActive && p.dailyFlightCount < p.maxDailyFlights)
+    .filter((p) => p.isActive && p.inQueue && p.dailyFlightCount < p.maxDailyFlights)
     .sort((a, b) => {
       const aAvailable = a.status === 'AVAILABLE' ? 0 : 1
       const bAvailable = b.status === 'AVAILABLE' ? 0 : 1
@@ -91,6 +90,9 @@ export default function PilotsPage() {
       return a.queuePosition - b.queuePosition
     })
   const limitReachedPilots = filteredPilots.filter((p) => p.dailyFlightCount >= p.maxDailyFlights && p.isActive)
+  const notInQueuePilots = filteredPilots.filter((p) => p.isActive && !p.inQueue && p.dailyFlightCount < p.maxDailyFlights)
+  const onBreakPilots = filteredPilots.filter((p) => p.isActive && p.inQueue && p.status === 'ON_BREAK' && p.dailyFlightCount < p.maxDailyFlights)
+  const offDutyPilots = filteredPilots.filter((p) => p.isActive && p.inQueue && p.status === 'OFF_DUTY' && p.dailyFlightCount < p.maxDailyFlights)
   const inactivePilots = filteredPilots.filter((p) => !p.isActive)
 
   // First AVAILABLE pilot in queue is the next one to receive a customer
@@ -288,60 +290,136 @@ export default function PilotsPage() {
         {/* Limit Reached Pilots */}
         {limitReachedPilots.length > 0 && (
           <div className="space-y-4">
-            <div className="flex items-center gap-2">
-              <h2 className="text-lg font-semibold">Bugün Uçuşu Dolanlar ({limitReachedPilots.length})</h2>
-              <span className="text-sm text-red-600 bg-red-50 px-2 py-1 rounded-full">
-                Günlük limit doldu
-              </span>
+            <div className="flex items-center gap-3">
+              <div className="flex-1 h-px bg-red-300" />
+              <span className="text-sm font-medium text-red-500 whitespace-nowrap">Günlük Limit Doldu ({limitReachedPilots.length})</span>
+              <div className="flex-1 h-px bg-red-300" />
             </div>
-            <div className="grid gap-4">
+            <div className="grid gap-3">
               {limitReachedPilots.map((pilot) => {
                 const status = statusConfig[pilot.status]
                 const StatusIcon = status.icon
-
                 return (
-                  <Card key={pilot.id} className="opacity-75 bg-red-50 dark:bg-red-950/20">
+                  <Card key={pilot.id} className="opacity-75 bg-red-50 border-red-200">
                     <CardContent className="p-4">
                       <div className="flex items-center gap-4">
-                        {/* Limit Badge */}
-                        <div className="hidden sm:flex items-center justify-center px-3 py-1 bg-red-500 text-white rounded-full text-xs font-bold">
-                          LİMİT
-                        </div>
-
-                        {/* Pilot Info */}
+                        <div className="hidden sm:flex items-center justify-center px-3 py-1 bg-red-500 text-white rounded-full text-xs font-bold">LİMİT</div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1">
                             <h3 className="font-semibold truncate">{pilot.name}</h3>
-                            <span
-                              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs text-white ${status.color}`}
-                            >
-                              <StatusIcon className="h-3 w-3" />
-                              {status.label}
+                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs text-white ${status.color}`}>
+                              <StatusIcon className="h-3 w-3" />{status.label}
                             </span>
                           </div>
-                          <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                            <span className="flex items-center gap-1">
-                              <Phone className="h-3 w-3" />
-                              {pilot.phone}
-                            </span>
-                          </div>
+                          <span className="flex items-center gap-1 text-sm text-muted-foreground"><Phone className="h-3 w-3" />{pilot.phone}</span>
                         </div>
-
-                        {/* Daily Stats */}
                         <div className="text-center">
-                          <p className="text-2xl font-bold text-red-600">
-                            {pilot.dailyFlightCount}/{pilot.maxDailyFlights}
-                          </p>
+                          <p className="text-2xl font-bold text-red-600">{pilot.dailyFlightCount}/{pilot.maxDailyFlights}</p>
                           <p className="text-xs text-muted-foreground">Bugün</p>
                         </div>
+                        <Link href={`/admin/pilots/${pilot.id}`}><Button variant="outline" size="sm"><Edit className="h-4 w-4 mr-1" />Detay</Button></Link>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )
+              })}
+            </div>
+          </div>
+        )}
 
-                        {/* Actions */}
-                        <Link href={`/admin/pilots/${pilot.id}`}>
-                          <Button variant="outline" size="sm">
-                            <Edit className="h-4 w-4 mr-1" />
-                            Detay
-                          </Button>
-                        </Link>
+        {/* Molada Pilotlar */}
+        {onBreakPilots.length > 0 && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="flex-1 h-px bg-yellow-300" />
+              <span className="text-sm font-medium text-yellow-600 whitespace-nowrap">Molada ({onBreakPilots.length})</span>
+              <div className="flex-1 h-px bg-yellow-300" />
+            </div>
+            <div className="grid gap-3">
+              {onBreakPilots.map((pilot) => (
+                <Card key={pilot.id} className="opacity-75 bg-yellow-50 border-yellow-200">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-4">
+                      <div className="hidden sm:flex items-center justify-center px-3 py-1 bg-yellow-500 text-white rounded-full text-xs font-bold">MOLA</div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold truncate">{pilot.name}</h3>
+                        <span className="flex items-center gap-1 text-sm text-muted-foreground"><Phone className="h-3 w-3" />{pilot.phone}</span>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-2xl font-bold text-primary">{pilot.dailyFlightCount}/{pilot.maxDailyFlights}</p>
+                        <p className="text-xs text-muted-foreground">Bugün</p>
+                      </div>
+                      <Link href={`/admin/pilots/${pilot.id}`}><Button variant="outline" size="sm"><Edit className="h-4 w-4 mr-1" />Detay</Button></Link>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Mesai Dışı Pilotlar */}
+        {offDutyPilots.length > 0 && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="flex-1 h-px bg-gray-300" />
+              <span className="text-sm font-medium text-gray-500 whitespace-nowrap">Mesai Dışı ({offDutyPilots.length})</span>
+              <div className="flex-1 h-px bg-gray-300" />
+            </div>
+            <div className="grid gap-3">
+              {offDutyPilots.map((pilot) => (
+                <Card key={pilot.id} className="opacity-60 bg-gray-50 border-gray-200">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-4">
+                      <div className="hidden sm:flex items-center justify-center px-3 py-1 bg-gray-500 text-white rounded-full text-xs font-bold">MESAİ DIŞI</div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold truncate">{pilot.name}</h3>
+                        <span className="flex items-center gap-1 text-sm text-muted-foreground"><Phone className="h-3 w-3" />{pilot.phone}</span>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-2xl font-bold text-primary">{pilot.dailyFlightCount}/{pilot.maxDailyFlights}</p>
+                        <p className="text-xs text-muted-foreground">Bugün</p>
+                      </div>
+                      <Link href={`/admin/pilots/${pilot.id}`}><Button variant="outline" size="sm"><Edit className="h-4 w-4 mr-1" />Detay</Button></Link>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Sırada Değil */}
+        {notInQueuePilots.length > 0 && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="flex-1 h-px bg-orange-300" />
+              <span className="text-sm font-medium text-orange-500 whitespace-nowrap">Sırada Değil ({notInQueuePilots.length})</span>
+              <div className="flex-1 h-px bg-orange-300" />
+            </div>
+            <div className="grid gap-3">
+              {notInQueuePilots.map((pilot) => {
+                const status = statusConfig[pilot.status]
+                const StatusIcon = status.icon
+                return (
+                  <Card key={pilot.id} className="opacity-60 bg-orange-50 border-orange-200">
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-4">
+                        <div className="hidden sm:flex items-center justify-center px-3 py-1 bg-orange-400 text-white rounded-full text-xs font-bold">SIRADA DEĞİL</div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <h3 className="font-semibold truncate">{pilot.name}</h3>
+                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs text-white ${status.color}`}>
+                              <StatusIcon className="h-3 w-3" />{status.label}
+                            </span>
+                          </div>
+                          <span className="flex items-center gap-1 text-sm text-muted-foreground"><Phone className="h-3 w-3" />{pilot.phone}</span>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-2xl font-bold text-primary">{pilot.dailyFlightCount}/{pilot.maxDailyFlights}</p>
+                          <p className="text-xs text-muted-foreground">Bugün</p>
+                        </div>
+                        <Link href={`/admin/pilots/${pilot.id}`}><Button variant="outline" size="sm"><Edit className="h-4 w-4 mr-1" />Detay</Button></Link>
                       </div>
                     </CardContent>
                   </Card>
