@@ -55,7 +55,7 @@ interface Pilot {
   user: { id: string } | null
 }
 
-
+interface NotificationSettingItem {
   enabled: boolean
   label: string
   description: string
