@@ -49,7 +49,13 @@ interface FcmToken {
   }
 }
 
-interface NotificationSettingItem {
+interface Pilot {
+  id: string
+  name: string
+  user: { id: string } | null
+}
+
+
   enabled: boolean
   label: string
   description: string
@@ -144,6 +150,9 @@ export default function NotificationsPage() {
   const [editingTemplate, setEditingTemplate] = useState<string | null>(null)
   const [templates, setTemplates] = useState(defaultTemplates)
   const [showSettingsModal, setShowSettingsModal] = useState(false)
+  const [pilots, setPilots] = useState<Pilot[]>([])
+  const [pilotSending, setPilotSending] = useState(false)
+  const [pilotForm, setPilotForm] = useState({ pilotId: '', title: '', body: '' })
 
   const [broadcastForm, setBroadcastForm] = useState({
     title: '',
@@ -164,6 +173,15 @@ export default function NotificationsPage() {
     }
   }
 
+  const fetchPilots = async () => {
+    try {
+      const response = await api.get('/fcm/pilots')
+      setPilots(response.data.data || [])
+    } catch (error) {
+      console.error('Failed to fetch pilots:', error)
+    }
+  }
+
   const fetchSettings = async () => {
     setSettingsLoading(true)
     try {
@@ -179,6 +197,7 @@ export default function NotificationsPage() {
   useEffect(() => {
     fetchTokens()
     fetchSettings()
+    fetchPilots()
     // Load saved templates from localStorage
     const saved = localStorage.getItem('broadcast_templates')
     if (saved) {
@@ -187,6 +206,31 @@ export default function NotificationsPage() {
       } catch {}
     }
   }, [])
+
+  const handlePilotSend = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!pilotForm.pilotId || !pilotForm.title || !pilotForm.body) {
+      setMessage({ type: 'error', text: 'Pilot, başlık ve mesaj zorunludur' })
+      return
+    }
+
+    const pilotName = pilots.find(p => p.id === pilotForm.pilotId)?.name || ''
+    if (!confirm(`${pilotName} adlı pilota bildirim gönderilecek.\n\n${pilotForm.title}\n${pilotForm.body}\n\nOnaylıyor musunuz?`)) return
+
+    setPilotSending(true)
+    try {
+      const response = await api.post(`/fcm/send-pilot/${pilotForm.pilotId}`, {
+        title: pilotForm.title,
+        body: pilotForm.body,
+      })
+      setMessage({ type: 'success', text: response.data.message || 'Bildirim gönderildi!' })
+      setPilotForm({ pilotId: '', title: '', body: '' })
+    } catch (error: any) {
+      setMessage({ type: 'error', text: error.response?.data?.error?.message || 'Bildirim gönderilemedi' })
+    } finally {
+      setPilotSending(false)
+    }
+  }
 
   const handleBroadcast = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -393,7 +437,68 @@ export default function NotificationsPage() {
       </div>
 
 
-      <div className="grid lg:grid-cols-2 gap-6">
+      <div className="grid lg:grid-cols-3 gap-6">
+        {/* Single Pilot Form */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Plane className="w-5 h-5" />
+              Tek Pilota Bildirim
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handlePilotSend} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="pilotId">Pilot *</Label>
+                <select
+                  id="pilotId"
+                  value={pilotForm.pilotId}
+                  onChange={(e) => setPilotForm({ ...pilotForm, pilotId: e.target.value })}
+                  className="w-full border rounded-md p-2"
+                  required
+                >
+                  <option value="">Pilot seçin...</option>
+                  {pilots.map((p) => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="pilotTitle">Başlık *</Label>
+                <Input
+                  id="pilotTitle"
+                  value={pilotForm.title}
+                  onChange={(e) => setPilotForm({ ...pilotForm, title: e.target.value })}
+                  placeholder="Bildirim başlığı"
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="pilotBody">Mesaj *</Label>
+                <Textarea
+                  id="pilotBody"
+                  value={pilotForm.body}
+                  onChange={(e) => setPilotForm({ ...pilotForm, body: e.target.value })}
+                  placeholder="Bildirim mesajı"
+                  rows={3}
+                  required
+                />
+              </div>
+
+              <Button type="submit" className="w-full" disabled={pilotSending}>
+                {pilotSending ? (
+                  <RefreshCw className="w-4 h-4 animate-spin mr-2" />
+                ) : (
+                  <Send className="w-4 h-4 mr-2" />
+                )}
+                Gönder
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+
         {/* Broadcast Form */}
         <Card>
           <CardHeader>

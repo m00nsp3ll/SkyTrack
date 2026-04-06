@@ -163,6 +163,54 @@ router.put('/notification-settings', authenticate, requireRole('ADMIN'), asyncHa
   res.json({ success: true, data: existing, message: 'Bildirim ayarları güncellendi' });
 }));
 
+// GET /api/fcm/pilots - Admin: list active pilots with name and userId for targeting
+router.get('/pilots', authenticate, requireRole('ADMIN'), asyncHandler(async (req: AuthRequest, res: any) => {
+  const pilots = await prisma.pilot.findMany({
+    where: { isActive: true },
+    select: {
+      id: true,
+      name: true,
+      user: { select: { id: true } },
+    },
+    orderBy: { name: 'asc' },
+  });
+
+  res.json({ success: true, data: pilots });
+}));
+
+// POST /api/fcm/send-pilot/:pilotId - Send notification to a single pilot
+router.post('/send-pilot/:pilotId', authenticate, requireRole('ADMIN'), asyncHandler(async (req: AuthRequest, res: any) => {
+  const { pilotId } = req.params;
+  const { title, body, data } = req.body;
+
+  if (!title || !body) {
+    throw new AppError('Başlık ve mesaj zorunludur', 400, 'MISSING_FIELDS');
+  }
+
+  const pilot = await prisma.pilot.findUnique({
+    where: { id: pilotId },
+    include: { user: true },
+  });
+
+  if (!pilot || !pilot.user) {
+    throw new AppError('Pilot veya kullanıcı bulunamadı', 404, 'NOT_FOUND');
+  }
+
+  const tokens = await prisma.fcmToken.findMany({
+    where: { userId: pilot.user.id, isActive: true },
+  });
+
+  if (tokens.length === 0) {
+    throw new AppError('Bu pilota ait kayıtlı cihaz bulunamadı', 404, 'NO_DEVICES');
+  }
+
+  for (const t of tokens) {
+    await sendNativeNotification(t.token, { title, body, data: { type: 'manual', ...data } });
+  }
+
+  res.json({ success: true, message: `Bildirim ${pilot.name} adlı pilota gönderildi (${tokens.length} cihaz)` });
+}));
+
 // POST /api/fcm/keepalive - PUBLIC: Keep existing FCM token active (no auth required)
 // Safe because we only update tokens already in DB — we don't change their user mapping
 router.post('/keepalive', asyncHandler(async (req: AuthRequest, res: any) => {

@@ -31,6 +31,7 @@ import {
   X,
   ChevronRight,
   ListOrdered,
+  Bell,
 } from 'lucide-react'
 
 interface UserData {
@@ -99,6 +100,8 @@ export default function PilotPanel() {
   const [showProfileSidebar, setShowProfileSidebar] = useState(false)
   const [selectedQRCustomer, setSelectedQRCustomer] = useState<Customer | null>(null)
   const [selectedQRType, setSelectedQRType] = useState<'admin' | 'media'>('admin')
+  const [showNotifications, setShowNotifications] = useState(false)
+  const [notificationList, setNotificationList] = useState<{ id: string; text: string; time: Date }[]>([])
 
   // Socket.IO hook
   const { on, socket } = useSocket({
@@ -161,10 +164,19 @@ export default function PilotPanel() {
   useEffect(() => {
     if (!user?.pilotId) return
 
+    const addNotif = (text: string) => {
+      setNotificationList(prev => [
+        { id: Math.random().toString(36).slice(2), text, time: new Date() },
+        ...prev,
+      ])
+    }
+
     // New customer assigned
     const unsubAssigned = on(SOCKET_EVENTS.CUSTOMER_ASSIGNED, (data) => {
       console.log('🎯 New customer assigned:', data)
-      setNotification(`Yeni müşteri atandı: ${data.customer.firstName} ${data.customer.lastName}`)
+      const text = `Yeni müşteri atandı: ${data.customer.firstName} ${data.customer.lastName}`
+      setNotification(text)
+      addNotif(text)
       fetchPanelData(user.pilotId)
 
       // Play notification sound
@@ -198,11 +210,13 @@ export default function PilotPanel() {
     // Limit warnings
     const unsubLimitWarning = on(SOCKET_EVENTS.PILOT_LIMIT_WARNING, (data) => {
       setNotification(data.message)
+      addNotif(data.message)
       setTimeout(() => setNotification(null), 5000)
     })
 
     const unsubLimitReached = on(SOCKET_EVENTS.PILOT_LIMIT_REACHED, (data) => {
       setNotification(data.message)
+      addNotif(data.message)
       setTimeout(() => setNotification(null), 8000)
     })
 
@@ -313,11 +327,26 @@ export default function PilotPanel() {
             </div>
             <ChevronRight className="h-5 w-5 opacity-60" />
           </div>
+          {/* Notification Bell */}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setShowNotifications(true)}
+            className="text-white hover:bg-white/20 relative"
+          >
+            <Bell className="h-5 w-5" />
+            {notificationList.length > 0 && (
+              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+                {notificationList.length > 99 ? '99+' : notificationList.length}
+              </span>
+            )}
+          </Button>
+
           <Button
             variant="ghost"
             size="icon"
             onClick={handleLogout}
-            className="text-white hover:bg-white/20 ml-2"
+            className="text-white hover:bg-white/20 ml-1"
           >
             <LogOut className="h-5 w-5" />
           </Button>
@@ -696,6 +725,76 @@ export default function PilotPanel() {
                 Çıkış Yap
               </Button>
             </div>
+          </div>
+        </>
+      )}
+
+      {/* Notification Modal */}
+      {showNotifications && (
+        <>
+          <div
+            className="fixed inset-0 bg-black/50 z-50"
+            onClick={() => setShowNotifications(false)}
+          />
+          <div className="fixed inset-x-0 top-0 bottom-0 z-50 flex flex-col bg-white max-w-md mx-auto shadow-xl">
+            {/* Modal Header */}
+            <div className="bg-primary text-white p-4 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Bell className="h-5 w-5" />
+                <h2 className="font-semibold text-lg">Bugünkü Bildirimler</h2>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setShowNotifications(false)}
+                className="text-white hover:bg-white/20"
+              >
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
+
+            {/* Notification List */}
+            <div className="flex-1 overflow-y-auto">
+              {notificationList.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full text-muted-foreground py-16">
+                  <Bell className="h-12 w-12 opacity-20 mb-3" />
+                  <p className="font-medium">Henüz bildirim yok</p>
+                  <p className="text-sm mt-1">Yeni bildirimler burada görünür</p>
+                </div>
+              ) : (
+                <div className="divide-y">
+                  {notificationList.map((notif) => (
+                    <div key={notif.id} className="flex items-start gap-3 p-4 hover:bg-gray-50">
+                      <div className="w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <Bell className="h-4 w-4 text-blue-600" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-gray-800">{notif.text}</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {notif.time.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            {notificationList.length > 0 && (
+              <div className="p-4 border-t">
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => {
+                    setNotificationList([])
+                    setShowNotifications(false)
+                  }}
+                >
+                  Tümünü Temizle
+                </Button>
+              </div>
+            )}
           </div>
         </>
       )}
