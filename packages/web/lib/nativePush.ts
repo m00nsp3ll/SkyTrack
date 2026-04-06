@@ -172,6 +172,24 @@ async function registerToken(fcmToken: string, platform: string, authToken: stri
 
     console.log('[PUSH] register response status:', res.status);
 
+    // If JWT expired, try keepalive (public endpoint — just marks existing token active)
+    if (res.status === 401) {
+      console.log('[PUSH] JWT expired, attempting keepalive for existing token...');
+      const keepRes = await fetch(`${baseUrl}/api/fcm/keepalive`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: fcmToken }),
+      });
+      if (keepRes.ok) {
+        console.log('[PUSH] keepalive OK — token kept active');
+        localStorage.setItem(TOKEN_KEY, fcmToken);
+        (window as any)._fcmTokenDone = true;
+      } else {
+        console.warn('[PUSH] keepalive failed (token not registered) — pilot needs to re-login');
+      }
+      return;
+    }
+
     if (res.ok) {
       const data = await res.json();
       console.log('[PUSH] TOKEN REGISTERED:', JSON.stringify(data));

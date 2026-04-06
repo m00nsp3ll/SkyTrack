@@ -163,6 +163,30 @@ router.put('/notification-settings', authenticate, requireRole('ADMIN'), asyncHa
   res.json({ success: true, data: existing, message: 'Bildirim ayarları güncellendi' });
 }));
 
+// POST /api/fcm/keepalive - PUBLIC: Keep existing FCM token active (no auth required)
+// Safe because we only update tokens already in DB — we don't change their user mapping
+router.post('/keepalive', asyncHandler(async (req: AuthRequest, res: any) => {
+  const { token } = req.body;
+
+  if (!token) {
+    throw new AppError('Token gerekli', 400, 'MISSING_TOKEN');
+  }
+
+  const existing = await prisma.fcmToken.findUnique({ where: { token } });
+
+  if (!existing) {
+    // Token not in DB — can't keepalive an unknown token
+    return res.status(404).json({ success: false, message: 'Token kayıtlı değil, giriş yapın' });
+  }
+
+  await prisma.fcmToken.update({
+    where: { token },
+    data: { isActive: true },
+  });
+
+  res.json({ success: true, message: 'FCM token aktif tutuldu' });
+}));
+
 // POST /api/fcm/refresh - Refresh/keepalive FCM token (updates updatedAt)
 router.post('/refresh', authenticate, asyncHandler(async (req: AuthRequest, res: any) => {
   const { token, platform, device } = req.body;
