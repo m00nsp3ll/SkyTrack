@@ -105,6 +105,8 @@ export const pilotsApi = {
     api.post('/pilots/queue/reorder', { order }),
   updateStatus: (id: string, status: string) =>
     api.patch(`/pilots/${id}/status`, { status }),
+  toggleQueue: (id: string) =>
+    api.patch(`/pilots/${id}/queue-toggle`),
 }
 
 // Customers API

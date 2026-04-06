@@ -47,6 +47,7 @@ router.get('/queue', authenticate, asyncHandler(async (req: AuthRequest, res: an
         maxDailyFlights: true,
         status: true,
         queuePosition: true,
+        inQueue: true,
         phone: true,
       },
     });
@@ -56,7 +57,7 @@ router.get('/queue', authenticate, asyncHandler(async (req: AuthRequest, res: an
   }
 
   const availablePilots = (queueData as any[]).filter(
-    (p: any) => p.status === 'AVAILABLE' && p.dailyFlightCount < p.maxDailyFlights
+    (p: any) => p.inQueue !== false && p.status === 'AVAILABLE' && p.dailyFlightCount < p.maxDailyFlights
   );
 
   res.json({
@@ -407,6 +408,24 @@ router.put('/:id', authenticate, requireRole('ADMIN'), asyncHandler(async (req: 
     success: true,
     data: pilot,
   });
+}));
+
+// PATCH /api/pilots/:id/queue-toggle - Pilotu sıraya al/çıkar (admin only)
+router.patch('/:id/queue-toggle', authenticate, requireRole('ADMIN'), asyncHandler(async (req: AuthRequest, res: any) => {
+  const { id } = req.params;
+
+  const current = await prisma.pilot.findUnique({ where: { id }, select: { inQueue: true } });
+  if (!current) throw new AppError('Pilot bulunamadı', 404, 'PILOT_NOT_FOUND');
+
+  const pilot = await prisma.pilot.update({
+    where: { id },
+    data: { inQueue: !current.inQueue },
+  });
+
+  await cache.pilotQueue.invalidate();
+  await cache.pilot.invalidate(id);
+
+  res.json({ success: true, data: pilot, message: pilot.inQueue ? 'Pilot sıraya alındı' : 'Pilot sıradan çıkarıldı' });
 }));
 
 // PATCH /api/pilots/:id/status - Update pilot status

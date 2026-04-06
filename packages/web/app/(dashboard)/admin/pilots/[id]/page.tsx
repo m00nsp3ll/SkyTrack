@@ -24,6 +24,7 @@ import {
   Users,
   TrendingUp,
   Filter,
+  ListOrdered,
 } from 'lucide-react'
 
 interface Flight {
@@ -49,6 +50,7 @@ interface Pilot {
   maxDailyFlights: number
   queuePosition: number
   isActive: boolean
+  inQueue: boolean
   createdAt: string
   totalFlights: number
   completedAllTime: number
@@ -170,6 +172,15 @@ export default function PilotDetailPage() {
       fetchPilot()
     } catch (err: any) {
       setError(err.response?.data?.message || 'Durum değiştirilemedi')
+    }
+  }
+
+  const handleQueueToggle = async () => {
+    try {
+      await pilotsApi.toggleQueue(id as string)
+      fetchPilot()
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Sıra durumu değiştirilemedi')
     }
   }
 
@@ -353,6 +364,30 @@ export default function PilotDetailPage() {
               </p>
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Queue Toggle */}
+      <Card className={pilot.inQueue ? 'border-green-200' : 'border-orange-200'}>
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-medium flex items-center gap-2">
+                <ListOrdered className="h-4 w-4" />
+                Makara Sırası
+              </p>
+              <p className="text-sm text-muted-foreground">
+                {pilot.inQueue ? 'Pilot aktif sıradadır, müşteri atanabilir' : 'Pilot sıra dışıdır, müşteri atanmaz'}
+              </p>
+            </div>
+            <Button
+              variant={pilot.inQueue ? 'outline' : 'default'}
+              className={pilot.inQueue ? 'border-orange-400 text-orange-600 hover:bg-orange-50' : 'bg-green-600 hover:bg-green-700'}
+              onClick={handleQueueToggle}
+            >
+              {pilot.inQueue ? 'Sıradan Çıkar' : 'Sıraya Al'}
+            </Button>
+          </div>
         </CardContent>
       </Card>
 

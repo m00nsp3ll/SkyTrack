@@ -25,6 +25,7 @@ interface Pilot {
   dailyFlightCount: number
   maxDailyFlights: number
   queuePosition: number
+  inQueue: boolean
 }
 
 const statusConfig = {
@@ -168,11 +169,11 @@ export default function PilotQueuePage() {
       {/* Queue List */}
       <Card>
         <CardHeader>
-          <CardTitle>Aktif Pilotlar ({pilots.length})</CardTitle>
+          <CardTitle>Aktif Sıra ({pilots.filter(p => p.inQueue).length})</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           <div className="divide-y">
-            {pilots.map((pilot, index) => {
+            {pilots.filter(p => p.inQueue).map((pilot, index) => {
               const status = statusConfig[pilot.status]
               const StatusIcon = status.icon
               const isAtLimit = pilot.dailyFlightCount >= pilot.maxDailyFlights
@@ -188,51 +189,24 @@ export default function PilotQueuePage() {
                     draggedIndex === index ? 'bg-blue-50' : ''
                   }`}
                 >
-                  {/* Drag Handle */}
                   <GripVertical className="h-5 w-5 text-gray-400" />
-
-                  {/* Position */}
                   <div className="flex items-center justify-center w-8 h-8 bg-primary text-white rounded-full text-sm font-bold">
                     {index + 1}
                   </div>
-
-                  {/* Pilot Info */}
                   <div className="flex-1">
                     <p className="font-medium">{pilot.name}</p>
                     <div className="flex items-center gap-2 text-sm">
                       <StatusIcon className={`h-3 w-3 ${status.color}`} />
                       <span className={status.color}>{status.label}</span>
                       <span className="text-muted-foreground">·</span>
-                      <span
-                        className={
-                          isAtLimit ? 'text-red-600' : 'text-muted-foreground'
-                        }
-                      >
+                      <span className={isAtLimit ? 'text-red-600' : 'text-muted-foreground'}>
                         {pilot.dailyFlightCount}/{pilot.maxDailyFlights} uçuş
                       </span>
                     </div>
                   </div>
-
-                  {/* Move Buttons */}
                   <div className="flex flex-col gap-1">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 w-6 p-0"
-                      onClick={() => moveUp(index)}
-                      disabled={index === 0}
-                    >
-                      ↑
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 w-6 p-0"
-                      onClick={() => moveDown(index)}
-                      disabled={index === pilots.length - 1}
-                    >
-                      ↓
-                    </Button>
+                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => moveUp(index)} disabled={index === 0}>↑</Button>
+                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => moveDown(index)} disabled={index === pilots.filter(p => p.inQueue).length - 1}>↓</Button>
                   </div>
                 </div>
               )
@@ -240,6 +214,45 @@ export default function PilotQueuePage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Sıra Dışı Pilotlar */}
+      {pilots.filter(p => !p.inQueue).length > 0 && (
+        <div>
+          <div className="flex items-center gap-3 my-2">
+            <div className="flex-1 h-px bg-orange-300" />
+            <span className="text-sm font-medium text-orange-500 whitespace-nowrap">Sırada Değil</span>
+            <div className="flex-1 h-px bg-orange-300" />
+          </div>
+          <Card className="border-orange-200">
+            <CardContent className="p-0">
+              <div className="divide-y">
+                {pilots.filter(p => !p.inQueue).map((pilot) => {
+                  const status = statusConfig[pilot.status]
+                  const StatusIcon = status.icon
+                  const isAtLimit = pilot.dailyFlightCount >= pilot.maxDailyFlights
+                  return (
+                    <div key={pilot.id} className="flex items-center gap-4 p-4 opacity-60 bg-orange-50/40">
+                      <div className="w-5" />
+                      <div className="flex items-center justify-center w-8 h-8 bg-orange-300 text-white rounded-full text-sm font-bold">—</div>
+                      <div className="flex-1">
+                        <p className="font-medium">{pilot.name}</p>
+                        <div className="flex items-center gap-2 text-sm">
+                          <StatusIcon className={`h-3 w-3 ${status.color}`} />
+                          <span className={status.color}>{status.label}</span>
+                          <span className="text-muted-foreground">·</span>
+                          <span className={isAtLimit ? 'text-red-600' : 'text-muted-foreground'}>
+                            {pilot.dailyFlightCount}/{pilot.maxDailyFlights} uçuş
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   )
 }
