@@ -65,6 +65,7 @@ interface PilotData {
   dailyFlightCount: number
   maxDailyFlights: number
   queuePosition: number
+  inQueue: boolean
 }
 
 interface PanelData {
@@ -354,10 +355,10 @@ export default function PilotPanel() {
 
       {/* Stats */}
       <div className="p-4 grid grid-cols-4 gap-2">
-        <Card className={pilot?.queuePosition && pilot.queuePosition > 0 ? 'ring-2 ring-yellow-500' : ''}>
+        <Card className={pilot?.inQueue && pilot.queuePosition > 0 ? 'ring-2 ring-yellow-500' : ''}>
           <CardContent className="p-3 text-center">
             <p className="text-2xl font-bold text-yellow-600">
-              {pilot?.queuePosition && pilot.queuePosition > 0 ? pilot.queuePosition : '-'}
+              {pilot?.inQueue && pilot.queuePosition > 0 ? pilot.queuePosition : '-'}
             </p>
             <p className="text-xs text-muted-foreground">Sıra</p>
           </CardContent>
@@ -654,12 +655,14 @@ export default function PilotPanel() {
                     <span className="text-muted-foreground">Kalan Limit</span>
                     <span className="font-semibold">{stats?.remaining || 0}</span>
                   </div>
-                  {pilot?.queuePosition && pilot.queuePosition > 0 && (
-                    <div className="flex justify-between py-2 border-b">
+                  <div className="flex justify-between py-2 border-b">
                       <span className="text-muted-foreground">Sıra Durumu</span>
-                      <span className="font-semibold text-yellow-600">{pilot.queuePosition}. sırada</span>
+                      {pilot?.inQueue && pilot.queuePosition > 0 ? (
+                        <span className="font-semibold text-yellow-600">{pilot.queuePosition}. sırada</span>
+                      ) : (
+                        <span className="font-semibold text-orange-500">Sırada Değil</span>
+                      )}
                     </div>
-                  )}
                 </div>
               </div>
 
