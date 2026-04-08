@@ -298,6 +298,7 @@ router.get('/:id/panel', authenticate, asyncHandler(async (req: AuthRequest, res
   const allActivePilots = await prisma.pilot.findMany({
     where: {
       isActive: true,
+      inQueue: true, // exclude pilots who opted out of queue
       status: { in: ['AVAILABLE', 'ON_BREAK'] },
     },
     orderBy: [
