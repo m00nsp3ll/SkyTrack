@@ -926,79 +926,80 @@ router.post(
       return { count, size };
     };
 
-    // Yerel media klasöründe ara — DB'deki folderPath önce, yoksa pattern ile tara
+    // Tüm media klasörünü gezip displayId'yi recursive olarak bul
+    // Önce DB path'i dene (ama UUID formatıysa atla, içi boş olabilir)
+    const mediaBase = pathMod.resolve(process.cwd(), MEDIA_BASE_PATH);
     let processed = 0;
     let totalSize = 0;
     let foundLocalPath = '';
 
-    const { sanitizePilotName: spn } = await import('../services/media.js');
+    // Helper: bir klasörün tüm alt ağacında displayId klasörünü bul
+    const findDisplayIdInTree = (baseDir: string): string[] => {
+      const found: string[] = [];
+      try {
+        const entries = fsSync.readdirSync(baseDir, { withFileTypes: true });
+        for (const entry of entries) {
+          if (!entry.isDirectory()) continue;
+          const fullPath = pathMod.join(baseDir, entry.name);
+          if (entry.name === displayId || entry.name === `customer_${displayId}`) {
+            found.push(fullPath);
+          } else {
+            // UUID formatı pilot klasörü veya sorti klasörü — içine gir
+            found.push(...findDisplayIdInTree(fullPath));
+          }
+        }
+      } catch { /* okunamıyor */ }
+      return found;
+    };
 
     if (latestFlight.mediaFolder?.folderPath) {
-      // DB'de kayıtlı path'i önce dene (hem absolute hem relative)
       const dbPath = latestFlight.mediaFolder.folderPath;
       const candidates = [
-        dbPath,                                            // olduğu gibi
-        pathMod.resolve(MEDIA_BASE_PATH, '..', dbPath),   // api kökünden relative
-        pathMod.resolve(process.cwd(), dbPath),            // cwd'den relative
+        pathMod.resolve(process.cwd(), dbPath),
+        pathMod.resolve(mediaBase, '..', dbPath),
+        dbPath,
       ];
       for (const c of candidates) {
         if (fsSync.existsSync(c)) {
           const result = scanLocalFolder(c);
-          if (result.count > 0 || fsSync.existsSync(c)) {
+          if (result.count > 0) {
             processed = result.count;
             totalSize = result.size;
             foundLocalPath = c;
             break;
           }
+          // Klasör var ama boş (UUID formatı olabilir) — içinde alt klasör var mı?
+          const sub = findDisplayIdInTree(c);
+          for (const s of sub) {
+            const r = scanLocalFolder(s);
+            processed += r.count;
+            totalSize += r.size;
+            if (!foundLocalPath && r.count > 0) foundLocalPath = s;
+          }
+          if (processed > 0) break;
         }
       }
     }
 
-    // DB path çalışmadıysa — tarih klasörlerinde displayId ile ara
-    if (!foundLocalPath) {
-      const mediaBase = pathMod.resolve(process.cwd(), MEDIA_BASE_PATH);
+    // Hala bulunamadıysa — tüm media/tarih klasörlerinde displayId'yi ara
+    if (processed === 0) {
       try {
         const dateDirs = fsSync.readdirSync(mediaBase, { withFileTypes: true })
           .filter(e => e.isDirectory())
           .map(e => e.name)
           .sort()
-          .reverse(); // en son tarihe bak
-
-        const sanitizedPilot = spn(pilotName);
-        const originalPilotFolder = pilotName.replace(/\s+/g, '_');
+          .reverse(); // en yeni tarihe bak
 
         outer: for (const dateDir of dateDirs) {
           const dateFullPath = pathMod.join(mediaBase, dateDir);
-          // Pilot klasörü adayları
-          const pilotCandidates = [sanitizedPilot, originalPilotFolder];
-          for (const pc of pilotCandidates) {
-            const withDisplayId = pathMod.join(dateFullPath, pc, displayId);
-            const withoutDisplayId = pathMod.join(dateFullPath, pc);
-            if (fsSync.existsSync(withDisplayId)) {
-              const result = scanLocalFolder(withDisplayId);
-              processed = result.count;
-              totalSize = result.size;
-              foundLocalPath = withDisplayId;
-              break outer;
-            }
-            // sorti klasörleri içinde ara
-            if (fsSync.existsSync(withoutDisplayId)) {
-              try {
-                const sortiDirs = fsSync.readdirSync(withoutDisplayId, { withFileTypes: true })
-                  .filter(e => e.isDirectory());
-                for (const sd of sortiDirs) {
-                  const sortiCustomer = pathMod.join(withoutDisplayId, sd.name, displayId);
-                  if (fsSync.existsSync(sortiCustomer)) {
-                    const result = scanLocalFolder(sortiCustomer);
-                    processed += result.count;
-                    totalSize += result.size;
-                    if (!foundLocalPath) foundLocalPath = sortiCustomer;
-                  }
-                }
-                if (processed > 0) break outer;
-              } catch { /* */ }
-            }
+          const matches = findDisplayIdInTree(dateFullPath);
+          for (const m of matches) {
+            const result = scanLocalFolder(m);
+            processed += result.count;
+            totalSize += result.size;
+            if (!foundLocalPath && result.count > 0) foundLocalPath = m;
           }
+          if (processed > 0) break outer;
         }
       } catch { /* media klasörü okunamadı */ }
     }
