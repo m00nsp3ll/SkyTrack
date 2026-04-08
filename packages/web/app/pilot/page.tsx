@@ -384,7 +384,7 @@ export default function PilotPanel() {
 
       {/* Stats */}
       <div className="p-4 grid grid-cols-4 gap-2">
-        <Card className={pilot?.inQueue && pilot.queuePosition > 0 ? 'ring-2 ring-yellow-500' : ''}>
+        <Card className={pilot?.inQueue ? 'ring-2 ring-yellow-500' : ''}>
           <CardContent className="p-3 text-center">
             <p className="text-2xl font-bold text-yellow-600">
               {pilot?.inQueue && pilot.queuePosition > 0 ? pilot.queuePosition : '-'}
@@ -686,8 +686,8 @@ export default function PilotPanel() {
                   </div>
                   <div className="flex justify-between py-2 border-b">
                       <span className="text-muted-foreground">Sıra Durumu</span>
-                      {pilot?.inQueue && pilot.queuePosition > 0 ? (
-                        <span className="font-semibold text-yellow-600">{pilot.queuePosition}. sırada</span>
+                      {pilot?.inQueue ? (
+                        <span className="font-semibold text-yellow-600">{pilot.queuePosition > 0 ? `${pilot.queuePosition}. sırada` : 'Sırada'}</span>
                       ) : (
                         <span className="font-semibold text-orange-500">Sırada Değil</span>
                       )}

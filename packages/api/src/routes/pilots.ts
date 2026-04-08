@@ -295,16 +295,14 @@ router.get('/:id/panel', authenticate, asyncHandler(async (req: AuthRequest, res
   // Calculate ACTUAL completed flight count for today
   const actualDailyFlightCount = completedFlights.length;
 
-  // Calculate DYNAMIC queue position among available pilots
-  const allActivePilots = await prisma.pilot.findMany({
+  // Calculate DYNAMIC queue position: all inQueue=true pilots, status independent
+  // ON_BREAK / OFF_DUTY pilots keep their spot but won't receive customers until AVAILABLE
+  const allQueuedPilots = await prisma.pilot.findMany({
     where: {
       isActive: true,
-      inQueue: true, // exclude pilots who opted out of queue
-      status: { in: ['AVAILABLE', 'ON_BREAK'] },
+      inQueue: true,
     },
-    orderBy: [
-      { queuePosition: 'asc' }, // ONLY queue position
-    ],
+    orderBy: { queuePosition: 'asc' },
     select: {
       id: true,
       dailyFlightCount: true,
@@ -312,9 +310,9 @@ router.get('/:id/panel', authenticate, asyncHandler(async (req: AuthRequest, res
     },
   });
 
-  // Find this pilot's position in the queue (1-indexed)
+  // Position = rank among all inQueue pilots who haven't hit daily limit
   let dynamicQueuePosition = 0;
-  const eligiblePilots = allActivePilots.filter(p => p.dailyFlightCount < p.maxDailyFlights);
+  const eligiblePilots = allQueuedPilots.filter(p => p.dailyFlightCount < p.maxDailyFlights);
   const positionIndex = eligiblePilots.findIndex(p => p.id === id);
   if (positionIndex !== -1) {
     dynamicQueuePosition = positionIndex + 1;
