@@ -126,6 +126,17 @@ export default function PilotPanel() {
     }
   }, [])
 
+  const fetchQueueList = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('token')
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/pilots/queue`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const data = await res.json()
+      if (data.success) setQueueList(data.data.queue || [])
+    } catch {}
+  }, [])
+
   // Initial load and auth check
   useEffect(() => {
     // Redirect www to non-www to keep localStorage consistent
@@ -261,7 +272,7 @@ export default function PilotPanel() {
       unsubLimitReached()
       clearInterval(queueInterval)
     }
-  }, [user?.pilotId, on, fetchPanelData])
+  }, [user?.pilotId, on, fetchPanelData, fetchQueueList])
 
   const handleLogout = async () => {
     await cleanupFcmToken()
@@ -269,17 +280,6 @@ export default function PilotPanel() {
     localStorage.removeItem('user')
     localStorage.removeItem('permissions')
     router.push('/login')
-  }
-
-  const fetchQueueList = async () => {
-    try {
-      const token = localStorage.getItem('token')
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/pilots/queue`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      const data = await res.json()
-      if (data.success) setQueueList(data.data.queue || [])
-    } catch {}
   }
 
   const handleStatusChange = async (status: string) => {
