@@ -336,3 +336,15 @@ model FcmToken {
   @@index([isActive])
   @@map("fcm_tokens")
 }
+
+model PilotNotification {
+  id        String   @id @default(uuid())
+  pilotId   String   @map("pilot_id")
+  title     String
+  body      String
+  type      String   @default("general")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([pilotId, createdAt])
+  @@map("pilot_notifications")
+}

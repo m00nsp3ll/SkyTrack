@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { pilotsApi, flightsApi, mediaApi } from '@/lib/api'
+import { pilotsApi, flightsApi, mediaApi, fcmApi } from '@/lib/api'
 import { useSocket } from '@/hooks/useSocket'
 import { SOCKET_EVENTS } from '@/lib/socket'
 import { PushNotificationManager } from '@/components/pwa/PushNotificationManager'
@@ -161,18 +161,45 @@ export default function PilotPanel() {
     fetchQueueList()
     setLoading(false)
 
-    // localStorage'dan bugünkü bildirimleri yükle
-    try {
-      const saved = localStorage.getItem(`notifs_${parsed.pilotId}`)
-      if (saved) {
-        const parsedNotifs = JSON.parse(saved)
-        const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
-        const todayNotifs = parsedNotifs
-          .map((n: any) => ({ ...n, time: new Date(n.time) }))
-          .filter((n: any) => n.time >= todayStart)
-        setNotificationList(todayNotifs)
-      }
-    } catch {}
+    // API'den bugünkü bildirimleri yükle
+    fcmApi.getPilotNotifications(parsed.pilotId)
+      .then(res => {
+        if (res.data?.data?.length > 0) {
+          const apiNotifs = res.data.data.map((n: any) => ({
+            id: n.id,
+            text: `${n.title}: ${n.body}`,
+            time: new Date(n.createdAt),
+          }))
+          setNotificationList(apiNotifs)
+        } else {
+          // Fallback: localStorage'dan bugünkü bildirimleri yükle
+          try {
+            const saved = localStorage.getItem(`notifs_${parsed.pilotId}`)
+            if (saved) {
+              const parsedNotifs = JSON.parse(saved)
+              const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
+              const todayNotifs = parsedNotifs
+                .map((n: any) => ({ ...n, time: new Date(n.time) }))
+                .filter((n: any) => n.time >= todayStart)
+              setNotificationList(todayNotifs)
+            }
+          } catch {}
+        }
+      })
+      .catch(() => {
+        // Fallback: localStorage
+        try {
+          const saved = localStorage.getItem(`notifs_${parsed.pilotId}`)
+          if (saved) {
+            const parsedNotifs = JSON.parse(saved)
+            const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
+            const todayNotifs = parsedNotifs
+              .map((n: any) => ({ ...n, time: new Date(n.time) }))
+              .filter((n: any) => n.time >= todayStart)
+            setNotificationList(todayNotifs)
+          }
+        } catch {}
+      })
 
     // Initialize native push notifications (Capacitor/FCM)
     initNativePush(token || undefined).catch(console.error)
@@ -860,9 +887,14 @@ export default function PilotPanel() {
             </div>
             <div className="flex-1 overflow-y-auto divide-y">
               {(() => {
-                const inQueue = queueList.filter(p => p.inQueue && p.status !== 'IN_FLIGHT')
+                const active = queueList.filter(p => p.inQueue && p.status === 'AVAILABLE')
+                const onBreak = queueList.filter(p => p.inQueue && (p.status === 'ON_BREAK' || p.status === 'OFF_DUTY'))
                 const inFlight = queueList.filter(p => p.inQueue && p.status === 'IN_FLIGHT')
-                const sorted = [...inQueue.sort((a, b) => a.queuePosition - b.queuePosition), ...inFlight]
+                const sorted = [
+                  ...active.sort((a, b) => a.queuePosition - b.queuePosition),
+                  ...onBreak.sort((a, b) => a.queuePosition - b.queuePosition),
+                  ...inFlight,
+                ]
                 if (sorted.length === 0) return (
                   <div className="flex flex-col items-center justify-center h-full text-muted-foreground py-16">
                     <Users className="h-12 w-12 opacity-20 mb-3" />

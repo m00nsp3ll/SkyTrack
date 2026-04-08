@@ -109,6 +109,12 @@ export const pilotsApi = {
     api.patch(`/pilots/${id}/queue-toggle`),
 }
 
+// FCM / Notification API
+export const fcmApi = {
+  getPilotNotifications: (pilotId: string) =>
+    api.get(`/fcm/pilot-notifications/${pilotId}`),
+}
+
 // Customers API
 export const customersApi = {
   getAll: () => api.get('/customers'),

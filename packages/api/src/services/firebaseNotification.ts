@@ -109,6 +109,20 @@ export async function sendNativeToUser(userId: string, payload: NotificationPayl
 
 // Pilot kullanıcısına gönder (pilotId üzerinden user bul)
 export async function sendNativeToPilot(pilotId: string, payload: NotificationPayload) {
+  // Log notification to DB regardless of FCM status
+  try {
+    await prisma.pilotNotification.create({
+      data: {
+        pilotId,
+        title: payload.title,
+        body: payload.body,
+        type: payload.data?.type || 'general',
+      },
+    });
+  } catch (e) {
+    console.error('PilotNotification log error:', e);
+  }
+
   if (!firebaseInitialized) return;
 
   const user = await prisma.user.findFirst({

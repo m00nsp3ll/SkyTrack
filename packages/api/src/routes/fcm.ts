@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { asyncHandler, AppError } from '../middleware/errorHandler.js';
 import { authenticate, requireRole, AuthRequest } from '../middleware/auth.js';
-import { sendNativeBroadcast, sendNativeToUser, sendNativeNotification } from '../services/firebaseNotification.js';
+import { sendNativeBroadcast, sendNativeToUser, sendNativeNotification, sendNativeToPilot } from '../services/firebaseNotification.js';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -204,9 +204,7 @@ router.post('/send-pilot/:pilotId', authenticate, requireRole('ADMIN'), asyncHan
     throw new AppError('Bu pilota ait kayıtlı cihaz bulunamadı', 404, 'NO_DEVICES');
   }
 
-  for (const t of tokens) {
-    await sendNativeNotification(t.token, { title, body, data: { type: 'manual', ...data } });
-  }
+  await sendNativeToPilot(pilotId, { title, body, data: { type: 'manual', ...data } });
 
   res.json({ success: true, message: `Bildirim ${pilot.name} adlı pilota gönderildi (${tokens.length} cihaz)` });
 }));
@@ -281,6 +279,29 @@ router.delete('/token/:id', authenticate, requireRole('ADMIN'), asyncHandler(asy
   await prisma.fcmToken.delete({ where: { id } });
 
   res.json({ success: true, message: 'Cihaz kaldırıldı' });
+}));
+
+// GET /api/fcm/pilot-notifications/:pilotId - Get today's notifications for a pilot
+router.get('/pilot-notifications/:pilotId', authenticate, asyncHandler(async (req: AuthRequest, res: any) => {
+  const { pilotId } = req.params;
+
+  // Pilots can only view their own notifications
+  if (req.user!.role === 'PILOT' && req.user!.pilotId !== pilotId) {
+    throw new AppError('Bu bildirimlere erişim yetkiniz yok', 403, 'FORBIDDEN');
+  }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const notifications = await prisma.pilotNotification.findMany({
+    where: {
+      pilotId,
+      createdAt: { gte: today },
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+
+  res.json({ success: true, data: notifications });
 }));
 
 export default router;
