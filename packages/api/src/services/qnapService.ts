@@ -238,11 +238,14 @@ class QnapService {
   // NAS'ta displayId klasörünü tüm tarih/pilot kombinasyonlarında ara
   async findCustomerFolder(displayId: string): Promise<string | null> {
     try {
-      const sorted = await this.execSSH(
-        `find "${this.mediaPath}" -maxdepth 4 -type d -name "${displayId}" 2>/dev/null | xargs ls -dt 2>/dev/null | head -1`
+      // find ile tüm tarih klasörlerinde displayId klasörünü ara, en yeni olanı al
+      const output = await this.execSSH(
+        `find "${this.mediaPath}" -maxdepth 4 -type d -name "${displayId}" 2>/dev/null | sort -r | head -1`
       );
-      if (!sorted.trim()) return null;
-      return sorted.trim().replace(`${this.mediaPath}/`, '');
+      const fullPath = output.trim();
+      if (!fullPath || fullPath === '.' || !fullPath.startsWith('/')) return null;
+      // /share/skytrack-media/2026-04-08/PILOT/A0066 -> 2026-04-08/PILOT/A0066
+      return fullPath.replace(`${this.mediaPath}/`, '');
     } catch {
       return null;
     }
