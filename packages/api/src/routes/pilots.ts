@@ -235,6 +235,7 @@ router.get('/:id/panel', authenticate, asyncHandler(async (req: AuthRequest, res
       dailyFlightCount: true,
       maxDailyFlights: true,
       queuePosition: true,
+      inQueue: true,
     },
   });
 
