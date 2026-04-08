@@ -31,42 +31,35 @@ router.get('/', authenticate, asyncHandler(async (req: AuthRequest, res: any) =>
 
 // GET /api/pilots/queue - Get current pilot queue status
 router.get('/queue', authenticate, asyncHandler(async (req: AuthRequest, res: any) => {
-  // Try cache first
-  let queueData = await cache.pilotQueue.get();
+  // Always fetch fresh data — cache causes stale queue on real-time updates
+  const pilots = await prisma.pilot.findMany({
+    where: { isActive: true },
+    orderBy: [
+      { queuePosition: 'asc' },
+    ],
+    select: {
+      id: true,
+      name: true,
+      dailyFlightCount: true,
+      maxDailyFlights: true,
+      status: true,
+      queuePosition: true,
+      inQueue: true,
+      phone: true,
+    },
+  });
 
-  if (!queueData) {
-    const pilots = await prisma.pilot.findMany({
-      where: { isActive: true },
-      orderBy: [
-        { queuePosition: 'asc' }, // ONLY queue position, round-robin
-      ],
-      select: {
-        id: true,
-        name: true,
-        dailyFlightCount: true,
-        maxDailyFlights: true,
-        status: true,
-        queuePosition: true,
-        inQueue: true,
-        phone: true,
-      },
-    });
-
-    queueData = pilots;
-    await cache.pilotQueue.set(pilots);
-  }
-
-  const availablePilots = (queueData as any[]).filter(
+  const availablePilots = pilots.filter(
     (p: any) => p.inQueue !== false && p.status === 'AVAILABLE' && p.dailyFlightCount < p.maxDailyFlights
   );
 
   res.json({
     success: true,
     data: {
-      queue: queueData,
+      queue: pilots,
       nextPilot: availablePilots[0] || null,
       availableCount: availablePilots.length,
-      totalActive: (queueData as any[]).length,
+      totalActive: pilots.length,
     },
   });
 }));

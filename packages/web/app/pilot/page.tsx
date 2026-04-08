@@ -477,7 +477,7 @@ export default function PilotPanel() {
         >
           <CardContent className="p-3 text-center">
             <p className="text-2xl font-bold text-yellow-600">
-              {pilot?.inQueue && pilot.queuePosition > 0 ? pilot.queuePosition : '-'}
+              {pilot?.inQueue && pilot.status === 'AVAILABLE' && pilot.queuePosition > 0 ? pilot.queuePosition : '-'}
             </p>
             <p className="text-xs text-muted-foreground">Sıra</p>
           </CardContent>
@@ -776,10 +776,18 @@ export default function PilotPanel() {
                   </div>
                   <div className="flex justify-between py-2 border-b">
                       <span className="text-muted-foreground">Sıra Durumu</span>
-                      {pilot?.inQueue ? (
-                        <span className="font-semibold text-yellow-600">{pilot.queuePosition > 0 ? `${pilot.queuePosition}. sırada` : 'Sırada'}</span>
-                      ) : (
+                      {!pilot?.inQueue ? (
                         <span className="font-semibold text-orange-500">Sırada Değil</span>
+                      ) : pilot?.status === 'ON_BREAK' ? (
+                        <span className="font-semibold text-yellow-600">Molada</span>
+                      ) : pilot?.status === 'OFF_DUTY' ? (
+                        <span className="font-semibold text-gray-500">Mesai Dışı</span>
+                      ) : pilot?.status === 'IN_FLIGHT' ? (
+                        <span className="font-semibold text-blue-600">Uçuşta</span>
+                      ) : pilot.queuePosition > 0 ? (
+                        <span className="font-semibold text-yellow-600">{pilot.queuePosition}. sırada</span>
+                      ) : (
+                        <span className="font-semibold text-yellow-600">Sırada</span>
                       )}
                     </div>
                 </div>

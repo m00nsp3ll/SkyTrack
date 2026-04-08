@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { asyncHandler, AppError } from '../middleware/errorHandler.js';
 import { authenticate, requireRole, AuthRequest } from '../middleware/auth.js';
-import { sendNativeBroadcast, sendNativeToUser, sendNativeNotification, sendNativeToPilot } from '../services/firebaseNotification.js';
+import { sendNativeBroadcast, sendNativeToUser, sendNativeNotification, sendNativeToPilot, sendNativeToAllPilots } from '../services/firebaseNotification.js';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -74,15 +74,9 @@ router.post('/broadcast', authenticate, requireRole('ADMIN'), asyncHandler(async
     throw new AppError('Başlık ve mesaj zorunludur', 400, 'MISSING_FIELDS');
   }
 
-  const tokens = await prisma.fcmToken.findMany({
-    where: { isActive: true },
-  });
-
-  if (tokens.length === 0) {
-    throw new AppError('Kayıtlı cihaz bulunamadı', 404, 'NO_DEVICES');
-  }
-
+  // Pilotlara DB log + push, diğer herkese de push
   await sendNativeToAllPilots({ title, body, data: { type: 'broadcast', ...data } });
+  await sendNativeBroadcast({ title, body, data: { type: 'broadcast', ...data } });
 
   res.json({ success: true, message: `Bildirim gönderildi` });
 }));
