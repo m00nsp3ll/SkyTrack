@@ -343,6 +343,7 @@ model PilotNotification {
   title     String
   body      String
   type      String   @default("general")
+  isRead    Boolean  @default(false) @map("is_read")
   createdAt DateTime @default(now()) @map("created_at")
 
   @@index([pilotId, createdAt])

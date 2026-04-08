@@ -212,6 +212,36 @@ export const pilotQueueService = {
     await cache.pilotQueue.invalidate();
     await cache.pilot.invalidate(pilot.id);
 
+    // Notify the new #1 pilot in queue
+    try {
+      const nextFirst = await prisma.pilot.findFirst({
+        where: {
+          isActive: true,
+          inQueue: true,
+          status: 'AVAILABLE',
+          dailyFlightCount: { lt: prisma.pilot.fields.maxDailyFlights },
+          id: { not: pilot.id },
+        },
+        orderBy: { queuePosition: 'asc' },
+      });
+      if (nextFirst) {
+        getNotificationConfig('pilot_first_in_queue').then(config => {
+          if (config?.enabled) {
+            sendNativeToPilot(nextFirst.id, {
+              title: config.title || '🥇 İlk Sıradasınız!',
+              body: config.body || 'Sıra size geldi, bir sonraki müşteri size atanacak.',
+              data: { type: 'pilot_first_in_queue' },
+            }).catch(err => console.error('FCM first-in-queue error:', err));
+          }
+        });
+        if (io) {
+          io.emit('pilot:queue-updated');
+        }
+      }
+    } catch (e) {
+      console.error('First-in-queue notification error:', e);
+    }
+
     // Send Socket.IO notification to pilot
     if (io) {
       const customer = await prisma.customer.findUnique({

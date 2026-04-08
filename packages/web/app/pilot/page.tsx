@@ -32,6 +32,8 @@ import {
   ListOrdered,
   MessageSquare,
   Users,
+  ChevronDown,
+  History,
 } from 'lucide-react'
 
 interface UserData {
@@ -104,6 +106,8 @@ export default function PilotPanel() {
   const [notificationList, setNotificationList] = useState<{ id: string; text: string; time: Date; read: boolean }[]>([])
   const [showQueueModal, setShowQueueModal] = useState(false)
   const [queueList, setQueueList] = useState<{ id: string; name: string; status: string; queuePosition: number; dailyFlightCount: number; maxDailyFlights: number; inQueue: boolean }[]>([])
+  const [showFlightHistory, setShowFlightHistory] = useState(false)
+  const [flightHistory, setFlightHistory] = useState<any[]>([])
 
   // WebSocket: bağlantıyı user bekleme — token varsa hemen bağlan
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
@@ -169,36 +173,15 @@ export default function PilotPanel() {
             id: n.id,
             text: `${n.title}: ${n.body}`,
             time: new Date(n.createdAt),
-            read: false,
+            read: n.isRead ?? false,
           }))
           setNotificationList(apiNotifs)
-        } else {
-          try {
-            const saved = localStorage.getItem(`notifs_${parsed.pilotId}`)
-            if (saved) {
-              const parsedNotifs = JSON.parse(saved)
-              const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
-              const todayNotifs = parsedNotifs
-                .map((n: any) => ({ ...n, time: new Date(n.time), read: n.read ?? false }))
-                .filter((n: any) => n.time >= todayStart)
-              setNotificationList(todayNotifs)
-            }
-          } catch {}
+          // App badge
+          const unread = apiNotifs.filter((n: any) => !n.read).length
+          if ('setAppBadge' in navigator) (navigator as any).setAppBadge(unread || 0).catch(() => {})
         }
       })
-      .catch(() => {
-        try {
-          const saved = localStorage.getItem(`notifs_${parsed.pilotId}`)
-          if (saved) {
-            const parsedNotifs = JSON.parse(saved)
-            const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
-            const todayNotifs = parsedNotifs
-              .map((n: any) => ({ ...n, time: new Date(n.time), read: n.read ?? false }))
-              .filter((n: any) => n.time >= todayStart)
-            setNotificationList(todayNotifs)
-          }
-        } catch {}
-      })
+      .catch(() => {})
 
     // Initialize native push notifications (Capacitor/FCM)
     initNativePush(token || undefined).catch(console.error)
@@ -420,8 +403,12 @@ export default function PilotPanel() {
             size="icon"
             onClick={() => {
               setShowNotifications(true)
-              // Modal açılınca tüm bildirimleri okundu yap
+              // Modal açılınca tüm bildirimleri okundu yap (DB + state)
               setNotificationList(prev => prev.map(n => ({ ...n, read: true })))
+              if (user?.pilotId) {
+                fcmApi.markAllRead(user.pilotId).catch(() => {})
+                if ('setAppBadge' in navigator) (navigator as any).clearAppBadge().catch(() => {})
+              }
             }}
             className="text-white hover:bg-white/20 relative"
           >
@@ -701,7 +688,7 @@ export default function PilotPanel() {
           {/* Sidebar */}
           <div className="fixed top-0 left-0 bottom-0 w-80 bg-white shadow-xl z-50 flex flex-col animate-slide-in-left">
             {/* Header */}
-            <div className="bg-primary text-white p-4 flex items-center justify-between">
+            <div className="bg-primary text-white p-4 flex items-center justify-between" style={{ paddingTop: 'max(1rem, env(safe-area-inset-top))' }}>
               <div className="flex items-center gap-3">
                 <Avatar className="h-12 w-12">
                   <AvatarFallback className="bg-white text-primary text-lg">
@@ -789,6 +776,42 @@ export default function PilotPanel() {
                 </div>
               </div>
 
+              {/* Toplam Uçuş Sayısı */}
+              <div className="mb-6">
+                <button
+                  className="w-full text-left"
+                  onClick={async () => {
+                    if (!user?.pilotId) return
+                    try {
+                      const res = await pilotsApi.getById(user.pilotId)
+                      setFlightHistory(res.data.data.filteredFlights || res.data.data.todayFlights || [])
+                    } catch {}
+                    setShowFlightHistory(true)
+                  }}
+                >
+                  <h3 className="text-sm font-medium text-muted-foreground mb-3 flex items-center justify-between">
+                    Toplam Uçuş Sayısı
+                    <History className="h-4 w-4" />
+                  </h3>
+                </button>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between py-2 border-b">
+                    <span className="text-muted-foreground">Bugün</span>
+                    <span className="font-semibold">{pilot?.dailyFlightCount || 0}</span>
+                  </div>
+                  <div className="flex justify-between py-2 border-b">
+                    <span className="text-muted-foreground text-blue-600 cursor-pointer" onClick={async () => {
+                      if (!user?.pilotId) return
+                      try {
+                        const res = await pilotsApi.getById(user.pilotId)
+                        setFlightHistory(res.data.data.todayFlights || [])
+                      } catch {}
+                      setShowFlightHistory(true)
+                    }}>Geçmiş Uçuşlarım →</span>
+                  </div>
+                </div>
+              </div>
+
               {/* Connection Status */}
               <div className="mb-6">
                 <h3 className="text-sm font-medium text-muted-foreground mb-3">Bağlantı</h3>
@@ -852,15 +875,11 @@ export default function PilotPanel() {
                   {notificationList.map((notif) => (
                     <div
                       key={notif.id}
-                      className={`flex items-start gap-3 p-4 transition-colors ${notif.read ? 'bg-white' : 'bg-blue-50'}`}
-                      onMouseEnter={() => {
+                      className={`flex items-start gap-3 p-4 transition-colors cursor-pointer ${notif.read ? 'bg-white' : 'bg-blue-50'}`}
+                      onClick={() => {
                         if (!notif.read) {
                           setNotificationList(prev => prev.map(n => n.id === notif.id ? { ...n, read: true } : n))
-                        }
-                      }}
-                      onTouchStart={() => {
-                        if (!notif.read) {
-                          setNotificationList(prev => prev.map(n => n.id === notif.id ? { ...n, read: true } : n))
+                          fcmApi.markRead(notif.id).catch(() => {})
                         }
                       }}
                     >
@@ -872,6 +891,11 @@ export default function PilotPanel() {
                         <p className="text-xs text-muted-foreground mt-1">
                           {notif.time.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
                         </p>
+                        {notif.read && (
+                          <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
+                            <CheckCircle className="h-3 w-3" /> Okundu
+                          </p>
+                        )}
                       </div>
                       {!notif.read && (
                         <div className="w-2 h-2 rounded-full bg-blue-500 mt-2 flex-shrink-0" />
@@ -882,13 +906,21 @@ export default function PilotPanel() {
               )}
             </div>
             {notificationList.length > 0 && (
-              <div className="p-4 border-t" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
-                <Button variant="outline" className="w-full" onClick={() => {
+              <div className="p-4 border-t flex gap-2" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
+                <Button variant="outline" className="flex-1" onClick={() => {
+                  setNotificationList(prev => prev.map(n => ({ ...n, read: true })))
+                  if (user?.pilotId) fcmApi.markAllRead(user.pilotId).catch(() => {})
+                  if ('setAppBadge' in navigator) (navigator as any).clearAppBadge().catch(() => {})
+                }}>
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  Tümünü Okundu
+                </Button>
+                <Button variant="ghost" className="flex-1 text-red-500 hover:text-red-600" onClick={() => {
                   setNotificationList([])
                   try { localStorage.removeItem(`notifs_${user?.pilotId}`) } catch {}
                   setShowNotifications(false)
                 }}>
-                  Tümünü Temizle
+                  Temizle
                 </Button>
               </div>
             )}
@@ -959,6 +991,54 @@ export default function PilotPanel() {
                   )
                 })
               })()}
+            </div>
+            <div style={{ paddingBottom: 'env(safe-area-inset-bottom)' }} />
+          </div>
+        </>
+      )}
+
+      {/* Flight History Modal */}
+      {showFlightHistory && (
+        <>
+          <div className="fixed inset-0 bg-black/50 z-50" onClick={() => setShowFlightHistory(false)} />
+          <div className="fixed inset-x-0 top-0 bottom-0 z-50 flex flex-col bg-white max-w-md mx-auto shadow-xl">
+            <div className="bg-primary text-white flex flex-col" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+              <div className="flex items-center justify-between px-4 py-3">
+                <div className="flex items-center gap-2">
+                  <History className="h-5 w-5" />
+                  <h2 className="font-semibold text-lg">Uçuş Geçmişim</h2>
+                </div>
+                <Button variant="ghost" size="icon" onClick={() => setShowFlightHistory(false)} className="text-white hover:bg-white/20">
+                  <X className="h-5 w-5" />
+                </Button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto divide-y">
+              {flightHistory.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full text-muted-foreground py-16">
+                  <Plane className="h-12 w-12 opacity-20 mb-3" />
+                  <p className="font-medium">Uçuş kaydı bulunamadı</p>
+                </div>
+              ) : (
+                flightHistory.map((f: any, i: number) => (
+                  <div key={f.id} className="flex items-center gap-3 px-4 py-3">
+                    <span className="w-6 text-center text-sm font-bold text-muted-foreground">{flightHistory.length - i}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm truncate">
+                        {f.customer?.firstName} {f.customer?.lastName}
+                      </p>
+                      <p className="text-xs text-muted-foreground">{f.customer?.displayId}</p>
+                    </div>
+                    <div className="text-right text-xs text-muted-foreground">
+                      <p>{new Date(f.createdAt).toLocaleDateString('tr-TR')}</p>
+                      <p>{new Date(f.createdAt).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}</p>
+                    </div>
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${f.status === 'COMPLETED' ? 'bg-green-100 text-green-700' : f.status === 'CANCELLED' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'}`}>
+                      {f.status === 'COMPLETED' ? 'Tamam' : f.status === 'CANCELLED' ? 'İptal' : 'Aktif'}
+                    </span>
+                  </div>
+                ))
+              )}
             </div>
             <div style={{ paddingBottom: 'env(safe-area-inset-bottom)' }} />
           </div>

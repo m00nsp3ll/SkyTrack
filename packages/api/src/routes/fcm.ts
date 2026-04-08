@@ -128,6 +128,7 @@ router.get('/notification-settings', authenticate, requireRole('ADMIN'), asyncHa
           flight_completed: { enabled: true, label: 'Uçuş Tamamlandı', description: 'Uçuş tamamlandığında pilota bildirim gönder', title: '✅ Uçuş Tamamlandı', body: '{customer} ({displayId}) - {duration}dk' },
           pilot_limit_warning: { enabled: true, label: 'Limit Uyarısı', description: 'Pilot günlük limite yaklaştığında bildirim gönder', title: '⚠️ Limit Uyarısı', body: 'Günlük uçuş limitine yaklaştınız: {current}/{max}' },
           pilot_limit_reached: { enabled: true, label: 'Limit Doldu', description: 'Pilot günlük limitine ulaştığında bildirim gönder', title: '🛑 Günlük Limit Doldu', body: '{current}/{max} uçuş tamamlandı. Bugünlük sıra dışısınız.' },
+          pilot_first_in_queue: { enabled: true, label: 'İlk Sıra Bildirimi', description: 'Pilot sırada 1. olduğunda bildirim gönder', title: '🥇 İlk Sıradasınız!', body: 'Sıra size geldi, bir sonraki müşteri size atanacak.' },
         },
       },
     });
@@ -299,6 +300,37 @@ router.get('/pilot-notifications/:pilotId', authenticate, asyncHandler(async (re
   });
 
   res.json({ success: true, data: notifications });
+}));
+
+// PATCH /api/fcm/pilot-notifications/:pilotId/read-all - Mark all today's notifications as read
+router.patch('/pilot-notifications/:pilotId/read-all', authenticate, asyncHandler(async (req: AuthRequest, res: any) => {
+  const { pilotId } = req.params;
+
+  if (req.user!.role === 'PILOT' && req.user!.pilotId !== pilotId) {
+    throw new AppError('Bu bildirimlere erişim yetkiniz yok', 403, 'FORBIDDEN');
+  }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  await prisma.pilotNotification.updateMany({
+    where: { pilotId, createdAt: { gte: today }, isRead: false },
+    data: { isRead: true },
+  });
+
+  res.json({ success: true, message: 'Bildirimler okundu olarak işaretlendi' });
+}));
+
+// PATCH /api/fcm/pilot-notifications/:id/read - Mark single notification as read
+router.patch('/pilot-notifications/:id/read', authenticate, asyncHandler(async (req: AuthRequest, res: any) => {
+  const { id } = req.params;
+
+  await prisma.pilotNotification.update({
+    where: { id },
+    data: { isRead: true },
+  });
+
+  res.json({ success: true });
 }));
 
 export default router;

@@ -113,6 +113,10 @@ export const pilotsApi = {
 export const fcmApi = {
   getPilotNotifications: (pilotId: string) =>
     api.get(`/fcm/pilot-notifications/${pilotId}`),
+  markAllRead: (pilotId: string) =>
+    api.patch(`/fcm/pilot-notifications/${pilotId}/read-all`),
+  markRead: (id: string) =>
+    api.patch(`/fcm/pilot-notifications/${id}/read`),
 }
 
 // Customers API
