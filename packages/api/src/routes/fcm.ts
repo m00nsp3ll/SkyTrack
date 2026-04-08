@@ -82,9 +82,9 @@ router.post('/broadcast', authenticate, requireRole('ADMIN'), asyncHandler(async
     throw new AppError('Kayıtlı cihaz bulunamadı', 404, 'NO_DEVICES');
   }
 
-  await sendNativeBroadcast({ title, body, data: { type: 'broadcast', ...data } });
+  await sendNativeToAllPilots({ title, body, data: { type: 'broadcast', ...data } });
 
-  res.json({ success: true, message: `Bildirim ${tokens.length} cihaza gönderildi` });
+  res.json({ success: true, message: `Bildirim gönderildi` });
 }));
 
 // POST /api/fcm/send-role/:role - Send notification to specific role
@@ -101,19 +101,22 @@ router.post('/send-role/:role', authenticate, requireRole('ADMIN'), asyncHandler
     throw new AppError('Geçersiz rol', 400, 'INVALID_ROLE');
   }
 
-  const tokens = await prisma.fcmToken.findMany({
-    where: { user: { role: role as any }, isActive: true },
-  });
-
-  if (tokens.length === 0) {
-    throw new AppError('Bu role ait kayıtlı cihaz bulunamadı', 404, 'NO_DEVICES');
+  if (role === 'PILOT') {
+    // Pilotlara gönderilince DB'ye log at
+    await sendNativeToAllPilots({ title, body, data: { type: 'broadcast', ...data } });
+  } else {
+    const tokens = await prisma.fcmToken.findMany({
+      where: { user: { role: role as any }, isActive: true },
+    });
+    if (tokens.length === 0) {
+      throw new AppError('Bu role ait kayıtlı cihaz bulunamadı', 404, 'NO_DEVICES');
+    }
+    for (const t of tokens) {
+      await sendNativeNotification(t.token, { title, body, data: { type: 'broadcast', ...data } });
+    }
   }
 
-  for (const t of tokens) {
-    await sendNativeNotification(t.token, { title, body, data: { type: 'broadcast', ...data } });
-  }
-
-  res.json({ success: true, message: `Bildirim ${tokens.length} cihaza gönderildi (${role})` });
+  res.json({ success: true, message: `Bildirim ${role} rolüne gönderildi` });
 }));
 
 // GET /api/fcm/notification-settings - Get notification settings

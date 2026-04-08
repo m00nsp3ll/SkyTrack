@@ -287,6 +287,11 @@ export default function PilotPanel() {
       fetchQueueList()
     })
 
+    // Queue reorder veya toggle → anlık güncelle
+    const unsubQueueUpdated = on(SOCKET_EVENTS.PILOT_QUEUE_UPDATED, () => {
+      fetchQueueList()
+    })
+
     // Queue'yu her 30sn yenile
     const queueInterval = setInterval(fetchQueueList, 30000)
     fetchQueueList()
@@ -299,6 +304,7 @@ export default function PilotPanel() {
       unsubLimitWarning()
       unsubLimitReached()
       unsubStatusChanged()
+      unsubQueueUpdated()
       clearInterval(queueInterval)
     }
   }, [user?.pilotId, on, fetchPanelData, fetchQueueList])

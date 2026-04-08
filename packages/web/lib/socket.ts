@@ -131,6 +131,7 @@ export const SOCKET_EVENTS = {
   PILOT_STATUS_CHANGED: 'pilot:status-changed',
   PILOT_LIMIT_WARNING: 'pilot:limit-warning',
   PILOT_LIMIT_REACHED: 'pilot:limit-reached',
+  PILOT_QUEUE_UPDATED: 'pilot:queue-updated',
 
   // Customer events
   CUSTOMER_ASSIGNED: 'customer:assigned',

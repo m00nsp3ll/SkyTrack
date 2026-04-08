@@ -92,6 +92,12 @@ router.post('/queue/reorder', authenticate, requireRole('ADMIN'), asyncHandler(a
   // Invalidate cache
   await cache.pilotQueue.invalidate();
 
+  // Notify all pilots so queue modal updates in real-time
+  const io = req.app.get('io');
+  if (io) {
+    io.emit('pilot:queue-updated');
+  }
+
   res.json({
     success: true,
     message: 'Pilot sırası güncellendi',
@@ -425,6 +431,10 @@ router.patch('/:id/queue-toggle', authenticate, requireRole('ADMIN'), asyncHandl
   await cache.pilotQueue.invalidate();
   await cache.pilot.invalidate(id);
 
+  // Notify all pilots so queue modal updates in real-time
+  const io = req.app.get('io');
+  if (io) io.emit('pilot:queue-updated');
+
   res.json({ success: true, data: pilot, message: pilot.inQueue ? 'Pilot sıraya alındı' : 'Pilot sıradan çıkarıldı' });
 }));
 
@@ -461,11 +471,8 @@ router.patch('/:id/status', authenticate, asyncHandler(async (req: AuthRequest, 
   // Emit socket event
   const io = req.app.get('io');
   if (io) {
-    io.to('admin').emit('pilot:status-changed', {
-      pilotId: id,
-      pilotName: pilot.name,
-      status,
-    });
+    io.to('admin').emit('pilot:status-changed', { pilotId: id, pilotName: pilot.name, status });
+    io.emit('pilot:queue-updated'); // tüm pilotlara — queue modal anlık güncellenir
   }
 
   res.json({
