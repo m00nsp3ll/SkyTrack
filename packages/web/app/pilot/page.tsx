@@ -105,10 +105,11 @@ export default function PilotPanel() {
   const [showQueueModal, setShowQueueModal] = useState(false)
   const [queueList, setQueueList] = useState<{ id: string; name: string; status: string; queuePosition: number; dailyFlightCount: number; maxDailyFlights: number; inQueue: boolean }[]>([])
 
-  // Socket.IO hook
+  // WebSocket: bağlantıyı user bekleme — token varsa hemen bağlan
+  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
   const { on, socket } = useSocket({
     autoConnect: true,
-    rooms: user?.pilotId ? [`pilot:${user.pilotId}`] : [],
+    rooms: user?.pilotId ? [`pilot:${user.pilotId}`, 'pilots'] : ['pilots'],
   })
 
   const isConnected = socket?.connected ?? false
@@ -167,10 +168,16 @@ export default function PilotPanel() {
     if (!user?.pilotId) return
 
     const addNotif = (text: string) => {
-      setNotificationList(prev => [
-        { id: Math.random().toString(36).slice(2), text, time: new Date() },
-        ...prev,
-      ])
+      const notif = { id: Math.random().toString(36).slice(2), text, time: new Date() }
+      setNotificationList(prev => {
+        const updated = [notif, ...prev]
+        // localStorage'a kaydet (bugünküleri koru)
+        try {
+          const toSave = updated.map(n => ({ ...n, time: n.time.toISOString() }))
+          localStorage.setItem(`notifs_${user.pilotId}`, JSON.stringify(toSave))
+        } catch {}
+        return updated
+      })
     }
 
     // New customer assigned
@@ -180,6 +187,7 @@ export default function PilotPanel() {
       setNotification(text)
       addNotif(text)
       fetchPanelData(user.pilotId)
+      fetchQueueList()
 
       // Play notification sound
       try {
@@ -196,31 +204,53 @@ export default function PilotPanel() {
       setTimeout(() => setNotification(null), 5000)
     })
 
-    // Flight events
+    // Flight events — queue da güncelle
     const unsubPickup = on(SOCKET_EVENTS.FLIGHT_PICKUP, () => {
       fetchPanelData(user.pilotId)
+      fetchQueueList()
     })
 
     const unsubTakeoff = on(SOCKET_EVENTS.FLIGHT_TAKEOFF, () => {
       fetchPanelData(user.pilotId)
+      fetchQueueList()
     })
 
     const unsubLanded = on(SOCKET_EVENTS.FLIGHT_LANDED, () => {
       fetchPanelData(user.pilotId)
+      fetchQueueList()
     })
 
     // Limit warnings
     const unsubLimitWarning = on(SOCKET_EVENTS.PILOT_LIMIT_WARNING, (data) => {
       setNotification(data.message)
       addNotif(data.message)
+      fetchQueueList()
       setTimeout(() => setNotification(null), 5000)
     })
 
     const unsubLimitReached = on(SOCKET_EVENTS.PILOT_LIMIT_REACHED, (data) => {
       setNotification(data.message)
       addNotif(data.message)
+      fetchQueueList()
       setTimeout(() => setNotification(null), 8000)
     })
+
+    // localStorage'dan bugünkü bildirimleri yükle
+    try {
+      const saved = localStorage.getItem(`notifs_${user.pilotId}`)
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
+        const todayNotifs = parsed
+          .map((n: any) => ({ ...n, time: new Date(n.time) }))
+          .filter((n: any) => n.time >= todayStart)
+        setNotificationList(todayNotifs)
+      }
+    } catch {}
+
+    // Queue'yu her 30sn yenile
+    const queueInterval = setInterval(fetchQueueList, 30000)
+    fetchQueueList()
 
     return () => {
       unsubAssigned()
@@ -229,6 +259,7 @@ export default function PilotPanel() {
       unsubLanded()
       unsubLimitWarning()
       unsubLimitReached()
+      clearInterval(queueInterval)
     }
   }, [user?.pilotId, on, fetchPanelData])
 
@@ -339,7 +370,16 @@ export default function PilotPanel() {
               </div>
             </div>
           </div>
-          {/* Message/Notifications Button */}
+          {/* Sıra butonu */}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => { fetchQueueList(); setShowQueueModal(true) }}
+            className="text-white hover:bg-white/20 relative"
+          >
+            <ListOrdered className="h-5 w-5" />
+          </Button>
+          {/* Mesaj/Bildirim butonu */}
           <Button
             variant="ghost"
             size="icon"
@@ -747,28 +787,20 @@ export default function PilotPanel() {
       {/* Notification Modal */}
       {showNotifications && (
         <>
-          <div
-            className="fixed inset-0 bg-black/50 z-50"
-            onClick={() => setShowNotifications(false)}
-          />
+          <div className="fixed inset-0 bg-black/50 z-50" onClick={() => setShowNotifications(false)} />
           <div className="fixed inset-x-0 top-0 bottom-0 z-50 flex flex-col bg-white max-w-md mx-auto shadow-xl">
-            {/* Modal Header */}
-            <div className="bg-primary text-white p-4 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <MessageSquare className="h-5 w-5" />
-                <h2 className="font-semibold text-lg">Bugünkü Bildirimler</h2>
+            {/* Safe area header */}
+            <div className="bg-primary text-white flex flex-col" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+              <div className="flex items-center justify-between px-4 py-3">
+                <div className="flex items-center gap-2">
+                  <MessageSquare className="h-5 w-5" />
+                  <h2 className="font-semibold text-lg">Bugünkü Bildirimler</h2>
+                </div>
+                <Button variant="ghost" size="icon" onClick={() => setShowNotifications(false)} className="text-white hover:bg-white/20">
+                  <X className="h-5 w-5" />
+                </Button>
               </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setShowNotifications(false)}
-                className="text-white hover:bg-white/20"
-              >
-                <X className="h-5 w-5" />
-              </Button>
             </div>
-
-            {/* Notification List */}
             <div className="flex-1 overflow-y-auto">
               {notificationList.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full text-muted-foreground py-16">
@@ -794,18 +826,13 @@ export default function PilotPanel() {
                 </div>
               )}
             </div>
-
-            {/* Footer */}
             {notificationList.length > 0 && (
-              <div className="p-4 border-t">
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  onClick={() => {
-                    setNotificationList([])
-                    setShowNotifications(false)
-                  }}
-                >
+              <div className="p-4 border-t" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
+                <Button variant="outline" className="w-full" onClick={() => {
+                  setNotificationList([])
+                  try { localStorage.removeItem(`notifs_${user?.pilotId}`) } catch {}
+                  setShowNotifications(false)
+                }}>
                   Tümünü Temizle
                 </Button>
               </div>
@@ -813,49 +840,51 @@ export default function PilotPanel() {
           </div>
         </>
       )}
-
       {/* Queue Modal */}
       {showQueueModal && (
         <>
           <div className="fixed inset-0 bg-black/50 z-50" onClick={() => setShowQueueModal(false)} />
-          <div className="fixed inset-x-0 bottom-0 top-0 z-50 flex flex-col bg-white max-w-md mx-auto shadow-xl">
-            <div className="bg-primary text-white p-4 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Users className="h-5 w-5" />
-                <h2 className="font-semibold text-lg">Makara Sırası</h2>
+          <div className="fixed inset-x-0 top-0 bottom-0 z-50 flex flex-col bg-white max-w-md mx-auto shadow-xl">
+            {/* Safe area header */}
+            <div className="bg-primary text-white flex flex-col" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+              <div className="flex items-center justify-between px-4 py-3">
+                <div className="flex items-center gap-2">
+                  <ListOrdered className="h-5 w-5" />
+                  <h2 className="font-semibold text-lg">Pilot Sırası</h2>
+                </div>
+                <Button variant="ghost" size="icon" onClick={() => setShowQueueModal(false)} className="text-white hover:bg-white/20">
+                  <X className="h-5 w-5" />
+                </Button>
               </div>
-              <Button variant="ghost" size="icon" onClick={() => setShowQueueModal(false)} className="text-white hover:bg-white/20">
-                <X className="h-5 w-5" />
-              </Button>
             </div>
             <div className="flex-1 overflow-y-auto divide-y">
-              {queueList
-                .filter(p => p.inQueue)
-                .sort((a, b) => a.queuePosition - b.queuePosition)
-                .map((p, index) => {
+              {(() => {
+                const inQueue = queueList.filter(p => p.inQueue && p.status !== 'IN_FLIGHT')
+                const inFlight = queueList.filter(p => p.inQueue && p.status === 'IN_FLIGHT')
+                const sorted = [...inQueue.sort((a, b) => a.queuePosition - b.queuePosition), ...inFlight]
+                if (sorted.length === 0) return (
+                  <div className="flex flex-col items-center justify-center h-full text-muted-foreground py-16">
+                    <Users className="h-12 w-12 opacity-20 mb-3" />
+                    <p className="font-medium">Sıra yükleniyor...</p>
+                  </div>
+                )
+                return sorted.map((p, index) => {
                   const isMe = p.id === pilot?.id
+                  const isInFlight = p.status === 'IN_FLIGHT'
                   const isAtLimit = p.dailyFlightCount >= p.maxDailyFlights
                   const statusLabel: Record<string, string> = {
-                    AVAILABLE: 'Müsait',
-                    IN_FLIGHT: 'Uçuşta',
-                    ON_BREAK: 'Molada',
-                    OFF_DUTY: 'Mesai Dışı',
-                    ASSIGNED: 'Atandı',
+                    AVAILABLE: 'Müsait', IN_FLIGHT: 'Uçuşta', ON_BREAK: 'Molada',
+                    OFF_DUTY: 'Mesai Dışı', ASSIGNED: 'Atandı',
                   }
                   const statusColor: Record<string, string> = {
-                    AVAILABLE: 'text-green-600 bg-green-50',
-                    IN_FLIGHT: 'text-blue-600 bg-blue-50',
-                    ON_BREAK: 'text-yellow-600 bg-yellow-50',
-                    OFF_DUTY: 'text-gray-500 bg-gray-100',
+                    AVAILABLE: 'text-green-600 bg-green-50', IN_FLIGHT: 'text-blue-600 bg-blue-50',
+                    ON_BREAK: 'text-yellow-600 bg-yellow-50', OFF_DUTY: 'text-gray-500 bg-gray-100',
                     ASSIGNED: 'text-purple-600 bg-purple-50',
                   }
                   return (
-                    <div
-                      key={p.id}
-                      className={`flex items-center gap-3 px-4 py-3 ${isMe ? 'bg-yellow-50 border-l-4 border-yellow-400' : ''} ${isAtLimit ? 'opacity-50' : ''}`}
-                    >
-                      <span className={`w-8 text-center font-bold text-lg ${isMe ? 'text-yellow-600' : 'text-muted-foreground'}`}>
-                        {index + 1}
+                    <div key={p.id} className={`flex items-center gap-3 px-4 py-3 ${isMe ? 'bg-yellow-50 border-l-4 border-yellow-400' : isInFlight ? 'bg-blue-50/40' : ''} ${isAtLimit ? 'opacity-50' : ''}`}>
+                      <span className={`w-8 text-center font-bold text-lg ${isMe ? 'text-yellow-600' : isInFlight ? 'text-blue-400' : 'text-muted-foreground'}`}>
+                        {isInFlight ? <Plane className="h-4 w-4 mx-auto" /> : index + 1}
                       </span>
                       <div className="flex-1 min-w-0">
                         <p className={`font-semibold truncate ${isMe ? 'text-yellow-700' : ''}`}>
@@ -868,7 +897,8 @@ export default function PilotPanel() {
                       </span>
                     </div>
                   )
-                })}
+                })
+              })()}
             </div>
           </div>
         </>
