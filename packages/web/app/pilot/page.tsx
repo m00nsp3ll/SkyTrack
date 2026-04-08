@@ -565,17 +565,9 @@ export default function PilotPanel() {
                     </div>
 
                     {/* Customer Details */}
-                    <div className="grid grid-cols-2 gap-2 mb-4 text-sm">
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        <Phone className="h-4 w-4" />
-                        <a href={`tel:${customer.phone}`} className="text-primary">
-                          {customer.phone}
-                        </a>
-                      </div>
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        <Scale className="h-4 w-4" />
-                        <span>{customer.weight} kg</span>
-                      </div>
+                    <div className="flex items-center gap-2 mb-4 text-sm text-muted-foreground">
+                      <Scale className="h-4 w-4" />
+                      <span>{customer.weight} kg</span>
                     </div>
 
                     {/* Action Buttons */}
@@ -817,7 +809,7 @@ export default function PilotPanel() {
             </div>
 
             {/* Footer */}
-            <div className="p-4 border-t">
+            <div className="p-4 border-t" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
               <Button
                 variant="destructive"
                 className="w-full"
