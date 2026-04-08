@@ -329,3 +329,16 @@ export const reportsApi = {
     api.get('/reports/compare', { params: { period1_from, period1_to, period2_from, period2_to } }),
   getSystem: () => api.get('/reports/system'),
 }
+
+// OS algılamalı SMB/UNC klasör açma helper
+export function openNetworkFolder(data: { smbPath?: string; uncPath?: string }) {
+  const ua = navigator.userAgent
+  const isWindows = /Windows/.test(ua)
+  if (isWindows && data.uncPath) {
+    // Windows: file:///\\server\share formatına çevir
+    const fileUrl = 'file:///' + data.uncPath.replace(/\\/g, '\\')
+    window.open(fileUrl)
+  } else if (data.smbPath) {
+    window.open(data.smbPath)
+  }
+}

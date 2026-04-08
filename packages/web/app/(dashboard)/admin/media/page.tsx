@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { mediaApi } from '@/lib/api'
+import { mediaApi, openNetworkFolder } from '@/lib/api'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts'
@@ -179,9 +179,8 @@ export default function MediaDashboardPage() {
   const handleOpenFolder = async (customerId: string) => {
     try {
       const res = await mediaApi.openFolder(customerId)
-      const smbPath = res.data?.data?.smbPath
-      if (!smbPath) throw new Error('SMB path alınamadı')
-      window.open(smbPath)
+      if (!res.data?.data) throw new Error('SMB path alınamadı')
+      openNetworkFolder(res.data.data)
     } catch (e: any) {
       alert(e.response?.data?.error?.message || e.message || 'Klasör açılamadı')
     }
@@ -192,9 +191,8 @@ export default function MediaDashboardPage() {
       const dp = getDateParams()
       const date = dp.date === 'custom' ? dp.startDate : undefined
       const res = await mediaApi.openPilotFolder(pilotId, date)
-      const smbPath = res.data?.data?.smbPath
-      if (!smbPath) throw new Error('SMB path alınamadı')
-      window.open(smbPath)
+      if (!res.data?.data) throw new Error('SMB path alınamadı')
+      openNetworkFolder(res.data.data)
     } catch (e: any) {
       alert(e.response?.data?.error?.message || e.message || 'Klasör açılamadı')
     }

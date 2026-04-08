@@ -610,8 +610,9 @@ router.post(
 
     // smb://192.168.1.105/skytrack-media/2026-03-28/Ahmet_Yilmaz
     const smbPath = `smb://${nasIp}/skytrack-media/${folderDate}/${safePilotName}`;
+    const uncPath = `\\\\${nasIp}\\skytrack-media\\${folderDate}\\${safePilotName}`;
 
-    res.json({ success: true, data: { smbPath }, message: 'SMB path hazır' });
+    res.json({ success: true, data: { smbPath, uncPath }, message: 'SMB path hazır' });
   })
 );
 
@@ -865,7 +866,7 @@ router.post(
   })
 );
 
-// POST /api/media/:customerId/scan - Scan folder and generate thumbnails
+// POST /api/media/:customerId/scan - Scan local folder and update DB
 router.post(
   '/:customerId/scan',
   authenticate,
@@ -898,97 +899,112 @@ router.post(
     const displayId = customer.displayId;
     const pilotName = latestFlight.pilot?.name || '';
     const mediaExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.mp4', '.mov', '.avi', '.mkv', '.webm', '.heic', '.heif'];
+    const fsSync = await import('fs');
+    const pathMod = await import('path');
 
-    let processed = 0;
-    let totalSize = 0;
-    let foundNasPath = '';
-
-    const scanFolder = async (scanPath: string) => {
-      const files = await qnap.listFilesDetailed(scanPath);
-      const mediaFiles = files.filter((f: any) => !f.isFolder && mediaExtensions.some(ext => f.name.toLowerCase().endsWith(ext)));
-      let count = mediaFiles.length;
-      let size = mediaFiles.reduce((sum: number, f: any) => sum + f.size, 0);
-      for (const sub of files.filter((f: any) => f.isFolder)) {
-        try {
-          const subFiles = await qnap.listFilesDetailed(`${scanPath}/${sub.name}`);
-          const subMedia = subFiles.filter((f: any) => !f.isFolder && mediaExtensions.some(ext => f.name.toLowerCase().endsWith(ext)));
-          count += subMedia.length;
-          size += subMedia.reduce((sum: number, f: any) => sum + f.size, 0);
-        } catch { /* alt klasör okunamadı */ }
-      }
+    // Yerel filesystem'de recursive medya dosyası say
+    const scanLocalFolder = (dirPath: string): { count: number; size: number } => {
+      let count = 0;
+      let size = 0;
+      try {
+        const entries = fsSync.readdirSync(dirPath, { withFileTypes: true });
+        for (const entry of entries) {
+          const full = pathMod.join(dirPath, entry.name);
+          if (entry.isDirectory()) {
+            const sub = scanLocalFolder(full);
+            count += sub.count;
+            size += sub.size;
+          } else if (mediaExtensions.some(ext => entry.name.toLowerCase().endsWith(ext))) {
+            try {
+              const stat = fsSync.statSync(full);
+              count++;
+              size += stat.size;
+            } catch { /* */ }
+          }
+        }
+      } catch { /* klasör yok veya okunamıyor */ }
       return { count, size };
     };
 
-    if (latestFlight.mediaFolder) {
-      // DB'deki folderPath'ten NAS path listesi oluştur
-      const folderPath = latestFlight.mediaFolder.folderPath;
-      const relativePath = folderPath.replace(/^media\//, '');
-      const originalPilotFolder = pilotName.replace(/\s+/g, '_');
+    // Yerel media klasöründe ara — DB'deki folderPath önce, yoksa pattern ile tara
+    let processed = 0;
+    let totalSize = 0;
+    let foundLocalPath = '';
 
-      let dateIso = '';
-      const isoMatch = relativePath.match(/^(\d{4}-\d{2}-\d{2})/);
-      const ddMatch = relativePath.match(/^(\d{2})-(\d{2})-(\d{4})/);
-      if (isoMatch) dateIso = isoMatch[1];
-      else if (ddMatch) dateIso = `${ddMatch[3]}-${ddMatch[2]}-${ddMatch[1]}`;
-      else dateIso = new Date().toISOString().split('T')[0];
+    const { sanitizePilotName: spn } = await import('../services/media.js');
 
-      const { sanitizePilotName: spn } = await import('../services/media.js');
-      const sanitizedPilot = spn(pilotName);
-
-      const pathsToTry: string[] = [
-        `${dateIso}/${originalPilotFolder}/${displayId}`,
-        `${dateIso}/${originalPilotFolder}`,
-        `${dateIso}/${sanitizedPilot}/${displayId}`,
-        `${dateIso}/${sanitizedPilot}`,
-        relativePath,
+    if (latestFlight.mediaFolder?.folderPath) {
+      // DB'de kayıtlı path'i önce dene (hem absolute hem relative)
+      const dbPath = latestFlight.mediaFolder.folderPath;
+      const candidates = [
+        dbPath,                                            // olduğu gibi
+        pathMod.resolve(MEDIA_BASE_PATH, '..', dbPath),   // api kökünden relative
+        pathMod.resolve(process.cwd(), dbPath),            // cwd'den relative
       ];
-
-      for (const tryPath of pathsToTry) {
-        try {
-          const exists = await qnap.folderExists(tryPath);
-          if (!exists) continue;
-
-          if (tryPath.includes(displayId)) {
-            const result = await scanFolder(tryPath);
-            processed += result.count;
-            totalSize += result.size;
-            foundNasPath = tryPath;
-          } else {
-            const files = await qnap.listFilesDetailed(tryPath);
-            if (files.find((f: any) => f.isFolder && f.name === displayId)) {
-              const result = await scanFolder(`${tryPath}/${displayId}`);
-              processed += result.count;
-              totalSize += result.size;
-              foundNasPath = `${tryPath}/${displayId}`;
-            }
-            for (const sf of files.filter((f: any) => f.isFolder && f.name.includes('Sorti'))) {
-              try {
-                const sfExists = await qnap.folderExists(`${tryPath}/${sf.name}/${displayId}`);
-                if (sfExists) {
-                  const result = await scanFolder(`${tryPath}/${sf.name}/${displayId}`);
-                  processed += result.count;
-                  totalSize += result.size;
-                  foundNasPath = `${tryPath}/${sf.name}/${displayId}`;
-                }
-              } catch { /* */ }
-            }
+      for (const c of candidates) {
+        if (fsSync.existsSync(c)) {
+          const result = scanLocalFolder(c);
+          if (result.count > 0 || fsSync.existsSync(c)) {
+            processed = result.count;
+            totalSize = result.size;
+            foundLocalPath = c;
+            break;
           }
-          if (processed > 0) break;
-        } catch { /* bu path bulunamadı */ }
-      }
-    } else {
-      // DB'de mediaFolder kaydı yok — NAS'ta displayId klasörünü find ile ara
-      const found = await qnap.findCustomerFolder(displayId);
-      if (found) {
-        const result = await scanFolder(found);
-        processed = result.count;
-        totalSize = result.size;
-        foundNasPath = found;
+        }
       }
     }
 
+    // DB path çalışmadıysa — tarih klasörlerinde displayId ile ara
+    if (!foundLocalPath) {
+      const mediaBase = pathMod.resolve(process.cwd(), MEDIA_BASE_PATH);
+      try {
+        const dateDirs = fsSync.readdirSync(mediaBase, { withFileTypes: true })
+          .filter(e => e.isDirectory())
+          .map(e => e.name)
+          .sort()
+          .reverse(); // en son tarihe bak
+
+        const sanitizedPilot = spn(pilotName);
+        const originalPilotFolder = pilotName.replace(/\s+/g, '_');
+
+        outer: for (const dateDir of dateDirs) {
+          const dateFullPath = pathMod.join(mediaBase, dateDir);
+          // Pilot klasörü adayları
+          const pilotCandidates = [sanitizedPilot, originalPilotFolder];
+          for (const pc of pilotCandidates) {
+            const withDisplayId = pathMod.join(dateFullPath, pc, displayId);
+            const withoutDisplayId = pathMod.join(dateFullPath, pc);
+            if (fsSync.existsSync(withDisplayId)) {
+              const result = scanLocalFolder(withDisplayId);
+              processed = result.count;
+              totalSize = result.size;
+              foundLocalPath = withDisplayId;
+              break outer;
+            }
+            // sorti klasörleri içinde ara
+            if (fsSync.existsSync(withoutDisplayId)) {
+              try {
+                const sortiDirs = fsSync.readdirSync(withoutDisplayId, { withFileTypes: true })
+                  .filter(e => e.isDirectory());
+                for (const sd of sortiDirs) {
+                  const sortiCustomer = pathMod.join(withoutDisplayId, sd.name, displayId);
+                  if (fsSync.existsSync(sortiCustomer)) {
+                    const result = scanLocalFolder(sortiCustomer);
+                    processed += result.count;
+                    totalSize += result.size;
+                    if (!foundLocalPath) foundLocalPath = sortiCustomer;
+                  }
+                }
+                if (processed > 0) break outer;
+              } catch { /* */ }
+            }
+          }
+        }
+      } catch { /* media klasörü okunamadı */ }
+    }
+
     // MediaFolder kaydını oluştur/güncelle
-    const finalFolderPath = foundNasPath ? `media/${foundNasPath}` : (latestFlight.mediaFolder?.folderPath || `media/${new Date().toISOString().split('T')[0]}/${displayId}`);
+    const finalFolderPath = foundLocalPath || latestFlight.mediaFolder?.folderPath || pathMod.join(MEDIA_BASE_PATH, new Date().toISOString().split('T')[0], displayId);
 
     if (latestFlight.mediaFolder) {
       await prisma.mediaFolder.update({
@@ -996,7 +1012,7 @@ router.post(
         data: {
           fileCount: processed,
           totalSizeBytes: BigInt(totalSize),
-          ...(foundNasPath ? { folderPath: finalFolderPath } : {}),
+          ...(foundLocalPath ? { folderPath: finalFolderPath } : {}),
         },
       });
     } else if (processed > 0) {
@@ -1739,8 +1755,10 @@ router.post(
     // "media/" prefix'ini de temizle
     relativePart = relativePart.replace(/^media\//, '');
     const smbPath = `smb://${nasIp}/skytrack-media/${relativePart}`;
+    // Windows UNC path: \\192.168.1.105\skytrack-media\...
+    const uncPath = `\\\\${nasIp}\\skytrack-media\\${relativePart.replace(/\//g, '\\')}`;
 
-    res.json({ success: true, data: { smbPath }, message: 'SMB path hazır' });
+    res.json({ success: true, data: { smbPath, uncPath }, message: 'SMB path hazır' });
   })
 );
 

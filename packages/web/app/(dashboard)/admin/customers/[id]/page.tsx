@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { api } from '@/lib/api'
+import { api, openNetworkFolder } from '@/lib/api'
 import { io } from 'socket.io-client'
 import {
   ArrowLeft,
@@ -622,9 +622,8 @@ Bu belgeyi imzalayarak asagidaki hususlari kabul ve beyan ederim:
     setOpeningFolder(true)
     try {
       const res = await api.post(`/media/${customer.id}/open-folder`)
-      const smbPath = res.data?.data?.smbPath
-      if (!smbPath) throw new Error('SMB path alınamadı')
-      window.open(smbPath)
+      if (!res.data?.data) throw new Error('SMB path alınamadı')
+      openNetworkFolder(res.data.data)
     } catch (error: any) {
       alert(error.response?.data?.error?.message || error.message || 'Klasör açılamadı')
     } finally {

@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { api, mediaApi, currencyApi, productsApi } from '@/lib/api'
+import { api, mediaApi, currencyApi, productsApi, openNetworkFolder } from '@/lib/api'
 // html5-qrcode imported dynamically below
 import {
   Camera, Search, CreditCard, CheckCircle, Download,
@@ -358,9 +358,8 @@ export default function MediaPosPage() {
     setOpeningFolder(true)
     try {
       const res = await api.post(`/media/${customerMedia.customer.id}/open-folder`)
-      const smbPath = res.data?.data?.smbPath
-      if (!smbPath) throw new Error('SMB path alınamadı')
-      window.open(smbPath)
+      if (!res.data?.data) throw new Error('SMB path alınamadı')
+      openNetworkFolder(res.data.data)
     } catch (err: any) {
       alert(err.response?.data?.error?.message || err.message || 'Klasör açılamadı')
     } finally {
