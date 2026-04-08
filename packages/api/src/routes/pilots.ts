@@ -310,11 +310,14 @@ router.get('/:id/panel', authenticate, asyncHandler(async (req: AuthRequest, res
   });
 
   // Position = rank among all inQueue pilots who haven't hit daily limit
+  // Molada / Mesai Dışı / Uçuşta → sıra 0 (frontend "-" gösterir)
   let dynamicQueuePosition = 0;
-  const eligiblePilots = allQueuedPilots.filter(p => p.dailyFlightCount < p.maxDailyFlights);
-  const positionIndex = eligiblePilots.findIndex(p => p.id === id);
-  if (positionIndex !== -1) {
-    dynamicQueuePosition = positionIndex + 1;
+  if (pilot.status === 'AVAILABLE') {
+    const eligiblePilots = allQueuedPilots.filter(p => p.dailyFlightCount < p.maxDailyFlights);
+    const positionIndex = eligiblePilots.findIndex(p => p.id === id);
+    if (positionIndex !== -1) {
+      dynamicQueuePosition = positionIndex + 1;
+    }
   }
 
   // If dailyFlightCount is out of sync, update it

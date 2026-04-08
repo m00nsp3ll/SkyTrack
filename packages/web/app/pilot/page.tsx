@@ -418,7 +418,11 @@ export default function PilotPanel() {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => setShowNotifications(true)}
+            onClick={() => {
+              setShowNotifications(true)
+              // Modal açılınca tüm bildirimleri okundu yap
+              setNotificationList(prev => prev.map(n => ({ ...n, read: true })))
+            }}
             className="text-white hover:bg-white/20 relative"
           >
             <MessageSquare className="h-5 w-5" />
