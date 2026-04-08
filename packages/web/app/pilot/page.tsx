@@ -728,16 +728,16 @@ export default function PilotPanel() {
           {/* Sidebar */}
           <div className="fixed top-0 left-0 bottom-0 w-80 bg-white shadow-xl z-50 flex flex-col animate-slide-in-left">
             {/* Header */}
-            <div className="bg-primary text-white p-4 flex items-center justify-between" style={{ paddingTop: 'max(1rem, env(safe-area-inset-top))' }}>
-              <div className="flex items-center gap-3">
-                <Avatar className="h-12 w-12">
-                  <AvatarFallback className="bg-white text-primary text-lg">
+            <div className="bg-primary text-white p-3 flex items-center justify-between" style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}>
+              <div className="flex items-center gap-2 min-w-0 flex-1">
+                <Avatar className="h-9 w-9 flex-shrink-0">
+                  <AvatarFallback className="bg-white text-primary text-sm">
                     {user?.pilotName?.slice(0, 2).toUpperCase() || 'P'}
                   </AvatarFallback>
                 </Avatar>
-                <div>
-                  <h2 className="font-semibold">{user?.pilotName || user?.username}</h2>
-                  <p className="text-sm opacity-90">Pilot Panel</p>
+                <div className="min-w-0">
+                  <h2 className="font-semibold text-sm truncate leading-tight">{user?.pilotName || user?.username}</h2>
+                  <p className="text-xs opacity-75">Pilot Panel</p>
                 </div>
               </div>
               <Button
@@ -817,20 +817,15 @@ export default function PilotPanel() {
               </div>
 
               {/* Toplam Uçuş Sayısı */}
-              <div className="mb-6">
-                <h3 className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
-                  <History className="h-4 w-4" />
-                  Toplam Uçuş Sayısı
-                </h3>
-                <div className="flex items-center justify-between py-2 mb-3">
-                  <span className="text-3xl font-bold text-primary">
+              <div className="mb-4">
+                <div className="flex items-center justify-between py-2 border-b">
+                  <span className="text-sm text-muted-foreground">Toplam Uçuş Sayısı</span>
+                  <span className="font-semibold text-primary">
                     {flightHistoryCount !== null ? flightHistoryCount : pilot?.dailyFlightCount || 0}
                   </span>
-                  <span className="text-xs text-muted-foreground">uçuş</span>
                 </div>
-                <Button
-                  className="w-full bg-primary/10 text-primary hover:bg-primary/20 border border-primary/20"
-                  variant="ghost"
+                <button
+                  className="mt-2 w-full text-left text-sm text-blue-600 font-medium flex items-center gap-1 hover:text-blue-700 py-1"
                   onClick={() => {
                     setFlightHistoryPeriod('today')
                     fetchFlightHistory('today')
@@ -838,9 +833,9 @@ export default function PilotPanel() {
                     setShowProfileSidebar(false)
                   }}
                 >
-                  <History className="h-4 w-4 mr-2" />
+                  <History className="h-3.5 w-3.5" />
                   Geçmiş Uçuşlarım
-                </Button>
+                </button>
               </div>
 
               {/* Connection Status */}
