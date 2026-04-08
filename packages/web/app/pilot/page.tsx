@@ -101,7 +101,7 @@ export default function PilotPanel() {
   const [selectedQRCustomer, setSelectedQRCustomer] = useState<Customer | null>(null)
   const [selectedQRType, setSelectedQRType] = useState<'admin' | 'media'>('admin')
   const [showNotifications, setShowNotifications] = useState(false)
-  const [notificationList, setNotificationList] = useState<{ id: string; text: string; time: Date }[]>([])
+  const [notificationList, setNotificationList] = useState<{ id: string; text: string; time: Date; read: boolean }[]>([])
   const [showQueueModal, setShowQueueModal] = useState(false)
   const [queueList, setQueueList] = useState<{ id: string; name: string; status: string; queuePosition: number; dailyFlightCount: number; maxDailyFlights: number; inQueue: boolean }[]>([])
 
@@ -169,17 +169,17 @@ export default function PilotPanel() {
             id: n.id,
             text: `${n.title}: ${n.body}`,
             time: new Date(n.createdAt),
+            read: false,
           }))
           setNotificationList(apiNotifs)
         } else {
-          // Fallback: localStorage'dan bugünkü bildirimleri yükle
           try {
             const saved = localStorage.getItem(`notifs_${parsed.pilotId}`)
             if (saved) {
               const parsedNotifs = JSON.parse(saved)
               const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
               const todayNotifs = parsedNotifs
-                .map((n: any) => ({ ...n, time: new Date(n.time) }))
+                .map((n: any) => ({ ...n, time: new Date(n.time), read: n.read ?? false }))
                 .filter((n: any) => n.time >= todayStart)
               setNotificationList(todayNotifs)
             }
@@ -187,14 +187,13 @@ export default function PilotPanel() {
         }
       })
       .catch(() => {
-        // Fallback: localStorage
         try {
           const saved = localStorage.getItem(`notifs_${parsed.pilotId}`)
           if (saved) {
             const parsedNotifs = JSON.parse(saved)
             const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
             const todayNotifs = parsedNotifs
-              .map((n: any) => ({ ...n, time: new Date(n.time) }))
+              .map((n: any) => ({ ...n, time: new Date(n.time), read: n.read ?? false }))
               .filter((n: any) => n.time >= todayStart)
             setNotificationList(todayNotifs)
           }
@@ -217,10 +216,9 @@ export default function PilotPanel() {
     if (!user?.pilotId) return
 
     const addNotif = (text: string) => {
-      const notif = { id: Math.random().toString(36).slice(2), text, time: new Date() }
+      const notif = { id: Math.random().toString(36).slice(2), text, time: new Date(), read: false }
       setNotificationList(prev => {
         const updated = [notif, ...prev]
-        // localStorage'a kaydet (bugünküleri koru)
         try {
           const toSave = updated.map(n => ({ ...n, time: n.time.toISOString() }))
           localStorage.setItem(`notifs_${user.pilotId}`, JSON.stringify(toSave))
@@ -284,8 +282,10 @@ export default function PilotPanel() {
       setTimeout(() => setNotification(null), 8000)
     })
 
-    // localStorage'dan bugünkü bildirimleri yükle
-    // (initial load'da zaten yapıldı, burası sadece socket reconnect için)
+    // Pilot status changed → queue anlık güncelle
+    const unsubStatusChanged = on(SOCKET_EVENTS.PILOT_STATUS_CHANGED, () => {
+      fetchQueueList()
+    })
 
     // Queue'yu her 30sn yenile
     const queueInterval = setInterval(fetchQueueList, 30000)
@@ -298,6 +298,7 @@ export default function PilotPanel() {
       unsubLanded()
       unsubLimitWarning()
       unsubLimitReached()
+      unsubStatusChanged()
       clearInterval(queueInterval)
     }
   }, [user?.pilotId, on, fetchPanelData, fetchQueueList])
@@ -415,9 +416,9 @@ export default function PilotPanel() {
             className="text-white hover:bg-white/20 relative"
           >
             <MessageSquare className="h-5 w-5" />
-            {notificationList.length > 0 && (
+            {notificationList.filter(n => !n.read).length > 0 && (
               <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
-                {notificationList.length > 99 ? '99+' : notificationList.length}
+                {notificationList.filter(n => !n.read).length > 99 ? '99+' : notificationList.filter(n => !n.read).length}
               </span>
             )}
           </Button>
@@ -839,16 +840,32 @@ export default function PilotPanel() {
               ) : (
                 <div className="divide-y">
                   {notificationList.map((notif) => (
-                    <div key={notif.id} className="flex items-start gap-3 p-4 hover:bg-gray-50">
-                      <div className="w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                        <MessageSquare className="h-4 w-4 text-blue-600" />
+                    <div
+                      key={notif.id}
+                      className={`flex items-start gap-3 p-4 transition-colors ${notif.read ? 'bg-white' : 'bg-blue-50'}`}
+                      onMouseEnter={() => {
+                        if (!notif.read) {
+                          setNotificationList(prev => prev.map(n => n.id === notif.id ? { ...n, read: true } : n))
+                        }
+                      }}
+                      onTouchStart={() => {
+                        if (!notif.read) {
+                          setNotificationList(prev => prev.map(n => n.id === notif.id ? { ...n, read: true } : n))
+                        }
+                      }}
+                    >
+                      <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 ${notif.read ? 'bg-gray-100' : 'bg-blue-100'}`}>
+                        <MessageSquare className={`h-4 w-4 ${notif.read ? 'text-gray-400' : 'text-blue-600'}`} />
                       </div>
                       <div className="flex-1">
-                        <p className="text-sm font-medium text-gray-800">{notif.text}</p>
+                        <p className={`text-sm ${notif.read ? 'text-gray-500 font-normal' : 'text-gray-800 font-medium'}`}>{notif.text}</p>
                         <p className="text-xs text-muted-foreground mt-1">
                           {notif.time.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
                         </p>
                       </div>
+                      {!notif.read && (
+                        <div className="w-2 h-2 rounded-full bg-blue-500 mt-2 flex-shrink-0" />
+                      )}
                     </div>
                   ))}
                 </div>
@@ -933,6 +950,7 @@ export default function PilotPanel() {
                 })
               })()}
             </div>
+            <div style={{ paddingBottom: 'env(safe-area-inset-bottom)' }} />
           </div>
         </>
       )}

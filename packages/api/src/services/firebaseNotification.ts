@@ -136,6 +136,24 @@ export async function sendNativeToPilot(pilotId: string, payload: NotificationPa
 
 // Tüm pilotlara gönder
 export async function sendNativeToAllPilots(payload: NotificationPayload) {
+  // Log to all active pilots in DB
+  try {
+    const allPilots = await prisma.pilot.findMany({
+      where: { isActive: true },
+      select: { id: true },
+    });
+    await prisma.pilotNotification.createMany({
+      data: allPilots.map(p => ({
+        pilotId: p.id,
+        title: payload.title,
+        body: payload.body,
+        type: payload.data?.type || 'broadcast',
+      })),
+    });
+  } catch (e) {
+    console.error('PilotNotification broadcast log error:', e);
+  }
+
   if (!firebaseInitialized) return;
 
   const tokens = await prisma.fcmToken.findMany({
