@@ -161,7 +161,21 @@ export default function PilotPanel() {
 
     setUser(parsed)
     fetchPanelData(parsed.pilotId)
+    fetchQueueList()
     setLoading(false)
+
+    // localStorage'dan bugünkü bildirimleri yükle
+    try {
+      const saved = localStorage.getItem(`notifs_${parsed.pilotId}`)
+      if (saved) {
+        const parsedNotifs = JSON.parse(saved)
+        const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
+        const todayNotifs = parsedNotifs
+          .map((n: any) => ({ ...n, time: new Date(n.time) }))
+          .filter((n: any) => n.time >= todayStart)
+        setNotificationList(todayNotifs)
+      }
+    } catch {}
 
     // Initialize native push notifications (Capacitor/FCM)
     initNativePush(token || undefined).catch(console.error)
@@ -172,7 +186,7 @@ export default function PilotPanel() {
     }, 10000)
 
     return () => clearInterval(interval)
-  }, [router, fetchPanelData])
+  }, [router, fetchPanelData, fetchQueueList])
 
   // Socket.IO event listeners
   useEffect(() => {
@@ -247,17 +261,7 @@ export default function PilotPanel() {
     })
 
     // localStorage'dan bugünkü bildirimleri yükle
-    try {
-      const saved = localStorage.getItem(`notifs_${user.pilotId}`)
-      if (saved) {
-        const parsed = JSON.parse(saved)
-        const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
-        const todayNotifs = parsed
-          .map((n: any) => ({ ...n, time: new Date(n.time) }))
-          .filter((n: any) => n.time >= todayStart)
-        setNotificationList(todayNotifs)
-      }
-    } catch {}
+    // (initial load'da zaten yapıldı, burası sadece socket reconnect için)
 
     // Queue'yu her 30sn yenile
     const queueInterval = setInterval(fetchQueueList, 30000)
