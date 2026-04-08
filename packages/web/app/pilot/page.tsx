@@ -108,6 +108,11 @@ export default function PilotPanel() {
   const [queueList, setQueueList] = useState<{ id: string; name: string; status: string; queuePosition: number; dailyFlightCount: number; maxDailyFlights: number; inQueue: boolean }[]>([])
   const [showFlightHistory, setShowFlightHistory] = useState(false)
   const [flightHistory, setFlightHistory] = useState<any[]>([])
+  const [flightHistoryPeriod, setFlightHistoryPeriod] = useState<'today' | 'week' | 'month' | 'custom'>('today')
+  const [flightHistoryFrom, setFlightHistoryFrom] = useState('')
+  const [flightHistoryTo, setFlightHistoryTo] = useState('')
+  const [flightHistoryCount, setFlightHistoryCount] = useState<number | null>(null)
+  const [loadingHistory, setLoadingHistory] = useState(false)
 
   // WebSocket: bağlantıyı user bekleme — token varsa hemen bağlan
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
@@ -137,6 +142,41 @@ export default function PilotPanel() {
       if (data.success) setQueueList(data.data.queue || [])
     } catch {}
   }, [])
+
+  const fetchFlightHistory = useCallback(async (period: 'today' | 'week' | 'month' | 'custom', from?: string, to?: string) => {
+    if (!user?.pilotId) return
+    setLoadingHistory(true)
+    try {
+      let fromDate = ''
+      let toDate = ''
+      const today = new Date()
+      if (period === 'today') {
+        fromDate = today.toISOString().slice(0, 10)
+        toDate = fromDate
+      } else if (period === 'week') {
+        const start = new Date(today)
+        const day = today.getDay()
+        start.setDate(today.getDate() - (day === 0 ? 6 : day - 1))
+        fromDate = start.toISOString().slice(0, 10)
+        toDate = today.toISOString().slice(0, 10)
+      } else if (period === 'month') {
+        fromDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-01`
+        toDate = today.toISOString().slice(0, 10)
+      } else if (period === 'custom') {
+        fromDate = from || ''
+        toDate = to || from || ''
+      }
+      const response = await pilotsApi.getByIdWithDates(user.pilotId, fromDate, toDate)
+      const flights = response.data.data.filteredFlights || []
+      setFlightHistory(flights)
+      setFlightHistoryCount(flights.length)
+    } catch {
+      setFlightHistory([])
+      setFlightHistoryCount(0)
+    } finally {
+      setLoadingHistory(false)
+    }
+  }, [user?.pilotId])
 
   // Initial load and auth check
   useEffect(() => {
@@ -778,38 +818,29 @@ export default function PilotPanel() {
 
               {/* Toplam Uçuş Sayısı */}
               <div className="mb-6">
-                <button
-                  className="w-full text-left"
-                  onClick={async () => {
-                    if (!user?.pilotId) return
-                    try {
-                      const res = await pilotsApi.getById(user.pilotId)
-                      setFlightHistory(res.data.data.filteredFlights || res.data.data.todayFlights || [])
-                    } catch {}
+                <h3 className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
+                  <History className="h-4 w-4" />
+                  Toplam Uçuş Sayısı
+                </h3>
+                <div className="flex items-center justify-between py-2 mb-3">
+                  <span className="text-3xl font-bold text-primary">
+                    {flightHistoryCount !== null ? flightHistoryCount : pilot?.dailyFlightCount || 0}
+                  </span>
+                  <span className="text-xs text-muted-foreground">uçuş</span>
+                </div>
+                <Button
+                  className="w-full bg-primary/10 text-primary hover:bg-primary/20 border border-primary/20"
+                  variant="ghost"
+                  onClick={() => {
+                    setFlightHistoryPeriod('today')
+                    fetchFlightHistory('today')
                     setShowFlightHistory(true)
+                    setShowProfileSidebar(false)
                   }}
                 >
-                  <h3 className="text-sm font-medium text-muted-foreground mb-3 flex items-center justify-between">
-                    Toplam Uçuş Sayısı
-                    <History className="h-4 w-4" />
-                  </h3>
-                </button>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between py-2 border-b">
-                    <span className="text-muted-foreground">Bugün</span>
-                    <span className="font-semibold">{pilot?.dailyFlightCount || 0}</span>
-                  </div>
-                  <div className="flex justify-between py-2 border-b">
-                    <span className="text-muted-foreground text-blue-600 cursor-pointer" onClick={async () => {
-                      if (!user?.pilotId) return
-                      try {
-                        const res = await pilotsApi.getById(user.pilotId)
-                        setFlightHistory(res.data.data.todayFlights || [])
-                      } catch {}
-                      setShowFlightHistory(true)
-                    }}>Geçmiş Uçuşlarım →</span>
-                  </div>
-                </div>
+                  <History className="h-4 w-4 mr-2" />
+                  Geçmiş Uçuşlarım
+                </Button>
               </div>
 
               {/* Connection Status */}
@@ -875,18 +906,12 @@ export default function PilotPanel() {
                   {notificationList.map((notif) => (
                     <div
                       key={notif.id}
-                      className={`flex items-start gap-3 p-4 transition-colors cursor-pointer ${notif.read ? 'bg-white' : 'bg-blue-50'}`}
-                      onClick={() => {
-                        if (!notif.read) {
-                          setNotificationList(prev => prev.map(n => n.id === notif.id ? { ...n, read: true } : n))
-                          fcmApi.markRead(notif.id).catch(() => {})
-                        }
-                      }}
+                      className={`flex items-start gap-3 p-4 transition-colors ${notif.read ? 'bg-white' : 'bg-blue-50'}`}
                     >
                       <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 ${notif.read ? 'bg-gray-100' : 'bg-blue-100'}`}>
                         <MessageSquare className={`h-4 w-4 ${notif.read ? 'text-gray-400' : 'text-blue-600'}`} />
                       </div>
-                      <div className="flex-1">
+                      <div className="flex-1 min-w-0">
                         <p className={`text-sm ${notif.read ? 'text-gray-500 font-normal' : 'text-gray-800 font-medium'}`}>{notif.text}</p>
                         <p className="text-xs text-muted-foreground mt-1">
                           {notif.time.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
@@ -897,8 +922,18 @@ export default function PilotPanel() {
                           </p>
                         )}
                       </div>
-                      {!notif.read && (
-                        <div className="w-2 h-2 rounded-full bg-blue-500 mt-2 flex-shrink-0" />
+                      {!notif.read ? (
+                        <button
+                          onClick={() => {
+                            setNotificationList(prev => prev.map(n => n.id === notif.id ? { ...n, read: true } : n))
+                            fcmApi.markRead(notif.id).catch(() => {})
+                          }}
+                          className="flex-shrink-0 text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-700 hover:bg-blue-200 active:scale-95 transition-all font-medium"
+                        >
+                          Okundu
+                        </button>
+                      ) : (
+                        <div className="w-2 h-2 flex-shrink-0" />
                       )}
                     </div>
                   ))}
@@ -1006,15 +1041,68 @@ export default function PilotPanel() {
               <div className="flex items-center justify-between px-4 py-3">
                 <div className="flex items-center gap-2">
                   <History className="h-5 w-5" />
-                  <h2 className="font-semibold text-lg">Uçuş Geçmişim</h2>
+                  <h2 className="font-semibold text-lg">Geçmiş Uçuşlarım</h2>
                 </div>
                 <Button variant="ghost" size="icon" onClick={() => setShowFlightHistory(false)} className="text-white hover:bg-white/20">
                   <X className="h-5 w-5" />
                 </Button>
               </div>
+              {/* Period Tabs */}
+              <div className="flex gap-1 px-4 pb-3">
+                {(['today', 'week', 'month', 'custom'] as const).map((p) => (
+                  <button
+                    key={p}
+                    onClick={() => {
+                      setFlightHistoryPeriod(p)
+                      if (p !== 'custom') fetchFlightHistory(p)
+                    }}
+                    className={`flex-1 text-xs py-1.5 rounded font-medium transition-colors ${
+                      flightHistoryPeriod === p ? 'bg-white text-primary' : 'text-white/70 hover:bg-white/20'
+                    }`}
+                  >
+                    {p === 'today' ? 'Bugün' : p === 'week' ? 'Bu Hafta' : p === 'month' ? 'Bu Ay' : 'Özel'}
+                  </button>
+                ))}
+              </div>
+              {/* Custom date picker */}
+              {flightHistoryPeriod === 'custom' && (
+                <div className="flex items-center gap-2 px-4 pb-3">
+                  <input
+                    type="date"
+                    value={flightHistoryFrom}
+                    onChange={e => setFlightHistoryFrom(e.target.value)}
+                    className="flex-1 text-xs px-2 py-1.5 rounded bg-white/20 text-white placeholder-white/50 border border-white/30"
+                  />
+                  <span className="text-white/60 text-xs">–</span>
+                  <input
+                    type="date"
+                    value={flightHistoryTo}
+                    onChange={e => setFlightHistoryTo(e.target.value)}
+                    className="flex-1 text-xs px-2 py-1.5 rounded bg-white/20 text-white placeholder-white/50 border border-white/30"
+                  />
+                  <button
+                    onClick={() => fetchFlightHistory('custom', flightHistoryFrom, flightHistoryTo)}
+                    disabled={!flightHistoryFrom}
+                    className="text-xs px-3 py-1.5 bg-white text-primary rounded font-medium disabled:opacity-50"
+                  >
+                    Ara
+                  </button>
+                </div>
+              )}
+            </div>
+            {/* Count summary */}
+            <div className="px-4 py-3 border-b bg-gray-50 flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">Toplam uçuş</span>
+              <span className="text-lg font-bold text-primary">
+                {loadingHistory ? '...' : flightHistoryCount ?? flightHistory.length}
+              </span>
             </div>
             <div className="flex-1 overflow-y-auto divide-y">
-              {flightHistory.length === 0 ? (
+              {loadingHistory ? (
+                <div className="flex items-center justify-center py-16">
+                  <RefreshCw className="h-6 w-6 animate-spin text-primary" />
+                </div>
+              ) : flightHistory.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full text-muted-foreground py-16">
                   <Plane className="h-12 w-12 opacity-20 mb-3" />
                   <p className="font-medium">Uçuş kaydı bulunamadı</p>

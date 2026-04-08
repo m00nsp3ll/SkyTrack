@@ -100,6 +100,8 @@ export const pilotsApi = {
   create: (data: any) => api.post('/pilots', data),
   update: (id: string, data: any) => api.put(`/pilots/${id}`, data),
   delete: (id: string) => api.delete(`/pilots/${id}`),
+  getByIdWithDates: (id: string, from: string, to: string) =>
+    api.get(`/pilots/${id}`, { params: { from, to } }),
   getQueue: () => api.get('/pilots/queue'),
   reorderQueue: (order: { id: string; position: number }[]) =>
     api.post('/pilots/queue/reorder', { order }),
