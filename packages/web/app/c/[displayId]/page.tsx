@@ -454,15 +454,27 @@ export default function CustomerDownloadPage() {
     setApiUrl(getApiUrl())
   }, [])
 
-  // LAN detection via /api/network/discover — server-side IP comparison
+  // LAN detection: discover endpoint'ten LAN IP'yi al, doğrudan ping at
   useEffect(() => {
     if (!apiUrl) return
     fetch(`${apiUrl}/network/discover`, { cache: 'no-store' })
       .then(r => r.json())
-      .then(data => {
-        if (data.isLan && data.lanBaseUrl) {
-          setIsLan(true)
-          setLanBaseUrl(data.lanBaseUrl.replace(':3080', ':3001'))
+      .then(async (discoverData) => {
+        const lanIp = discoverData.lanIp
+        if (!lanIp || lanIp === 'localhost') return
+        const lanApi = `http://${lanIp}:3001`
+        // Doğrudan LAN IP'sine ping at; başarılıysa aynı ağdayız
+        try {
+          const pingRes = await fetch(`${lanApi}/api/network/ping`, {
+            cache: 'no-store',
+            signal: AbortSignal.timeout(1500),
+          })
+          if (pingRes.ok) {
+            setIsLan(true)
+            setLanBaseUrl(lanApi)
+          }
+        } catch {
+          // LAN erişimi yok — internet üzerinden devam
         }
       })
       .catch(() => {})

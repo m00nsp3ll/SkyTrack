@@ -866,7 +866,7 @@ router.post(
   })
 );
 
-// POST /api/media/:customerId/scan - Scan local folder and update DB
+// POST /api/media/:customerId/scan - Scan QNAP NAS and update DB
 router.post(
   '/:customerId/scan',
   authenticate,
@@ -897,123 +897,90 @@ router.post(
     }
 
     const displayId = customer.displayId;
-    const pilotName = latestFlight.pilot?.name || '';
     const mediaExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.mp4', '.mov', '.avi', '.mkv', '.webm', '.heic', '.heif'];
-    const fsSync = await import('fs');
-    const pathMod = await import('path');
 
-    // Yerel filesystem'de recursive medya dosyası say
-    const scanLocalFolder = (dirPath: string): { count: number; size: number } => {
-      let count = 0;
-      let size = 0;
+    let processed = 0;
+    let totalSize = 0;
+    let foundNasPath = '';
+
+    // Önce DB'deki folderPath'ten NAS relative path çıkar ve dene
+    if (latestFlight.mediaFolder?.folderPath) {
+      const dbPath = latestFlight.mediaFolder.folderPath;
+      // "media/..." veya "/share/skytrack-media/..." formatından relative path çıkar
+      const nasBase = process.env.QNAP_MEDIA_PATH || '/share/skytrack-media';
+      let relativePath = dbPath
+        .replace(`${nasBase}/`, '')
+        .replace(/^media\//, '');
+
       try {
-        const entries = fsSync.readdirSync(dirPath, { withFileTypes: true });
-        for (const entry of entries) {
-          const full = pathMod.join(dirPath, entry.name);
-          if (entry.isDirectory()) {
-            const sub = scanLocalFolder(full);
-            count += sub.count;
-            size += sub.size;
-          } else if (mediaExtensions.some(ext => entry.name.toLowerCase().endsWith(ext))) {
+        const files = await qnap.listFilesDetailed(relativePath);
+        const mediaFiles = files.filter(f => !f.isFolder && mediaExtensions.some(ext => f.name.toLowerCase().endsWith(ext)));
+
+        if (mediaFiles.length > 0) {
+          processed = mediaFiles.length;
+          totalSize = mediaFiles.reduce((s, f) => s + f.size, 0);
+          foundNasPath = relativePath;
+        } else {
+          // Klasör var ama boş veya alt klasörler var — displayId klasörünü ara
+          // UUID formatı: pilot_UUID/customer_A00XX şeklinde olabilir
+          const allItems = files.filter(f => f.isFolder);
+          for (const sub of allItems) {
             try {
-              const stat = fsSync.statSync(full);
-              count++;
-              size += stat.size;
+              const subPath = `${relativePath}/${sub.name}`;
+              // sub.name displayId ya da customer_displayId olabilir
+              if (sub.name === displayId || sub.name === `customer_${displayId}`) {
+                const subFiles = await qnap.listFilesDetailed(subPath);
+                const subMedia = subFiles.filter(f => !f.isFolder && mediaExtensions.some(ext => f.name.toLowerCase().endsWith(ext)));
+                processed += subMedia.length;
+                totalSize += subMedia.reduce((s, f) => s + f.size, 0);
+                if (subMedia.length > 0) foundNasPath = subPath;
+              }
             } catch { /* */ }
           }
         }
-      } catch { /* klasör yok veya okunamıyor */ }
-      return { count, size };
-    };
-
-    // Tüm media klasörünü gezip displayId'yi recursive olarak bul
-    // Önce DB path'i dene (ama UUID formatıysa atla, içi boş olabilir)
-    const mediaBase = pathMod.resolve(process.cwd(), MEDIA_BASE_PATH);
-    let processed = 0;
-    let totalSize = 0;
-    let foundLocalPath = '';
-
-    // Helper: bir klasörün tüm alt ağacında displayId klasörünü bul
-    const findDisplayIdInTree = (baseDir: string): string[] => {
-      const found: string[] = [];
-      try {
-        const entries = fsSync.readdirSync(baseDir, { withFileTypes: true });
-        for (const entry of entries) {
-          if (!entry.isDirectory()) continue;
-          const fullPath = pathMod.join(baseDir, entry.name);
-          if (entry.name === displayId || entry.name === `customer_${displayId}`) {
-            found.push(fullPath);
-          } else {
-            // UUID formatı pilot klasörü veya sorti klasörü — içine gir
-            found.push(...findDisplayIdInTree(fullPath));
-          }
-        }
-      } catch { /* okunamıyor */ }
-      return found;
-    };
-
-    if (latestFlight.mediaFolder?.folderPath) {
-      const dbPath = latestFlight.mediaFolder.folderPath;
-      const candidates = [
-        pathMod.resolve(process.cwd(), dbPath),
-        pathMod.resolve(mediaBase, '..', dbPath),
-        dbPath,
-      ];
-      for (const c of candidates) {
-        if (fsSync.existsSync(c)) {
-          const result = scanLocalFolder(c);
-          if (result.count > 0) {
-            processed = result.count;
-            totalSize = result.size;
-            foundLocalPath = c;
-            break;
-          }
-          // Klasör var ama boş (UUID formatı olabilir) — içinde alt klasör var mı?
-          const sub = findDisplayIdInTree(c);
-          for (const s of sub) {
-            const r = scanLocalFolder(s);
-            processed += r.count;
-            totalSize += r.size;
-            if (!foundLocalPath && r.count > 0) foundLocalPath = s;
-          }
-          if (processed > 0) break;
-        }
+      } catch {
+        // DB path geçersiz, NAS'ta ara
       }
     }
 
-    // Hala bulunamadıysa — tüm media/tarih klasörlerinde displayId'yi ara
+    // Hala bulunamadıysa — NAS'ta displayId'yi tüm tarih klasörlerinde ara
     if (processed === 0) {
-      try {
-        const dateDirs = fsSync.readdirSync(mediaBase, { withFileTypes: true })
-          .filter(e => e.isDirectory())
-          .map(e => e.name)
-          .sort()
-          .reverse(); // en yeni tarihe bak
+      const nasRelative = await qnap.findCustomerFolder(displayId);
+      if (nasRelative) {
+        try {
+          const files = await qnap.listFilesDetailed(nasRelative);
+          // Hem direkt dosyalar hem alt klasörler
+          const directMedia = files.filter(f => !f.isFolder && mediaExtensions.some(ext => f.name.toLowerCase().endsWith(ext)));
+          processed += directMedia.length;
+          totalSize += directMedia.reduce((s, f) => s + f.size, 0);
+          foundNasPath = nasRelative;
 
-        outer: for (const dateDir of dateDirs) {
-          const dateFullPath = pathMod.join(mediaBase, dateDir);
-          const matches = findDisplayIdInTree(dateFullPath);
-          for (const m of matches) {
-            const result = scanLocalFolder(m);
-            processed += result.count;
-            totalSize += result.size;
-            if (!foundLocalPath && result.count > 0) foundLocalPath = m;
+          for (const sub of files.filter(f => f.isFolder)) {
+            try {
+              const subFiles = await qnap.listFilesDetailed(`${nasRelative}/${sub.name}`);
+              const subMedia = subFiles.filter(f => !f.isFolder && mediaExtensions.some(ext => f.name.toLowerCase().endsWith(ext)));
+              processed += subMedia.length;
+              totalSize += subMedia.reduce((s, f) => s + f.size, 0);
+            } catch { /* */ }
           }
-          if (processed > 0) break outer;
-        }
-      } catch { /* media klasörü okunamadı */ }
+        } catch { /* */ }
+      }
     }
 
-    // MediaFolder kaydını oluştur/güncelle
-    const finalFolderPath = foundLocalPath || latestFlight.mediaFolder?.folderPath || pathMod.join(MEDIA_BASE_PATH, new Date().toISOString().split('T')[0], displayId);
+    // NAS relative path'ten DB folderPath oluştur
+    const nasBase = process.env.QNAP_MEDIA_PATH || '/share/skytrack-media';
+    const finalFolderPath = foundNasPath
+      ? `media/${foundNasPath}`
+      : (latestFlight.mediaFolder?.folderPath || `media/${new Date().toISOString().split('T')[0]}/${displayId}`);
 
+    // DB güncelle
     if (latestFlight.mediaFolder) {
       await prisma.mediaFolder.update({
         where: { id: latestFlight.mediaFolder.id },
         data: {
           fileCount: processed,
           totalSizeBytes: BigInt(totalSize),
-          ...(foundLocalPath ? { folderPath: finalFolderPath } : {}),
+          ...(foundNasPath ? { folderPath: finalFolderPath } : {}),
         },
       });
     } else if (processed > 0) {
@@ -1034,7 +1001,7 @@ router.post(
     res.json({
       success: true,
       data: { processed, totalSize },
-      message: `${processed} dosya bulundu (NAS)`,
+      message: processed > 0 ? `${processed} dosya bulundu` : 'NAS klasöründe medya dosyası bulunamadı',
     });
   })
 );
