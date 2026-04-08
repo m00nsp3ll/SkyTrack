@@ -29,9 +29,9 @@ import {
   FolderSync,
   QrCode,
   X,
-  ChevronRight,
   ListOrdered,
-  Bell,
+  MessageSquare,
+  Users,
 } from 'lucide-react'
 
 interface UserData {
@@ -102,6 +102,8 @@ export default function PilotPanel() {
   const [selectedQRType, setSelectedQRType] = useState<'admin' | 'media'>('admin')
   const [showNotifications, setShowNotifications] = useState(false)
   const [notificationList, setNotificationList] = useState<{ id: string; text: string; time: Date }[]>([])
+  const [showQueueModal, setShowQueueModal] = useState(false)
+  const [queueList, setQueueList] = useState<{ id: string; name: string; status: string; queuePosition: number; dailyFlightCount: number; maxDailyFlights: number; inQueue: boolean }[]>([])
 
   // Socket.IO hook
   const { on, socket } = useSocket({
@@ -238,6 +240,17 @@ export default function PilotPanel() {
     router.push('/login')
   }
 
+  const fetchQueueList = async () => {
+    try {
+      const token = localStorage.getItem('token')
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/pilots/queue`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const data = await res.json()
+      if (data.success) setQueueList(data.data.queue || [])
+    } catch {}
+  }
+
   const handleStatusChange = async (status: string) => {
     if (!user) return
     setUpdating('status')
@@ -325,16 +338,15 @@ export default function PilotPanel() {
                 )}
               </div>
             </div>
-            <ChevronRight className="h-5 w-5 opacity-60" />
           </div>
-          {/* Notification Bell */}
+          {/* Message/Notifications Button */}
           <Button
             variant="ghost"
             size="icon"
             onClick={() => setShowNotifications(true)}
             className="text-white hover:bg-white/20 relative"
           >
-            <Bell className="h-5 w-5" />
+            <MessageSquare className="h-5 w-5" />
             {notificationList.length > 0 && (
               <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
                 {notificationList.length > 99 ? '99+' : notificationList.length}
@@ -384,7 +396,10 @@ export default function PilotPanel() {
 
       {/* Stats */}
       <div className="p-4 grid grid-cols-4 gap-2">
-        <Card className={pilot?.inQueue ? 'ring-2 ring-yellow-500' : ''}>
+        <Card
+          className={`cursor-pointer active:scale-95 transition-transform ${pilot?.inQueue ? 'ring-2 ring-yellow-500' : ''}`}
+          onClick={() => { fetchQueueList(); setShowQueueModal(true) }}
+        >
           <CardContent className="p-3 text-center">
             <p className="text-2xl font-bold text-yellow-600">
               {pilot?.inQueue && pilot.queuePosition > 0 ? pilot.queuePosition : '-'}
@@ -740,7 +755,7 @@ export default function PilotPanel() {
             {/* Modal Header */}
             <div className="bg-primary text-white p-4 flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Bell className="h-5 w-5" />
+                <MessageSquare className="h-5 w-5" />
                 <h2 className="font-semibold text-lg">Bugünkü Bildirimler</h2>
               </div>
               <Button
@@ -757,7 +772,7 @@ export default function PilotPanel() {
             <div className="flex-1 overflow-y-auto">
               {notificationList.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full text-muted-foreground py-16">
-                  <Bell className="h-12 w-12 opacity-20 mb-3" />
+                  <MessageSquare className="h-12 w-12 opacity-20 mb-3" />
                   <p className="font-medium">Henüz bildirim yok</p>
                   <p className="text-sm mt-1">Yeni bildirimler burada görünür</p>
                 </div>
@@ -766,7 +781,7 @@ export default function PilotPanel() {
                   {notificationList.map((notif) => (
                     <div key={notif.id} className="flex items-start gap-3 p-4 hover:bg-gray-50">
                       <div className="w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                        <Bell className="h-4 w-4 text-blue-600" />
+                        <MessageSquare className="h-4 w-4 text-blue-600" />
                       </div>
                       <div className="flex-1">
                         <p className="text-sm font-medium text-gray-800">{notif.text}</p>
@@ -795,6 +810,66 @@ export default function PilotPanel() {
                 </Button>
               </div>
             )}
+          </div>
+        </>
+      )}
+
+      {/* Queue Modal */}
+      {showQueueModal && (
+        <>
+          <div className="fixed inset-0 bg-black/50 z-50" onClick={() => setShowQueueModal(false)} />
+          <div className="fixed inset-x-0 bottom-0 top-0 z-50 flex flex-col bg-white max-w-md mx-auto shadow-xl">
+            <div className="bg-primary text-white p-4 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Users className="h-5 w-5" />
+                <h2 className="font-semibold text-lg">Makara Sırası</h2>
+              </div>
+              <Button variant="ghost" size="icon" onClick={() => setShowQueueModal(false)} className="text-white hover:bg-white/20">
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
+            <div className="flex-1 overflow-y-auto divide-y">
+              {queueList
+                .filter(p => p.inQueue)
+                .sort((a, b) => a.queuePosition - b.queuePosition)
+                .map((p, index) => {
+                  const isMe = p.id === pilot?.id
+                  const isAtLimit = p.dailyFlightCount >= p.maxDailyFlights
+                  const statusLabel: Record<string, string> = {
+                    AVAILABLE: 'Müsait',
+                    IN_FLIGHT: 'Uçuşta',
+                    ON_BREAK: 'Molada',
+                    OFF_DUTY: 'Mesai Dışı',
+                    ASSIGNED: 'Atandı',
+                  }
+                  const statusColor: Record<string, string> = {
+                    AVAILABLE: 'text-green-600 bg-green-50',
+                    IN_FLIGHT: 'text-blue-600 bg-blue-50',
+                    ON_BREAK: 'text-yellow-600 bg-yellow-50',
+                    OFF_DUTY: 'text-gray-500 bg-gray-100',
+                    ASSIGNED: 'text-purple-600 bg-purple-50',
+                  }
+                  return (
+                    <div
+                      key={p.id}
+                      className={`flex items-center gap-3 px-4 py-3 ${isMe ? 'bg-yellow-50 border-l-4 border-yellow-400' : ''} ${isAtLimit ? 'opacity-50' : ''}`}
+                    >
+                      <span className={`w-8 text-center font-bold text-lg ${isMe ? 'text-yellow-600' : 'text-muted-foreground'}`}>
+                        {index + 1}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <p className={`font-semibold truncate ${isMe ? 'text-yellow-700' : ''}`}>
+                          {p.name} {isMe && <span className="text-xs font-normal text-yellow-600">(Sen)</span>}
+                        </p>
+                        <p className="text-xs text-muted-foreground">{p.dailyFlightCount}/{p.maxDailyFlights} uçuş</p>
+                      </div>
+                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${statusColor[p.status] || 'text-gray-500 bg-gray-100'}`}>
+                        {statusLabel[p.status] || p.status}
+                      </span>
+                    </div>
+                  )
+                })}
+            </div>
           </div>
         </>
       )}
