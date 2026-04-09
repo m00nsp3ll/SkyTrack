@@ -33,7 +33,7 @@
 5. **Production Deploy** ✅
    - Sunucu: root@5.10.220.205 (şifre memory'de)
    - sshpass ile bağlantı çalışıyor
-   - GitHub token: (gizli)
+   - GitHub token: (memory/reference_server.md'de)
    - Deploy akışı: git push → ssh pull → build → pm2 restart
 
 ### Tamamlanan Task'lar (Bu Oturumda Kapatıldı)
@@ -52,7 +52,7 @@
 - **Node PATH:** /root/.nvm/versions/node/v20.20.2/bin
 - **PM2:** skytrack-api (port 3001), skytrack-web (port 3000)
 - **GitHub:** github.com/m00nsp3ll/SkyTrack
-- **GitHub Token:** (gizli)
+- **GitHub Token:** (memory/reference_server.md'de)
 - **Deploy:** `cd /opt/skytrack && git pull origin main && export PATH=/root/.nvm/versions/node/v20.20.2/bin:$PATH && cd packages/api && npm run build && pm2 restart skytrack-api && cd /opt/skytrack/packages/web && npm run build && pm2 restart skytrack-web`
 
 ### QNAP NAS Bilgileri
