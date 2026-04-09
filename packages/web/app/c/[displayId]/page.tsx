@@ -492,28 +492,7 @@ export default function CustomerDownloadPage() {
     }
   }, [fetchData, apiUrl])
 
-  const handleDownload = async () => {
-    if (isLan && nasHttpsBase) {
-      // LAN'daysa: API'den NAS HTTPS dosya URL'lerini al, her dosyayı aç
-      try {
-        const res = await fetch(`${apiUrl}/media/${displayId}/lan-info`)
-        const json = await res.json()
-        if (json.success && json.data.files?.length > 0) {
-          for (const file of json.data.files) {
-            const a = document.createElement('a')
-            a.href = file.url
-            a.download = file.name
-            a.target = '_blank'
-            document.body.appendChild(a)
-            a.click()
-            document.body.removeChild(a)
-            await new Promise(r => setTimeout(r, 200))
-          }
-          return
-        }
-      } catch { /* fallback */ }
-    }
-    // İnternet üzerinden ZIP indir
+  const handleDownload = () => {
     window.location.href = getDownloadUrl(displayId)
   }
 
