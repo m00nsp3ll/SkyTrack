@@ -11,6 +11,8 @@ import {
   Clock,
   Plane,
   User,
+  Wifi,
+  Globe,
   Lock,
 } from 'lucide-react'
 
@@ -444,9 +446,31 @@ export default function CustomerDownloadPage() {
   const [error, setError] = useState<string | null>(null)
   const [apiUrl, setApiUrl] = useState('')
 
+  const [isLan, setIsLan] = useState(false)
+  const [lanBaseUrl, setLanBaseUrl] = useState<string | null>(null)
+  const [connectionChecked, setConnectionChecked] = useState(false)
+
   useEffect(() => {
     setApiUrl(getApiUrl())
   }, [])
+
+  // LAN detection: NAS port 80'e no-cors fetch (2s timeout)
+  // no-cors modunda response opaque gelir ama exception fırlatmaz = NAS'a ulaşıldı = LAN'dayız
+  // AbortError veya TypeError: Failed to fetch = NAS'a ulaşılamıyor = internet
+  useEffect(() => {
+    if (!apiUrl) return
+    const NAS_IP = '192.168.1.105'
+    const ctrl = new AbortController()
+    const timer = setTimeout(() => ctrl.abort(), 2000)
+    fetch(`http://${NAS_IP}`, { cache: 'no-store', mode: 'no-cors', signal: ctrl.signal })
+      .then(() => {
+        clearTimeout(timer)
+        setIsLan(true)
+        setLanBaseUrl(`http://${NAS_IP}`)
+      })
+      .catch(() => { clearTimeout(timer) })
+      .finally(() => setConnectionChecked(true))
+  }, [apiUrl])
 
   const fetchData = useCallback(async () => {
     if (!apiUrl) return
@@ -471,7 +495,29 @@ export default function CustomerDownloadPage() {
     }
   }, [fetchData, apiUrl])
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
+    if (isLan && lanBaseUrl) {
+      // LAN'daysa: API'den NAS HTTP dosya URL'lerini al, zip yerine her dosyayı aç
+      try {
+        const res = await fetch(`${apiUrl}/media/${displayId}/lan-info`)
+        const json = await res.json()
+        if (json.success && json.data.files?.length > 0) {
+          // Dosyaları tek tek NAS'tan indir
+          for (const file of json.data.files) {
+            const a = document.createElement('a')
+            a.href = file.url
+            a.download = file.name
+            a.target = '_blank'
+            document.body.appendChild(a)
+            a.click()
+            document.body.removeChild(a)
+            await new Promise(r => setTimeout(r, 200))
+          }
+          return
+        }
+      } catch { /* fallback */ }
+    }
+    // İnternet üzerinden ZIP indir
     window.location.href = getDownloadUrl(displayId)
   }
 
@@ -573,6 +619,21 @@ export default function CustomerDownloadPage() {
                       {data.media?.fileCount} {txt.filesReady}
                     </p>
 
+                    {connectionChecked && (
+                      <div className="mb-4">
+                        {isLan ? (
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700 border border-green-200">
+                            <Wifi className="w-3.5 h-3.5" />
+                            {txt.localNetwork}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700 border border-blue-200">
+                            <Globe className="w-3.5 h-3.5" />
+                            {txt.viaInternet}
+                          </span>
+                        )}
+                      </div>
+                    )}
 
                     <button
                       onClick={handleDownload}
