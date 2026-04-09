@@ -3,24 +3,20 @@ import { getLocalIP, getClientIP } from '../utils/networkUtils.js';
 
 const router = Router();
 
-// NAS LAN IP — müşteri buna ping atarak aynı ağda olup olmadığını anlar
 const NAS_LAN_IP = process.env.QNAP_SSH_HOST_LOCAL || '192.168.1.105';
-const NAS_LAN_PORT = 3001; // API port (ping için kullanılmaz, sadece bilgi)
+// Ofisin sabit public IP'si — bu IP'den gelen istek = ofis WiFi'ındayız
+const OFFICE_PUBLIC_IP = process.env.OFFICE_PUBLIC_IP || '81.213.175.47';
+// NAS HTTPS base URL (self-signed, port 8081)
+const NAS_HTTPS_BASE = process.env.NAS_HTTPS_BASE || `https://${NAS_LAN_IP}:8081`;
 
 // GET /api/network/discover - LAN detection
-// Sunucu NAS'ın LAN IP'sini döner, frontend o IP'ye ping atar
+// Client'ın public IP'si ofis IP'siyle eşleşiyorsa = aynı ağdayız
 router.get('/discover', async (req, res) => {
   const localIP = getLocalIP();
   const clientIP = getClientIP(req);
 
-  const isPrivate = (ip: string) =>
-    /^10\./.test(ip) ||
-    /^172\.(1[6-9]|2\d|3[01])\./.test(ip) ||
-    /^192\.168\./.test(ip) ||
-    ip === '127.0.0.1' ||
-    ip === '::1';
-
-  const isLan = isPrivate(clientIP);
+  // Ofis sabit IP kontrolü — en güvenilir yöntem
+  const isLan = clientIP === OFFICE_PUBLIC_IP;
 
   res.set('Cache-Control', 'no-store, max-age=0');
   res.set('Access-Control-Allow-Origin', '*');
@@ -28,11 +24,9 @@ router.get('/discover', async (req, res) => {
     localIP,
     clientIP,
     isLan,
-    // NAS'ın LAN IP'si — müşteri buna ping atarak aynı ağda mı diye anlar
     nasLanIp: NAS_LAN_IP,
-    nasLanApiUrl: `http://${NAS_LAN_IP}:3001`,
-    lanIp: NAS_LAN_IP,
-    lanApiUrl: `http://${NAS_LAN_IP}:3001`,
+    nasHttpsBase: NAS_HTTPS_BASE,
+    officePublicIp: OFFICE_PUBLIC_IP,
   });
 });
 

@@ -447,28 +447,25 @@ export default function CustomerDownloadPage() {
   const [apiUrl, setApiUrl] = useState('')
 
   const [isLan, setIsLan] = useState(false)
-  const [lanBaseUrl, setLanBaseUrl] = useState<string | null>(null)
+  const [nasHttpsBase, setNasHttpsBase] = useState<string | null>(null)
   const [connectionChecked, setConnectionChecked] = useState(false)
 
   useEffect(() => {
     setApiUrl(getApiUrl())
   }, [])
 
-  // LAN detection: NAS port 80'e no-cors fetch (2s timeout)
-  // no-cors modunda response opaque gelir ama exception fırlatmaz = NAS'a ulaşıldı = LAN'dayız
-  // AbortError veya TypeError: Failed to fetch = NAS'a ulaşılamıyor = internet
+  // LAN detection: API'ye sor — client IP ofis sabit IP'siyle (81.213.175.47) eşleşiyorsa LAN
   useEffect(() => {
     if (!apiUrl) return
-    const NAS_IP = '192.168.1.105'
-    const ctrl = new AbortController()
-    const timer = setTimeout(() => ctrl.abort(), 2000)
-    fetch(`http://${NAS_IP}`, { cache: 'no-store', mode: 'no-cors', signal: ctrl.signal })
-      .then(() => {
-        clearTimeout(timer)
-        setIsLan(true)
-        setLanBaseUrl(`http://${NAS_IP}`)
+    fetch(`${apiUrl}/network/discover`, { cache: 'no-store' })
+      .then(r => r.json())
+      .then(json => {
+        if (json.isLan) {
+          setIsLan(true)
+          setNasHttpsBase(json.nasHttpsBase || 'https://192.168.1.105:8081')
+        }
       })
-      .catch(() => { clearTimeout(timer) })
+      .catch(() => {})
       .finally(() => setConnectionChecked(true))
   }, [apiUrl])
 
@@ -496,13 +493,12 @@ export default function CustomerDownloadPage() {
   }, [fetchData, apiUrl])
 
   const handleDownload = async () => {
-    if (isLan && lanBaseUrl) {
-      // LAN'daysa: API'den NAS HTTP dosya URL'lerini al, zip yerine her dosyayı aç
+    if (isLan && nasHttpsBase) {
+      // LAN'daysa: API'den NAS HTTPS dosya URL'lerini al, her dosyayı aç
       try {
         const res = await fetch(`${apiUrl}/media/${displayId}/lan-info`)
         const json = await res.json()
         if (json.success && json.data.files?.length > 0) {
-          // Dosyaları tek tek NAS'tan indir
           for (const file of json.data.files) {
             const a = document.createElement('a')
             a.href = file.url

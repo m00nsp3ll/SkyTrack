@@ -1390,7 +1390,7 @@ router.get(
   '/:customerId/lan-info',
   asyncHandler(async (req: any, res: any) => {
     const { customerId } = req.params;
-    const NAS_HTTP_BASE = process.env.NAS_HTTP_BASE || 'http://192.168.1.105';
+    const NAS_HTTPS_BASE = process.env.NAS_HTTPS_BASE || 'https://192.168.1.105:8081';
     const NAS_MEDIA_WEB_PATH = process.env.NAS_MEDIA_WEB_PATH || '/skytrack-media';
 
     const customer = await prisma.customer.findFirst({
@@ -1414,9 +1414,9 @@ router.get(
     }
 
     // folderPath = "media/2026-04-09/PILOT/N_sorti/A0069"
-    // NAS HTTP URL = "http://192.168.1.105/skytrack-media/2026-04-09/PILOT/N_sorti/A0069/"
+    // NAS HTTPS URL = "https://192.168.1.105:8081/skytrack-media/2026-04-09/PILOT/N_sorti/A0069/"
     const relPath = mediaFolder.folderPath.replace(/^media\//, '');
-    const nasBaseUrl = `${NAS_HTTP_BASE}${NAS_MEDIA_WEB_PATH}/${relPath}`;
+    const nasBaseUrl = `${NAS_HTTPS_BASE}${NAS_MEDIA_WEB_PATH}/${relPath}`;
 
     // NAS SSH ile dosya listesi al
     let files: string[] = [];
