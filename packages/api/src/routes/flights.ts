@@ -595,7 +595,7 @@ router.post('/:id/reassign', authenticate, requireRole('ADMIN'), asyncHandler(as
     include: { customer: true, pilot: true, mediaFolder: true },
   });
 
-  // NAS'ta klasörü yeni pilot adına taşı
+  // NAS'ta eski klasörü sil, yeni pilotun sortisinde yeni klasör aç
   if ((updatedFlight as any).mediaFolder) {
     try {
       const mediaFolder = (updatedFlight as any).mediaFolder;
@@ -604,17 +604,28 @@ router.post('/:id/reassign', authenticate, requireRole('ADMIN'), asyncHandler(as
       if (dateMatch) {
         const dateStr = dateMatch[1];
         const safeName = safePilotName(newPilot.name);
-        // Sorti numarasını eski path'ten al (N_sorti) yoksa yeni pilotunn uçuş sayısını kullan
-        const sortiMatch = oldPath.match(/\/(\d+)_sorti\//);
-        const sortiNo = sortiMatch ? sortiMatch[1] : (newPilot.dailyFlightCount ?? 1);
+        // Yeni pilotun güncel sorti numarası (dailyFlightCount = bu uçuş dahil tamamlanan sayı)
+        // Henüz tamamlanmadığı için +1 ekliyoruz: atama anında kaçıncı sortisindeysek o klasör
+        const sortiNo = (newPilot.dailyFlightCount ?? 0) + 1;
         const newRelPath = `${dateStr}/${safeName}/${sortiNo}_sorti/${updatedFlight.customer.displayId}`;
         const { qnap } = await import('../services/qnapService.js');
-        await qnap.moveFolder(oldPath, newRelPath);
-        await prisma.mediaFolder.update({
-          where: { id: mediaFolder.id },
-          data: { folderPath: `media/${newRelPath}`, pilotId },
-        });
-        console.log(`[Reassign] NAS klasör taşındı: ${oldPath} → ${newRelPath}`);
+        // Eski klasörü yeni konuma taşı (içinde dosya varsa koru)
+        const moved = await qnap.moveFolder(oldPath, newRelPath);
+        if (moved) {
+          await prisma.mediaFolder.update({
+            where: { id: mediaFolder.id },
+            data: { folderPath: `media/${newRelPath}`, pilotId },
+          });
+          console.log(`[Reassign] NAS klasör taşındı: ${oldPath} → ${newRelPath}`);
+        } else {
+          // Taşıma başarısız olsa bile DB'yi güncelle ve yeni klasör oluştur
+          await qnap.createFolder(newRelPath);
+          await prisma.mediaFolder.update({
+            where: { id: mediaFolder.id },
+            data: { folderPath: `media/${newRelPath}`, pilotId },
+          });
+          console.log(`[Reassign] Yeni klasör oluşturuldu: ${newRelPath}`);
+        }
       }
     } catch (err: any) { console.error('[Reassign] NAS klasör taşıma hatası:', err?.message); }
   }
