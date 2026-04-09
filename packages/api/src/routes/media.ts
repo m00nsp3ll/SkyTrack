@@ -1416,7 +1416,9 @@ router.get(
     // folderPath = "media/2026-04-09/PILOT/N_sorti/A0069"
     // NAS HTTPS URL = "https://192.168.1.105:8081/skytrack-media/2026-04-09/PILOT/N_sorti/A0069/"
     const relPath = mediaFolder.folderPath.replace(/^media\//, '');
-    const nasBaseUrl = `${NAS_HTTPS_BASE}${NAS_MEDIA_WEB_PATH}/${relPath}`;
+    // Path segment'lerini ayrı ayrı encode et (/ korunsun)
+    const encodedPath = relPath.split('/').map(s => encodeURIComponent(s)).join('/');
+    const nasBaseUrl = `${NAS_HTTPS_BASE}${NAS_MEDIA_WEB_PATH}/${encodedPath}`;
 
     // NAS SSH ile dosya listesi al
     let files: string[] = [];
