@@ -1384,6 +1384,65 @@ router.get(
   })
 );
 
+// GET /api/media/:customerId/lan-info - NAS HTTP URL bilgisi (public, auth yok)
+// Müşteri LAN'dayken NAS'tan direkt indirmek için dosya listesi ve URL'leri döner
+router.get(
+  '/:customerId/lan-info',
+  asyncHandler(async (req: any, res: any) => {
+    const { customerId } = req.params;
+    const NAS_HTTP_BASE = process.env.NAS_HTTP_BASE || 'http://192.168.1.105';
+    const NAS_MEDIA_WEB_PATH = process.env.NAS_MEDIA_WEB_PATH || '/skytrack-media';
+
+    const customer = await prisma.customer.findFirst({
+      where: { OR: [{ id: customerId }, { displayId: customerId }] },
+      include: {
+        flights: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          include: { mediaFolder: true },
+        },
+      },
+    });
+
+    if (!customer) throw new AppError('Müşteri bulunamadı', 404, 'CUSTOMER_NOT_FOUND');
+
+    const mediaFolder = customer.flights[0]?.mediaFolder;
+    if (!mediaFolder) throw new AppError('Medya klasörü bulunamadı', 404, 'MEDIA_FOLDER_NOT_FOUND');
+
+    if (mediaFolder.paymentStatus !== 'PAID') {
+      throw new AppError('Ödeme yapılmadan indirilemez', 403, 'PAYMENT_REQUIRED');
+    }
+
+    // folderPath = "media/2026-04-09/PILOT/N_sorti/A0069"
+    // NAS HTTP URL = "http://192.168.1.105/skytrack-media/2026-04-09/PILOT/N_sorti/A0069/"
+    const relPath = mediaFolder.folderPath.replace(/^media\//, '');
+    const nasBaseUrl = `${NAS_HTTP_BASE}${NAS_MEDIA_WEB_PATH}/${relPath}`;
+
+    // NAS SSH ile dosya listesi al
+    let files: string[] = [];
+    try {
+      files = await qnap.listFiles(relPath);
+    } catch { /* */ }
+
+    const fileUrls = files
+      .filter(f => /\.(jpg|jpeg|png|gif|webp|mp4|mov|avi|mkv|webm|heic|heif)$/i.test(f))
+      .map(f => ({
+        name: f,
+        url: `${nasBaseUrl}/${encodeURIComponent(f)}`,
+      }));
+
+    res.set('Cache-Control', 'no-store');
+    res.json({
+      success: true,
+      data: {
+        nasBaseUrl,
+        fileCount: fileUrls.length,
+        files: fileUrls,
+      },
+    });
+  })
+);
+
 // PATCH /api/media/:customerId/payment - Update payment status
 router.patch(
   '/:customerId/payment',
