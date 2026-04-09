@@ -236,12 +236,13 @@ class QnapService {
   }
 
   // NAS'ta displayId klasörünü tüm tarih/pilot kombinasyonlarında ara
+  // for loop: Türkçe karakterli dizinlerde find -name çalışmadığı için glob ile tarama
   async findCustomerFolder(displayId: string): Promise<string | null> {
     try {
-      // find -name Türkçe karakterli parent klasörlerde çalışmıyor
-      // find + grep ile filtrele, en yeni tarihi önce al (sort -r)
+      // Yeni format: tarih/pilot/N_sorti/displayId  — maxdepth 4
+      // Eski format: tarih/pilot/displayId           — maxdepth 3
       const output = await this.execSSH(
-        `find "${this.mediaPath}" -maxdepth 4 -type d 2>/dev/null | grep "/${displayId}$" | sort -r | head -1`
+        `result=""; for d in "${this.mediaPath}"/*/; do for s in "$d"*/; do if [ -d "$s${displayId}" ]; then result="$s${displayId}"; fi; for t in "$s"*/; do if [ -d "$t${displayId}" ]; then result="$t${displayId}"; fi; done; done; done; echo "$result"`
       );
       const fullPath = output.trim();
       if (!fullPath || !fullPath.startsWith('/')) return null;

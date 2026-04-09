@@ -303,6 +303,40 @@
 - [x] Progress bar gösterimleri (personel katkı, ödeme dağılımı)
 - [x] Tıklanabilir linkler arası navigasyon (personel ↔ detay, müşteri ↔ portfolyo)
 
+### Production Deploy (2026-04-01)
+- [x] VDS sunucu kurulumu (5.10.220.205, dehost.com.tr, Ubuntu 24.04)
+- [x] PostgreSQL 16 + Redis native kurulum
+- [x] Node.js 24 (nvm) + PM2 process manager
+- [x] Nginx reverse proxy + Let's Encrypt SSL (certbot)
+- [x] Hostinger DNS A records (skytrackyp.com, api, www)
+- [x] GitHub deployment pipeline (git pull → build → pm2 restart)
+- [x] Seed data production'a yüklendi
+- [x] Firebase FCM production'da çalışıyor
+- [x] TypeScript build hataları düzeltildi (CommonJS, ES2020, strict=false)
+- [x] .gitignore media/ pattern düzeltildi (media sayfaları git'e eklendi)
+- [x] Sidebar sticky layout (sayfa scroll ederken sabit kalıyor)
+
+### Pilot Sıra Yönetimi v2 & Kritik Düzeltmeler (2026-04-06)
+- [x] Pilot "Sırada Değil" (inQueue) toggle özelliği — sıra dışı pilotlara müşteri atanmıyor
+- [x] Pilot listesi renkli bölümler: Pilot Sırası / Limit Doldu / Molada / Mesai Dışı / Sırada Değil
+- [x] Pilot paneli: inQueue=false → sıra numarası "-", profil sidebar'da "Sırada Değil" etiketi
+- [x] Login büyük/küçük harf sorunu: `findFirst + mode: insensitive` ile düzeltildi
+- [x] FCM keepalive endpoint (public): JWT süresi dolunca token aktif kalıyor, bildirimler kesilmiyor
+- [x] Frontend: /fcm/register 401 → otomatik /fcm/keepalive fallback
+- [x] Production DB `password_changed_at` kolonu eksikti → prisma db push ile eklendi
+- [x] SMB "Klasör Aç": window.location.href → window.open() (share does not exist hatası düzeltildi)
+- [x] NAS SSH external bağlantısı: skytrack.myqnapcloud.com:2222 (production → NAS)
+- [x] NAS SSH şifresi güncellendi: parasut26
+- [x] NAS IP 192.168.1.105 olarak güncellendi (tüm dosyalarda)
+- [x] NAS port forwarding: router 2222 → 192.168.1.105:22
+- [x] Sunucudan NAS'a SSH bağlantısı çalışıyor (skytrack.myqnapcloud.com:2222)
+- [x] Klasör Aç: window.location.href → smb:// ile Finder doğrudan açılıyor
+- [x] Klasörü Tara: NAS SSH üzerinden dosya listeleme (lokal dosya sistemi yerine)
+- [x] Dosya Listeleme: /api/media/:id/files NAS SSH üzerinden çalışıyor
+- [x] Farklı folderPath formatları destekleniyor (pilot_UUID, sanitized, orijinal Türkçe)
+- [x] .heic ve .heif dosya desteği eklendi
+- [x] iOS splash screen: "Alanya Paragliding" yazısı kaldırıldı
+
 ## Devam Eden / Eksik Özellikler
 
 ### Raporlar
@@ -317,23 +351,16 @@
 
 ## Deployment Notları
 
-- Proje Cloudflare Tunnel ile internete açıldı
-- Custom domain: skytrackyp.com
-- API subdomain: api.skytrackyp.com
-- Tunnel config: ~/.cloudflared/config.yml
+### Production (VDS — 5.10.220.205)
+- Sunucu: dehost.com.tr, Ubuntu 24.04 LTS
+- Proje dizini: `/opt/skytrack`
+- PM2: skytrack-api (port 3001), skytrack-web (port 3000)
+- Nginx: reverse proxy + SSL (Let's Encrypt)
+- Domains: skytrackyp.com, api.skytrackyp.com, www.skytrackyp.com
+- DNS: Hostinger (A records)
+- Deploy: `cd /opt/skytrack && git pull && cd packages/api && npm run build && cd ../packages/web && npm run build && pm2 restart all`
 
-### Hızlı Başlatma (2025-02-10)
-
-**Tek Komut:**
-```bash
-./scripts/start-all.sh
-```
-
-**Durdurma:**
-```bash
-./scripts/stop-all.sh
-```
-
-**Detaylı Rehber:**
-- `memory-bank/quickstart.md` dosyasını oku
-- Tüm başlatma komutları ve sorun giderme adımları içerir
+### Lokal Geliştirme (LAN)
+- scripts/start-all.sh ile tüm servisler
+- scripts/stop-all.sh ile durdurma
+- Detay: memory-bank/quickstart.md

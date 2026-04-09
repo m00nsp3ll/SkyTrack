@@ -10,39 +10,42 @@ import path from 'path';
 const router = Router();
 const prisma = new PrismaClient();
 
-// Helper: Create media folder for completed flight
+// Helper: Pilot adını NAS klasörü için güvenli formata çevir
+function safePilotName(name: string): string {
+  return name
+    .replace(/\s+/g, '_')
+    .replace(/[^a-zA-Z0-9_çÇğĞıİöÖşŞüÜ-]/g, '')
+    .trim();
+}
+
+// Helper: Create media folder for completed flight — format: YYYY-MM-DD/PILOT_ADI/N_sorti/DISPLAYID
 async function createMediaFolder(flight: any, customer: any, pilot: any): Promise<string | null> {
   try {
-    const today = new Date();
-    const dateStr = today.toISOString().split('T')[0]; // YYYY-MM-DD
-    const mediaBasePath = process.env.MEDIA_STORAGE_PATH || './media';
+    const { qnap } = await import('../services/qnapService.js');
+    const dateStr = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+    const safeName = safePilotName(pilot.name);
+    // Pilorun o günkü uçuş sayısı = sorti numarası
+    const sortiNo = pilot.dailyFlightCount ?? 1;
+    const relPath = `${dateStr}/${safeName}/${sortiNo}_sorti/${customer.displayId}`;
 
-    const folderPath = path.join(
-      mediaBasePath,
-      dateStr,
-      `pilot_${pilot.id}`,
-      `customer_${customer.displayId}`
-    );
+    await qnap.createFolder(relPath);
 
-    // Create directory recursively
-    await fs.mkdir(folderPath, { recursive: true });
+    const folderPath = `media/${relPath}`;
 
-    // Create or update MediaFolder record
     await prisma.mediaFolder.upsert({
       where: { flightId: flight.id },
       create: {
         flightId: flight.id,
         customerId: customer.id,
         pilotId: pilot.id,
-        folderPath: folderPath,
+        folderPath,
         fileCount: 0,
         totalSizeBytes: 0,
       },
-      update: {
-        folderPath: folderPath,
-      },
+      update: { folderPath },
     });
 
+    console.log(`[MediaFolder] Klasör oluşturuldu: ${folderPath}`);
     return folderPath;
   } catch (error) {
     console.error('Failed to create media folder:', error);
@@ -600,14 +603,18 @@ router.post('/:id/reassign', authenticate, requireRole('ADMIN'), asyncHandler(as
       const dateMatch = oldPath.match(/^(\d{4}-\d{2}-\d{2})/);
       if (dateMatch) {
         const dateStr = dateMatch[1];
-        const safeName = newPilot.name.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_çÇğĞıİöÖşŞüÜ-]/g, '');
-        const newRelPath = `${dateStr}/${safeName}/${updatedFlight.customer.displayId}`;
+        const safeName = safePilotName(newPilot.name);
+        // Sorti numarasını eski path'ten al (N_sorti) yoksa yeni pilotunn uçuş sayısını kullan
+        const sortiMatch = oldPath.match(/\/(\d+)_sorti\//);
+        const sortiNo = sortiMatch ? sortiMatch[1] : (newPilot.dailyFlightCount ?? 1);
+        const newRelPath = `${dateStr}/${safeName}/${sortiNo}_sorti/${updatedFlight.customer.displayId}`;
         const { qnap } = await import('../services/qnapService.js');
         await qnap.moveFolder(oldPath, newRelPath);
         await prisma.mediaFolder.update({
           where: { id: mediaFolder.id },
           data: { folderPath: `media/${newRelPath}`, pilotId },
         });
+        console.log(`[Reassign] NAS klasör taşındı: ${oldPath} → ${newRelPath}`);
       }
     } catch (err: any) { console.error('[Reassign] NAS klasör taşıma hatası:', err?.message); }
   }

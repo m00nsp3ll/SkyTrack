@@ -310,19 +310,23 @@ router.post('/', authenticate, requireRole('ADMIN', 'OFFICE_STAFF', 'KIOSK'), as
   const updatedCustomer = await prisma.customer.findUnique({
     where: { id: customer.id },
     include: {
-      assignedPilot: { select: { id: true, name: true } },
+      assignedPilot: { select: { id: true, name: true, dailyFlightCount: true } },
     },
   });
 
   // QNAP NAS'ta müşteri klasörü oluştur (hata olsa da kayıt devam eder)
+  // Format: YYYY-MM-DD/PILOT_ADI/N_sorti/DISPLAYID
   try {
     const today = new Date().toISOString().split('T')[0];
-    const pilotName = updatedCustomer?.assignedPilot?.name || 'Pilot_Yok';
-    const folderPath = await qnap.createCustomerFolder(today, pilotName, customer.displayId);
-    if (folderPath) {
+    const pilot = updatedCustomer?.assignedPilot;
+    if (pilot) {
+      const safeName = pilot.name.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_çÇğĞıİöÖşŞüÜ-]/g, '').trim();
+      const sortiNo = pilot.dailyFlightCount ?? 1;
+      const relPath = `${today}/${safeName}/${sortiNo}_sorti/${customer.displayId}`;
+      await qnap.createFolder(relPath);
       await prisma.customer.update({
         where: { id: customer.id },
-        data: { mediaFolderPath: folderPath },
+        data: { mediaFolderPath: `media/${relPath}` },
       });
     }
   } catch (err) {
