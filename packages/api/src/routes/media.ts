@@ -1334,7 +1334,7 @@ router.get(
     }
 
     // Set response headers for ZIP download
-    const zipFilename = `${customer.displayId}_medya.zip`;
+    const zipFilename = `Alanya Paragliding.zip`;
     res.setHeader('Content-Type', 'application/zip');
     res.setHeader('Content-Disposition', `attachment; filename="${zipFilename}"`);
 
