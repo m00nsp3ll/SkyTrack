@@ -724,7 +724,7 @@ export default function POSPage() {
       {/* MAIN CONTENT */}
       <div className="flex-1 flex gap-2 min-h-0">
         {/* LEFT: Customer Section */}
-        <div className="w-72 lg:w-48 flex-shrink-0 flex flex-col gap-2 overflow-hidden">
+        <div className="w-72 flex-shrink-0 flex flex-col gap-2 overflow-hidden">
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm flex items-center gap-2">
@@ -961,7 +961,7 @@ export default function POSPage() {
         </div>
 
         {/* RIGHT: Cart + Payment (wider) */}
-        <div className="w-96 lg:w-72 flex-shrink-0 flex flex-col">
+        <div className="w-96 flex-shrink-0 flex flex-col">
           <Card className="flex-1 flex flex-col">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm flex items-center justify-between">
