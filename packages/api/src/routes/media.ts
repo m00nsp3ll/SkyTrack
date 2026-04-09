@@ -1307,6 +1307,32 @@ router.get(
       throw new AppError('Ödeme yapılmadan indirilemez', 403, 'PAYMENT_REQUIRED');
     }
 
+    // Get files from NAS via SSH
+    const relPath = mediaFolder.folderPath.replace(/^media\//, '');
+    const nasFiles = await qnap.listFilesDetailed(relPath);
+    const mediaExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.mp4', '.mov', '.avi', '.mkv', '.webm', '.heic', '.heif'];
+
+    // Collect all media files (including subfolders)
+    const allFiles: { nasPath: string; name: string }[] = [];
+    for (const f of nasFiles) {
+      if (f.isFolder) {
+        try {
+          const subFiles = await qnap.listFilesDetailed(`${relPath}/${f.name}`);
+          for (const sf of subFiles) {
+            if (!sf.isFolder && mediaExtensions.some(ext => sf.name.toLowerCase().endsWith(ext))) {
+              allFiles.push({ nasPath: `${relPath}/${f.name}/${sf.name}`, name: sf.name });
+            }
+          }
+        } catch { /* skip */ }
+      } else if (mediaExtensions.some(ext => f.name.toLowerCase().endsWith(ext))) {
+        allFiles.push({ nasPath: `${relPath}/${f.name}`, name: f.name });
+      }
+    }
+
+    if (allFiles.length === 0) {
+      throw new AppError('İndirilecek dosya bulunamadı', 404, 'NO_FILES');
+    }
+
     // Set response headers for ZIP download
     const zipFilename = `${customer.displayId}_medya.zip`;
     res.setHeader('Content-Type', 'application/zip');
@@ -1322,8 +1348,13 @@ router.get(
     // Pipe archive to response
     archive.pipe(res);
 
-    // Add media folder to archive with "Alanya Paragliding" folder name
-    archive.directory(mediaFolder.folderPath, 'Alanya Paragliding');
+    // Download each file from NAS and add to ZIP
+    for (const file of allFiles) {
+      const buffer = await qnap.downloadFile(file.nasPath);
+      if (buffer && buffer.length > 0) {
+        archive.append(buffer, { name: `Alanya Paragliding/${file.name}` });
+      }
+    }
 
     // Finalize archive
     await archive.finalize();

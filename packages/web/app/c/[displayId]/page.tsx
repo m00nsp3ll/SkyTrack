@@ -493,30 +493,27 @@ export default function CustomerDownloadPage() {
   }, [fetchData, apiUrl])
 
   const handleDownload = async () => {
-    if (isLan) {
-      // LAN'daysa: NAS'tan direkt dosyaları indir (port 8082)
-      try {
-        const res = await fetch(`${apiUrl}/media/${displayId}/lan-info`)
-        const json = await res.json()
-        if (json.success && json.data.files?.length > 0) {
-          for (const file of json.data.files) {
-            // fetch ile blob olarak al — mixed content sorunu olmaz
-            const blob = await fetch(file.url).then(r => r.blob())
-            const blobUrl = URL.createObjectURL(blob)
-            const a = document.createElement('a')
-            a.href = blobUrl
-            a.download = file.name
-            document.body.appendChild(a)
-            a.click()
-            document.body.removeChild(a)
-            URL.revokeObjectURL(blobUrl)
-            await new Promise(r => setTimeout(r, 300))
-          }
-          return
+    // Her iki durumda da (LAN + internet) dosyaları tek tek indir → galeriye gider
+    try {
+      const res = await fetch(`${apiUrl}/media/${displayId}/lan-info`)
+      const json = await res.json()
+      if (json.success && json.data.files?.length > 0) {
+        for (const file of json.data.files) {
+          const blob = await fetch(file.url).then(r => r.blob())
+          const blobUrl = URL.createObjectURL(blob)
+          const a = document.createElement('a')
+          a.href = blobUrl
+          a.download = file.name
+          document.body.appendChild(a)
+          a.click()
+          document.body.removeChild(a)
+          URL.revokeObjectURL(blobUrl)
+          await new Promise(r => setTimeout(r, 300))
         }
-      } catch { /* fallback to zip */ }
-    }
-    // İnternet üzerinden ZIP indir
+        return
+      }
+    } catch { /* fallback */ }
+    // Fallback: ZIP
     window.location.href = getDownloadUrl(displayId)
   }
 

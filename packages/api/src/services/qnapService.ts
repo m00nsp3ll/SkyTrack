@@ -235,6 +235,34 @@ class QnapService {
     });
   }
 
+  // NAS'tan dosya indir — buffer döner
+  async downloadFile(relativeFilePath: string): Promise<Buffer | null> {
+    const remotePath = `${this.mediaPath}/${relativeFilePath}`;
+    return new Promise((resolve) => {
+      const conn = new Client();
+      const timeout = setTimeout(() => {
+        conn.end();
+        resolve(null);
+      }, 60000);
+
+      conn.on('ready', () => {
+        conn.exec(`cat "${remotePath}"`, (err, stream) => {
+          if (err) { clearTimeout(timeout); conn.end(); return resolve(null); }
+          const chunks: Buffer[] = [];
+          stream.on('data', (chunk: Buffer) => chunks.push(chunk));
+          stream.on('close', () => {
+            clearTimeout(timeout);
+            conn.end();
+            resolve(chunks.length > 0 ? Buffer.concat(chunks) : null);
+          });
+          stream.stderr.on('data', () => {});
+        });
+      });
+      conn.on('error', () => { clearTimeout(timeout); resolve(null); });
+      conn.connect(this.sshConfig);
+    });
+  }
+
   // NAS'ta displayId klasörünü tüm tarih/pilot kombinasyonlarında ara
   // for loop: Türkçe karakterli dizinlerde find -name çalışmadığı için glob ile tarama
   async findCustomerFolder(displayId: string): Promise<string | null> {
