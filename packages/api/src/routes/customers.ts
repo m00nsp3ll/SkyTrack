@@ -189,7 +189,7 @@ router.get('/:id', authenticate, asyncHandler(async (req: AuthRequest, res: any)
 }));
 
 // POST /api/customers - Create new customer with QR and pilot assignment
-router.post('/', authenticate, requireRole('ADMIN', 'OFFICE_STAFF'), asyncHandler(async (req: AuthRequest, res: any) => {
+router.post('/', authenticate, requireRole('ADMIN', 'OFFICE_STAFF', 'KIOSK'), asyncHandler(async (req: AuthRequest, res: any) => {
   const {
     firstName,
     lastName,
