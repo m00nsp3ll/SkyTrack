@@ -493,27 +493,6 @@ export default function CustomerDownloadPage() {
   }, [fetchData, apiUrl])
 
   const handleDownload = async () => {
-    // Her iki durumda da (LAN + internet) dosyaları tek tek indir → galeriye gider
-    try {
-      const res = await fetch(`${apiUrl}/media/${displayId}/lan-info`)
-      const json = await res.json()
-      if (json.success && json.data.files?.length > 0) {
-        for (const file of json.data.files) {
-          const blob = await fetch(file.url).then(r => r.blob())
-          const blobUrl = URL.createObjectURL(blob)
-          const a = document.createElement('a')
-          a.href = blobUrl
-          a.download = file.name
-          document.body.appendChild(a)
-          a.click()
-          document.body.removeChild(a)
-          URL.revokeObjectURL(blobUrl)
-          await new Promise(r => setTimeout(r, 300))
-        }
-        return
-      }
-    } catch { /* fallback */ }
-    // Fallback: ZIP
     window.location.href = getDownloadUrl(displayId)
   }
 
