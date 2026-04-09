@@ -321,7 +321,7 @@ router.post('/', authenticate, requireRole('ADMIN', 'OFFICE_STAFF', 'KIOSK'), as
     const pilot = updatedCustomer?.assignedPilot;
     if (pilot) {
       const safeName = pilot.name.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_çÇğĞıİöÖşŞüÜ-]/g, '').trim();
-      const sortiNo = pilot.dailyFlightCount ?? 1;
+      const sortiNo = Math.max(1, (pilot.dailyFlightCount ?? 0) + 1);
       const relPath = `${today}/${safeName}/${sortiNo}_sorti/${customer.displayId}`;
       await qnap.createFolder(relPath);
       await prisma.customer.update({

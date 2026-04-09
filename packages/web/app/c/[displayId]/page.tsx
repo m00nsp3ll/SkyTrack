@@ -454,15 +454,32 @@ export default function CustomerDownloadPage() {
     setApiUrl(getApiUrl())
   }, [])
 
-  // LAN detection: server-side IP check (client IP private range = same LAN)
+  // LAN detection: sunucudan NAS LAN IP'sini al, o IP'nin port 80'ine fetch at
+  // CORS hatası = TCP bağlandı = aynı ağdayız (isLan=true)
+  // "Failed to fetch" = ağda değil = internet üzerinden devam
   useEffect(() => {
     if (!apiUrl) return
     fetch(`${apiUrl}/network/discover`, { cache: 'no-store' })
       .then(r => r.json())
-      .then((discoverData) => {
-        if (discoverData.isLan && discoverData.lanApiUrl) {
+      .then(async (discoverData) => {
+        const nasIp = discoverData.nasLanIp || discoverData.lanIp
+        if (!nasIp || nasIp === 'localhost' || nasIp === '127.0.0.1') return
+        const nasBaseUrl = `http://${nasIp}:3001`
+        try {
+          const ctrl = new AbortController()
+          const timer = setTimeout(() => ctrl.abort(), 2000)
+          // NAS port 80'e fetch — CORS hatası bile olsa TCP bağlandı = aynı ağdayız
+          await fetch(`http://${nasIp}`, {
+            cache: 'no-store',
+            mode: 'no-cors',
+            signal: ctrl.signal,
+          })
+          clearTimeout(timer)
+          // no-cors modunda hata gelmezse bağlantı var
           setIsLan(true)
-          setLanBaseUrl(discoverData.lanApiUrl)
+          setLanBaseUrl(nasBaseUrl)
+        } catch {
+          // AbortError veya network error = NAS'a erişilemiyor
         }
       })
       .catch(() => {})

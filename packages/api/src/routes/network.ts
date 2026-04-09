@@ -3,13 +3,16 @@ import { getLocalIP, getClientIP } from '../utils/networkUtils.js';
 
 const router = Router();
 
+// NAS LAN IP — müşteri buna ping atarak aynı ağda olup olmadığını anlar
+const NAS_LAN_IP = process.env.QNAP_SSH_HOST_LOCAL || '192.168.1.105';
+const NAS_LAN_PORT = 3001; // API port (ping için kullanılmaz, sadece bilgi)
+
 // GET /api/network/discover - LAN detection
-// Returns server's local IP so frontend can probe it directly
+// Sunucu NAS'ın LAN IP'sini döner, frontend o IP'ye ping atar
 router.get('/discover', async (req, res) => {
   const localIP = getLocalIP();
   const clientIP = getClientIP(req);
 
-  // Private IP ranges: 10.x, 172.16-31.x, 192.168.x
   const isPrivate = (ip: string) =>
     /^10\./.test(ip) ||
     /^172\.(1[6-9]|2\d|3[01])\./.test(ip) ||
@@ -24,11 +27,12 @@ router.get('/discover', async (req, res) => {
   res.json({
     localIP,
     clientIP,
-    lanBaseUrl: isLan ? `http://${localIP}:3001` : null,
-    // Always expose localIP so frontend can probe directly
-    lanIp: localIP,
-    lanApiUrl: `http://${localIP}:3001`,
     isLan,
+    // NAS'ın LAN IP'si — müşteri buna ping atarak aynı ağda mı diye anlar
+    nasLanIp: NAS_LAN_IP,
+    nasLanApiUrl: `http://${NAS_LAN_IP}:3001`,
+    lanIp: NAS_LAN_IP,
+    lanApiUrl: `http://${NAS_LAN_IP}:3001`,
   });
 });
 

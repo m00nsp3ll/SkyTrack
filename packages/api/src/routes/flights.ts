@@ -25,7 +25,7 @@ async function createMediaFolder(flight: any, customer: any, pilot: any): Promis
     const dateStr = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
     const safeName = safePilotName(pilot.name);
     // Pilorun o günkü uçuş sayısı = sorti numarası
-    const sortiNo = pilot.dailyFlightCount ?? 1;
+    const sortiNo = Math.max(1, (pilot.dailyFlightCount ?? 0) + 1);
     const relPath = `${dateStr}/${safeName}/${sortiNo}_sorti/${customer.displayId}`;
 
     await qnap.createFolder(relPath);
@@ -604,9 +604,8 @@ router.post('/:id/reassign', authenticate, requireRole('ADMIN'), asyncHandler(as
       if (dateMatch) {
         const dateStr = dateMatch[1];
         const safeName = safePilotName(newPilot.name);
-        // Yeni pilotun güncel sorti numarası (dailyFlightCount = bu uçuş dahil tamamlanan sayı)
-        // Henüz tamamlanmadığı için +1 ekliyoruz: atama anında kaçıncı sortisindeysek o klasör
-        const sortiNo = (newPilot.dailyFlightCount ?? 0) + 1;
+        // Yeni pilotun güncel sorti numarası: tamamlanan uçuş sayısı + 1 (en az 1)
+        const sortiNo = Math.max(1, (newPilot.dailyFlightCount ?? 0) + 1);
         const newRelPath = `${dateStr}/${safeName}/${sortiNo}_sorti/${updatedFlight.customer.displayId}`;
         const { qnap } = await import('../services/qnapService.js');
         // Eski klasörü yeni konuma taşı (içinde dosya varsa koru)
