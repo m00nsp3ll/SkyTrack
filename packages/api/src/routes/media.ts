@@ -1446,20 +1446,30 @@ router.get(
 
     const relPath = mediaFolder.folderPath.replace(/^media\//, '');
 
-    // NAS SSH ile dosya listesi al
-    let files: string[] = [];
-    try {
-      files = await qnap.listFiles(relPath);
-    } catch { /* */ }
+    // NAS SSH ile tüm medya dosyalarını recursive listele
+    const mediaExt = /\.(jpg|jpeg|png|gif|webp|mp4|mov|avi|mkv|webm|heic|heif)$/i;
+    const allFileNames: string[] = [];
+
+    const collectFiles = async (subPath: string) => {
+      try {
+        const items = await qnap.listFilesDetailed(subPath);
+        for (const item of items) {
+          if (item.isFolder) {
+            await collectFiles(`${subPath}/${item.name}`);
+          } else if (mediaExt.test(item.name)) {
+            allFileNames.push(item.name);
+          }
+        }
+      } catch { /* */ }
+    };
+    await collectFiles(relPath);
 
     // API üzerinden proxy URL döndür — HTTPS, SSL sorunu yok
     const apiBase = process.env.API_PUBLIC_URL || 'https://api.skytrackyp.com/api';
-    const fileUrls = files
-      .filter(f => /\.(jpg|jpeg|png|gif|webp|mp4|mov|avi|mkv|webm|heic|heif)$/i.test(f))
-      .map(f => ({
-        name: f,
-        url: `${apiBase}/media/${customerId}/proxy-file/${encodeURIComponent(f)}`,
-      }));
+    const fileUrls = allFileNames.map(f => ({
+      name: f,
+      url: `${apiBase}/media/${customerId}/proxy-file/${encodeURIComponent(f)}`,
+    }));
 
     res.set('Cache-Control', 'no-store');
     res.json({
@@ -1500,7 +1510,24 @@ router.get(
 
     const relPath = mediaFolder.folderPath.replace(/^media\//, '');
     const safeFilename = path.basename(decodeURIComponent(filename));
-    const nasFilePath = `${relPath}/${safeFilename}`;
+
+    // Dosyayı önce direkt klasörde, bulamazsa alt klasörlerde ara
+    let nasFilePath = `${relPath}/${safeFilename}`;
+    const findFile = async (subPath: string): Promise<string | null> => {
+      try {
+        const items = await qnap.listFilesDetailed(subPath);
+        for (const item of items) {
+          if (!item.isFolder && item.name === safeFilename) return `${subPath}/${safeFilename}`;
+          if (item.isFolder) {
+            const found = await findFile(`${subPath}/${item.name}`);
+            if (found) return found;
+          }
+        }
+      } catch { /* */ }
+      return null;
+    };
+    const foundPath = await findFile(relPath);
+    if (foundPath) nasFilePath = foundPath;
 
     const buffer = await qnap.downloadFile(nasFilePath);
     if (!buffer || buffer.length === 0) {
