@@ -519,7 +519,6 @@ export default function CustomerDownloadPage() {
     }
     // İnternet üzerinden ZIP indir
     window.location.href = getDownloadUrl(displayId)
-    }
   }
 
   if (loading) {
