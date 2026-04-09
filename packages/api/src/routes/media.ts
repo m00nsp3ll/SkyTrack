@@ -1444,12 +1444,7 @@ router.get(
       throw new AppError('Ödeme yapılmadan indirilemez', 403, 'PAYMENT_REQUIRED');
     }
 
-    // folderPath = "media/2026-04-09/PILOT/N_sorti/A0069"
-    // NAS HTTPS URL = "https://192.168.1.105:8081/skytrack-media/2026-04-09/PILOT/N_sorti/A0069/"
     const relPath = mediaFolder.folderPath.replace(/^media\//, '');
-    // Path segment'lerini ayrı ayrı encode et (/ korunsun)
-    const encodedPath = relPath.split('/').map(s => encodeURIComponent(s)).join('/');
-    const nasBaseUrl = `${NAS_HTTPS_BASE}${NAS_MEDIA_WEB_PATH}/${encodedPath}`;
 
     // NAS SSH ile dosya listesi al
     let files: string[] = [];
@@ -1457,22 +1452,75 @@ router.get(
       files = await qnap.listFiles(relPath);
     } catch { /* */ }
 
+    // API üzerinden proxy URL döndür — HTTPS, SSL sorunu yok
+    const apiBase = process.env.API_PUBLIC_URL || 'https://api.skytrackyp.com/api';
     const fileUrls = files
       .filter(f => /\.(jpg|jpeg|png|gif|webp|mp4|mov|avi|mkv|webm|heic|heif)$/i.test(f))
       .map(f => ({
         name: f,
-        url: `${nasBaseUrl}/${encodeURIComponent(f)}`,
+        url: `${apiBase}/media/${customerId}/proxy-file/${encodeURIComponent(f)}`,
       }));
 
     res.set('Cache-Control', 'no-store');
     res.json({
       success: true,
       data: {
-        nasBaseUrl,
         fileCount: fileUrls.length,
         files: fileUrls,
       },
     });
+  })
+);
+
+// GET /api/media/:customerId/proxy-file/:filename - NAS dosyasını API üzerinden stream et (public)
+router.get(
+  '/:customerId/proxy-file/:filename',
+  asyncHandler(async (req: any, res: any) => {
+    const { customerId, filename } = req.params;
+
+    const customer = await prisma.customer.findFirst({
+      where: { OR: [{ id: customerId }, { displayId: customerId }] },
+      include: {
+        flights: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          include: { mediaFolder: true },
+        },
+      },
+    });
+
+    if (!customer) throw new AppError('Müşteri bulunamadı', 404, 'CUSTOMER_NOT_FOUND');
+
+    const mediaFolder = customer.flights[0]?.mediaFolder;
+    if (!mediaFolder) throw new AppError('Medya klasörü bulunamadı', 404, 'MEDIA_FOLDER_NOT_FOUND');
+
+    if (mediaFolder.paymentStatus !== 'PAID') {
+      throw new AppError('Ödeme yapılmadan indirilemez', 403, 'PAYMENT_REQUIRED');
+    }
+
+    const relPath = mediaFolder.folderPath.replace(/^media\//, '');
+    const safeFilename = path.basename(decodeURIComponent(filename));
+    const nasFilePath = `${relPath}/${safeFilename}`;
+
+    const buffer = await qnap.downloadFile(nasFilePath);
+    if (!buffer || buffer.length === 0) {
+      throw new AppError('Dosya bulunamadı', 404, 'FILE_NOT_FOUND');
+    }
+
+    const ext = path.extname(safeFilename).toLowerCase();
+    const mimeMap: Record<string, string> = {
+      '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png',
+      '.gif': 'image/gif', '.webp': 'image/webp', '.heic': 'image/heic', '.heif': 'image/heif',
+      '.mp4': 'video/mp4', '.mov': 'video/quicktime', '.avi': 'video/x-msvideo',
+      '.mkv': 'video/x-matroska', '.webm': 'video/webm',
+    };
+    const mime = mimeMap[ext] || 'application/octet-stream';
+
+    res.set('Content-Type', mime);
+    res.set('Content-Disposition', `attachment; filename="${safeFilename}"`);
+    res.set('Access-Control-Allow-Origin', '*');
+    res.set('Cache-Control', 'no-store');
+    res.send(buffer);
   })
 );
 
