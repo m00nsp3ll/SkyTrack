@@ -1390,8 +1390,8 @@ router.get(
   '/:customerId/lan-info',
   asyncHandler(async (req: any, res: any) => {
     const { customerId } = req.params;
-    const NAS_HTTPS_BASE = process.env.NAS_HTTPS_BASE || 'https://192.168.1.105:8081';
-    const NAS_MEDIA_WEB_PATH = process.env.NAS_MEDIA_WEB_PATH || '/skytrack-media';
+    const NAS_HTTPS_BASE = process.env.NAS_HTTPS_BASE || 'http://192.168.1.105:8082';
+    const NAS_MEDIA_WEB_PATH = process.env.NAS_MEDIA_WEB_PATH || '';
 
     const customer = await prisma.customer.findFirst({
       where: { OR: [{ id: customerId }, { displayId: customerId }] },

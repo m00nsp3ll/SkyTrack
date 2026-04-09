@@ -6,8 +6,8 @@ const router = Router();
 const NAS_LAN_IP = process.env.QNAP_SSH_HOST_LOCAL || '192.168.1.105';
 // Ofisin sabit public IP'si — bu IP'den gelen istek = ofis WiFi'ındayız
 const OFFICE_PUBLIC_IP = process.env.OFFICE_PUBLIC_IP || '81.213.175.47';
-// NAS HTTPS base URL (self-signed, port 8081)
-const NAS_HTTPS_BASE = process.env.NAS_HTTPS_BASE || `https://${NAS_LAN_IP}:8081`;
+// NAS Virtual Host — HTTP port 8082, /skytrack-media klasörünü serve eder
+const NAS_HTTPS_BASE = process.env.NAS_HTTPS_BASE || `http://${NAS_LAN_IP}:8082`;
 
 // GET /api/network/discover - LAN detection
 // Client'ın public IP'si ofis IP'siyle eşleşiyorsa = aynı ağdayız
