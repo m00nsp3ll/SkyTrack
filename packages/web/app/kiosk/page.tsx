@@ -146,7 +146,7 @@ interface RegistrationResult {
 }
 
 // Auto-reset countdown in seconds after successful registration
-const AUTO_RESET_SECONDS = 30
+const AUTO_RESET_SECONDS = 15
 
 export default function KioskPage() {
   const [step, setStep] = useState<'language' | 'form' | 'waiver' | 'success'>('language')
@@ -286,6 +286,7 @@ export default function KioskPage() {
       })
       setResult(response.data.data)
       setStep('success')
+      autoPrint(response.data.data)
     } catch (err: any) {
       setError(err.response?.data?.error?.message || tr.registrationFailed)
       setStep('form')
@@ -294,43 +295,55 @@ export default function KioskPage() {
     }
   }
 
-  const handlePrint = () => {
+  const printTicket = (res: RegistrationResult, copy: 'musteri' | 'pilot') => {
     const printWindow = window.open('', '_blank')
-    if (printWindow && result) {
-      const now = new Date()
-      const dateStr = now.toLocaleDateString('tr-TR')
-      const timeStr = now.toLocaleTimeString('tr-TR')
-      printWindow.document.write(`
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <title>QR Kod - ${result.customer.displayId}</title>
-          <style>
-            @page { size: auto; margin: 0; }
-            @media print { html, body { margin: 0; padding: 0; } }
-            body { font-family: Arial, sans-serif; text-align: center; padding: 10px; margin: 0; }
-            .qr-container { width: 5cm; margin: 0 auto; padding: 10px; border: 1px dashed #ccc; }
-            .qr-code { width: 4cm; height: 4cm; }
-            .display-id { font-size: 14px; font-weight: bold; margin-top: 5px; }
-            .customer-name { font-size: 12px; color: #666; }
-            .pilot-name { font-size: 12px; font-weight: bold; color: #333; margin-top: 3px; }
-            .datetime { font-size: 10px; color: #888; margin-top: 5px; }
-          </style>
-        </head>
-        <body>
-          <div class="qr-container">
-            <img src="${result.qrCode}" alt="QR Code" class="qr-code" />
-            <div class="display-id">${result.customer.displayId}</div>
-            <div class="customer-name">${result.customer.firstName} ${result.customer.lastName}</div>
-            ${result.pilot ? `<div class="pilot-name">Pilot: ${result.pilot.name}</div>` : ''}
-            <div class="datetime">${dateStr} - ${timeStr}</div>
-          </div>
-          <script>window.onload = () => window.print();<\/script>
-        </body>
-        </html>
-      `)
-      printWindow.document.close()
-    }
+    if (!printWindow) return
+    const now = new Date()
+    const dateStr = now.toLocaleDateString('tr-TR')
+    const timeStr = now.toLocaleTimeString('tr-TR')
+    const label = copy === 'musteri' ? 'MÜŞTERİ KOPYASI' : 'PİLOT KOPYASI'
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>QR Kod - ${res.customer.displayId}</title>
+        <style>
+          @page { size: 7cm 9cm; margin: 0; }
+          @media print { html, body { margin: 0; padding: 0; } }
+          body { font-family: Arial, sans-serif; text-align: center; padding: 8px; margin: 0; width: 7cm; box-sizing: border-box; }
+          .label { font-size: 9px; font-weight: bold; color: #fff; background: ${copy === 'musteri' ? '#2563eb' : '#16a34a'}; padding: 2px 6px; border-radius: 4px; display: inline-block; margin-bottom: 4px; }
+          .qr-code { width: 4.5cm; height: 4.5cm; }
+          .display-id { font-size: 16px; font-weight: bold; margin-top: 4px; letter-spacing: 1px; }
+          .customer-name { font-size: 11px; color: #444; margin-top: 2px; }
+          .pilot-name { font-size: 11px; font-weight: bold; color: #16a34a; margin-top: 3px; }
+          .datetime { font-size: 9px; color: #888; margin-top: 4px; }
+          .divider { border-top: 1px dashed #ccc; margin: 4px 0; }
+        </style>
+      </head>
+      <body>
+        <div class="label">${label}</div>
+        <div><img src="${res.qrCode}" alt="QR" class="qr-code" /></div>
+        <div class="display-id">${res.customer.displayId}</div>
+        <div class="divider"></div>
+        <div class="customer-name">${res.customer.firstName} ${res.customer.lastName}</div>
+        ${res.pilot ? `<div class="pilot-name">Pilot: ${res.pilot.name}</div>` : ''}
+        <div class="datetime">${dateStr} - ${timeStr}</div>
+        <script>window.onload = () => { window.print(); setTimeout(() => window.close(), 1000); }<\/script>
+      </body>
+      </html>
+    `)
+    printWindow.document.close()
+  }
+
+  const handlePrint = () => {
+    if (!result) return
+    printTicket(result, 'musteri')
+    setTimeout(() => printTicket(result, 'pilot'), 800)
+  }
+
+  const autoPrint = (res: RegistrationResult) => {
+    printTicket(res, 'musteri')
+    setTimeout(() => printTicket(res, 'pilot'), 800)
   }
 
   const getWaiverText = () => {
