@@ -14,6 +14,7 @@ const DEFAULT_POS_CATEGORIES: Record<string, Record<string, boolean>> = {
   PILOT: { 'Rest': false, 'İçecek': false, 'Yiyecek': false, 'Hediyelik': false, 'Foto/Video': false, 'Diğer': false },
   MEDIA_SELLER: { 'Rest': false, 'İçecek': false, 'Yiyecek': false, 'Hediyelik': false, 'Foto/Video': true, 'Diğer': false },
   CUSTOM: { 'Rest': false, 'İçecek': false, 'Yiyecek': false, 'Hediyelik': false, 'Foto/Video': false, 'Diğer': false },
+  KIOSK: { 'Rest': false, 'İçecek': false, 'Yiyecek': false, 'Hediyelik': false, 'Foto/Video': false, 'Diğer': false },
 };
 
 // Ensure posCategories exists in permissions (backward compat)
@@ -33,8 +34,8 @@ router.post('/login', asyncHandler(async (req: AuthRequest, res: any) => {
     throw new AppError('Kullanıcı adı ve şifre gerekli', 400, 'MISSING_CREDENTIALS');
   }
 
-  const user = await prisma.user.findUnique({
-    where: { username },
+  const user = await prisma.user.findFirst({
+    where: { username: { equals: username, mode: 'insensitive' } },
     include: { pilot: true },
   });
 

@@ -31,6 +31,11 @@ export default function DashboardLayout({
     }
 
     const userData = JSON.parse(user)
+    // KIOSK role goes to dedicated kiosk page
+    if (userData.role === 'KIOSK') {
+      router.push('/kiosk')
+      return
+    }
     // ADMIN, OFFICE_STAFF, MEDIA_SELLER, CUSTOM can access dashboard
     const dashboardRoles = ['ADMIN', 'OFFICE_STAFF', 'MEDIA_SELLER', 'CUSTOM']
     if (!dashboardRoles.includes(userData.role)) {

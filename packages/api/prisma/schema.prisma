@@ -13,6 +13,7 @@ enum UserRole {
   PILOT
   MEDIA_SELLER
   CUSTOM
+  KIOSK
 }
 
 enum CustomerStatus {
