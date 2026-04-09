@@ -722,9 +722,9 @@ export default function POSPage() {
       </div>
 
       {/* MAIN CONTENT */}
-      <div className="flex-1 flex gap-4 min-h-0">
+      <div className="flex-1 flex gap-2 min-h-0">
         {/* LEFT: Customer Section */}
-        <div className="w-72 flex-shrink-0 flex flex-col gap-4 overflow-hidden">
+        <div className="w-48 flex-shrink-0 flex flex-col gap-2 overflow-hidden">
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm flex items-center gap-2">
@@ -868,7 +868,7 @@ export default function POSPage() {
         {/* CENTER: Products */}
         <div className="flex-1 flex flex-col min-w-0">
           {/* Category Tabs */}
-          <div className="flex gap-1 mb-3 overflow-x-auto pb-1">
+          <div className="flex gap-1 mb-2 overflow-x-auto pb-1 flex-wrap">
             <Button
               key="Tüm Ürünler"
               variant={activeCategory === 'Tüm Ürünler' ? 'default' : 'outline'}
@@ -896,7 +896,7 @@ export default function POSPage() {
           </div>
 
           {/* Product Search */}
-          <div className="mb-3">
+          <div className="mb-2">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
@@ -919,7 +919,7 @@ export default function POSPage() {
                 Bu kategoride ürün yok
               </div>
             ) : (
-              <div className="grid grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
+              <div className="grid grid-cols-3 xl:grid-cols-4 gap-1.5">
                 {displayProducts.map((product) => {
                   const isOutOfStock = product.stock !== null && product.stock <= 0
                   const isRest = product.category === 'Rest'
@@ -928,7 +928,7 @@ export default function POSPage() {
                       key={product.id}
                       onClick={() => addToCart(product)}
                       disabled={isOutOfStock}
-                      className={`p-3 rounded-lg border text-left transition-all ${
+                      className={`p-2 rounded-lg border text-left transition-all ${
                         isOutOfStock
                           ? 'bg-gray-100 opacity-50 cursor-not-allowed'
                           : isRest
@@ -936,19 +936,19 @@ export default function POSPage() {
                           : 'bg-white hover:bg-primary/5 hover:border-primary active:scale-95'
                       }`}
                     >
-                      <p className={`font-medium text-sm truncate ${isRest ? 'text-red-700' : ''}`}>{product.name}</p>
+                      <p className={`font-medium text-xs truncate ${isRest ? 'text-red-700' : ''}`}>{product.name}</p>
                       {isRest ? (
-                        <p className="text-sm font-semibold text-red-500 mt-1">Tutar Girin</p>
+                        <p className="text-xs font-semibold text-red-500 mt-0.5">Tutar Girin</p>
                       ) : (
                         <>
-                          <p className="text-lg font-bold text-primary">€{product.price.toFixed(2)}</p>
+                          <p className="text-sm font-bold text-primary">€{product.price.toFixed(2)}</p>
                           {eurTryRate > 0 && (
-                            <p className="text-xs text-muted-foreground">≈ ₺{(product.price * eurTryRate).toFixed(0)}</p>
+                            <p className="text-[10px] text-muted-foreground">≈ ₺{(product.price * eurTryRate).toFixed(0)}</p>
                           )}
                         </>
                       )}
                       {product.stock !== null && (
-                        <p className={`text-xs ${isOutOfStock ? 'text-red-500' : 'text-muted-foreground'}`}>
+                        <p className={`text-[10px] ${isOutOfStock ? 'text-red-500' : 'text-muted-foreground'}`}>
                           {isOutOfStock ? 'Tükendi' : `Stok: ${product.stock}`}
                         </p>
                       )}
@@ -961,7 +961,7 @@ export default function POSPage() {
         </div>
 
         {/* RIGHT: Cart + Payment (wider) */}
-        <div className="w-96 flex-shrink-0 flex flex-col">
+        <div className="w-72 flex-shrink-0 flex flex-col">
           <Card className="flex-1 flex flex-col">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm flex items-center justify-between">
