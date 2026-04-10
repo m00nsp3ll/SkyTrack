@@ -98,6 +98,103 @@ router.post('/queue/reorder', authenticate, requireRole('ADMIN'), asyncHandler(a
   });
 }));
 
+// GET /api/pilots/registration-stats - Aggregate stats for self-registration + app installs
+// NOTE: must be declared BEFORE /:id routes so Express doesn't treat "registration-stats" as an id
+router.get('/registration-stats', authenticate, requireRole('ADMIN'), asyncHandler(async (_req: AuthRequest, res: any) => {
+  const [total, appInstalled, notInstalled] = await Promise.all([
+    prisma.pilot.count(),
+    prisma.pilot.count({ where: { appInstalled: true } }),
+    prisma.pilot.count({ where: { appInstalled: false } }),
+  ]);
+  const pilots = await prisma.pilot.findMany({
+    select: { id: true, name: true, phone: true, appInstalled: true, createdAt: true },
+    orderBy: { createdAt: 'desc' },
+  });
+  res.json({
+    success: true,
+    data: { total, appInstalled, notInstalled, pilots },
+  });
+}));
+
+// POST /api/pilots/public-register - Public endpoint for pilot self-registration
+// Token-protected: requires PILOT_REGISTRATION_TOKEN env match
+// NOTE: must be declared BEFORE /:id routes
+router.post('/public-register', asyncHandler(async (req: any, res: any) => {
+  const expectedToken = process.env.PILOT_REGISTRATION_TOKEN;
+  if (!expectedToken) {
+    throw new AppError('Pilot kayıt kapalı', 503, 'REGISTRATION_DISABLED');
+  }
+
+  const providedToken = (req.query.token as string) || (req.body.token as string) || req.get('x-pilot-registration-token');
+  if (providedToken !== expectedToken) {
+    throw new AppError('Geçersiz kayıt bağlantısı', 403, 'INVALID_TOKEN');
+  }
+
+  const { name, phone, email, username, password, appInstalled } = req.body || {};
+
+  if (!name || typeof name !== 'string' || name.trim().length < 3) {
+    throw new AppError('Ad Soyad en az 3 karakter olmalı', 400, 'INVALID_NAME');
+  }
+  if (!phone || typeof phone !== 'string' || phone.trim().length < 7) {
+    throw new AppError('Geçerli bir telefon numarası girin', 400, 'INVALID_PHONE');
+  }
+  if (!username || typeof username !== 'string' || username.trim().length < 3) {
+    throw new AppError('Kullanıcı adı en az 3 karakter olmalı', 400, 'INVALID_USERNAME');
+  }
+  if (!/^[a-zA-Z0-9._-]+$/.test(username.trim())) {
+    throw new AppError('Kullanıcı adı sadece harf, rakam, nokta, tire ve alt çizgi içerebilir', 400, 'INVALID_USERNAME_CHARS');
+  }
+  if (!password || typeof password !== 'string' || password.length < 4) {
+    throw new AppError('Şifre en az 4 karakter olmalı', 400, 'INVALID_PASSWORD');
+  }
+
+  const cleanName = name.trim();
+  const cleanPhone = phone.trim();
+  const cleanEmail = email && typeof email === 'string' && email.trim() ? email.trim() : null;
+  const cleanUsername = username.trim().toLowerCase();
+
+  const existingUser = await prisma.user.findUnique({ where: { username: cleanUsername } });
+  if (existingUser) {
+    throw new AppError('Bu kullanıcı adı zaten kullanılıyor', 409, 'USERNAME_TAKEN');
+  }
+
+  const maxPos = await prisma.pilot.aggregate({ _max: { queuePosition: true } });
+  const nextPos = (maxPos._max.queuePosition || 0) + 1;
+
+  const pilot = await prisma.pilot.create({
+    data: {
+      name: cleanName,
+      phone: cleanPhone,
+      email: cleanEmail,
+      queuePosition: nextPos,
+      isActive: true,
+      inQueue: true,
+      status: 'AVAILABLE',
+      appInstalled: appInstalled === true,
+    },
+  });
+
+  const passwordHash = await bcrypt.hash(password, 10);
+  await prisma.user.create({
+    data: {
+      username: cleanUsername,
+      name: cleanName,
+      passwordHash,
+      plainPassword: password,
+      role: 'PILOT',
+      pilotId: pilot.id,
+      isActive: true,
+    },
+  });
+
+  await cache.pilotQueue.invalidate();
+
+  res.json({
+    success: true,
+    data: { name: cleanName, username: cleanUsername, message: 'Kayıt başarılı' },
+  });
+}));
+
 // GET /api/pilots/:id - Get pilot by ID with optional date filter
 router.get('/:id', authenticate, asyncHandler(async (req: AuthRequest, res: any) => {
   const { id } = req.params;
@@ -510,114 +607,6 @@ router.delete('/:id', authenticate, requireRole('ADMIN'), asyncHandler(async (re
   res.json({
     success: true,
     message: 'Pilot silindi',
-  });
-}));
-
-// GET /api/pilots/registration-stats - Aggregate stats for self-registration + app installs
-router.get('/registration-stats', authenticate, requireRole('ADMIN'), asyncHandler(async (_req: AuthRequest, res: any) => {
-  const [total, appInstalled, notInstalled] = await Promise.all([
-    prisma.pilot.count(),
-    prisma.pilot.count({ where: { appInstalled: true } }),
-    prisma.pilot.count({ where: { appInstalled: false } }),
-  ]);
-  const pilots = await prisma.pilot.findMany({
-    select: { id: true, name: true, phone: true, appInstalled: true, createdAt: true },
-    orderBy: { createdAt: 'desc' },
-  });
-  res.json({
-    success: true,
-    data: {
-      total,
-      appInstalled,
-      notInstalled,
-      pilots,
-    },
-  });
-}));
-
-// POST /api/pilots/public-register - Public endpoint for pilot self-registration
-// Token-protected: requires PILOT_REGISTRATION_TOKEN env match
-// Creates both Pilot and User records in one go
-router.post('/public-register', asyncHandler(async (req: any, res: any) => {
-  const expectedToken = process.env.PILOT_REGISTRATION_TOKEN;
-  if (!expectedToken) {
-    throw new AppError('Pilot kayıt kapalı', 503, 'REGISTRATION_DISABLED');
-  }
-
-  const providedToken = (req.query.token as string) || (req.body.token as string) || req.get('x-pilot-registration-token');
-  if (providedToken !== expectedToken) {
-    throw new AppError('Geçersiz kayıt bağlantısı', 403, 'INVALID_TOKEN');
-  }
-
-  const { name, phone, email, username, password, appInstalled } = req.body || {};
-
-  if (!name || typeof name !== 'string' || name.trim().length < 3) {
-    throw new AppError('Ad Soyad en az 3 karakter olmalı', 400, 'INVALID_NAME');
-  }
-  if (!phone || typeof phone !== 'string' || phone.trim().length < 7) {
-    throw new AppError('Geçerli bir telefon numarası girin', 400, 'INVALID_PHONE');
-  }
-  if (!username || typeof username !== 'string' || username.trim().length < 3) {
-    throw new AppError('Kullanıcı adı en az 3 karakter olmalı', 400, 'INVALID_USERNAME');
-  }
-  if (!/^[a-zA-Z0-9._-]+$/.test(username.trim())) {
-    throw new AppError('Kullanıcı adı sadece harf, rakam, nokta, tire ve alt çizgi içerebilir', 400, 'INVALID_USERNAME_CHARS');
-  }
-  if (!password || typeof password !== 'string' || password.length < 4) {
-    throw new AppError('Şifre en az 4 karakter olmalı', 400, 'INVALID_PASSWORD');
-  }
-
-  const cleanName = name.trim();
-  const cleanPhone = phone.trim();
-  const cleanEmail = email && typeof email === 'string' && email.trim() ? email.trim() : null;
-  const cleanUsername = username.trim().toLowerCase();
-
-  // Uniqueness check
-  const existingUser = await prisma.user.findUnique({ where: { username: cleanUsername } });
-  if (existingUser) {
-    throw new AppError('Bu kullanıcı adı zaten kullanılıyor', 409, 'USERNAME_TAKEN');
-  }
-
-  // Next queue position
-  const maxPos = await prisma.pilot.aggregate({ _max: { queuePosition: true } });
-  const nextPos = (maxPos._max.queuePosition || 0) + 1;
-
-  // Create pilot + user
-  const pilot = await prisma.pilot.create({
-    data: {
-      name: cleanName,
-      phone: cleanPhone,
-      email: cleanEmail,
-      queuePosition: nextPos,
-      isActive: true,
-      inQueue: true,
-      status: 'AVAILABLE',
-      appInstalled: appInstalled === true,
-    },
-  });
-
-  const passwordHash = await bcrypt.hash(password, 10);
-  await prisma.user.create({
-    data: {
-      username: cleanUsername,
-      name: cleanName,
-      passwordHash,
-      plainPassword: password,
-      role: 'PILOT',
-      pilotId: pilot.id,
-      isActive: true,
-    },
-  });
-
-  await cache.pilotQueue.invalidate();
-
-  res.json({
-    success: true,
-    data: {
-      name: cleanName,
-      username: cleanUsername,
-      message: 'Kayıt başarılı',
-    },
   });
 }));
 
