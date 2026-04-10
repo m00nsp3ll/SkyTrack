@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useMemo } from 'react'
+import { useRouter } from 'next/navigation'
 import SignatureCanvas from 'react-signature-canvas'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -8,6 +9,9 @@ import { Label } from '@/components/ui/label'
 import { api } from '@/lib/api'
 import { Check, X, PenLine, Eraser, Printer, UserPlus } from 'lucide-react'
 import { type Language, LANGUAGES, t, isRtl } from '@/lib/translations'
+
+const KIOSK_EXIT_PIN = process.env.NEXT_PUBLIC_KIOSK_EXIT_PIN || '1903'
+const LOGO_LONG_PRESS_MS = 5000
 
 function getBaseUrl() {
   if (typeof window === 'undefined') return 'https://skytrackyp.com'
@@ -156,12 +160,50 @@ export default function KioskPage() {
   const [result, setResult] = useState<RegistrationResult | null>(null)
   const [countdown, setCountdown] = useState(AUTO_RESET_SECONDS)
 
+  const router = useRouter()
   const signatureRef = useRef<SignatureCanvas | null>(null)
   const countryDropdownRef = useRef<HTMLDivElement | null>(null)
   const [showCountryDropdown, setShowCountryDropdown] = useState(false)
   const [countrySearch, setCountrySearch] = useState('')
   const [countryCode, setCountryCode] = useState('+90')
   const [showKvkkModal, setShowKvkkModal] = useState(false)
+
+  const logoPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [showLogoutModal, setShowLogoutModal] = useState(false)
+  const [logoutPin, setLogoutPin] = useState('')
+  const [logoutError, setLogoutError] = useState('')
+
+  const startLogoPress = () => {
+    if (logoPressTimerRef.current) clearTimeout(logoPressTimerRef.current)
+    logoPressTimerRef.current = setTimeout(() => {
+      setLogoutPin('')
+      setLogoutError('')
+      setShowLogoutModal(true)
+    }, LOGO_LONG_PRESS_MS)
+  }
+
+  const cancelLogoPress = () => {
+    if (logoPressTimerRef.current) {
+      clearTimeout(logoPressTimerRef.current)
+      logoPressTimerRef.current = null
+    }
+  }
+
+  const handleLogoutSubmit = () => {
+    if (logoutPin !== KIOSK_EXIT_PIN) {
+      setLogoutError('Hatalı PIN')
+      setLogoutPin('')
+      return
+    }
+    try {
+      localStorage.removeItem('token')
+      localStorage.removeItem('user')
+    } catch {}
+    setShowLogoutModal(false)
+    router.push('/login')
+  }
+
+  useEffect(() => () => cancelLogoPress(), [])
 
   const [formData, setFormData] = useState({
     firstName: '',
@@ -350,15 +392,58 @@ export default function KioskPage() {
     return `${tr.waiverFullTitle}\n\n${tr.waiverIntro}\n\n${tr.waiverAccept}\n\n1. ${tr.waiverItem1}\n\n2. ${tr.waiverItem2}\n\n3. ${tr.waiverItem3}\n\n4. ${tr.waiverItem4}\n\n5. ${tr.waiverItem5}\n\n6. ${tr.waiverItem6}\n\n7. ${tr.waiverItem7}\n\n8. ${tr.waiverItem8}`
   }
 
+  const logoutModal = showLogoutModal ? (
+    <div className="fixed inset-0 z-[100] bg-black/60 flex items-center justify-center p-6">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
+        <h2 className="text-xl font-bold text-gray-800 mb-2">Kiosk Çıkışı</h2>
+        <p className="text-sm text-gray-600 mb-4">Çıkmak için PIN giriniz.</p>
+        <input
+          type="password"
+          inputMode="numeric"
+          autoFocus
+          value={logoutPin}
+          onChange={(e) => { setLogoutPin(e.target.value); setLogoutError('') }}
+          onKeyDown={(e) => { if (e.key === 'Enter') handleLogoutSubmit() }}
+          className="w-full px-4 py-3 text-2xl text-center tracking-widest border-2 border-sky-200 rounded-xl focus:border-sky-500 outline-none"
+          placeholder="••••"
+        />
+        {logoutError && <p className="text-red-600 text-sm mt-2 text-center">{logoutError}</p>}
+        <div className="flex gap-3 mt-5">
+          <button
+            onClick={() => { setShowLogoutModal(false); setLogoutPin(''); setLogoutError('') }}
+            className="flex-1 px-4 py-3 rounded-xl border-2 border-gray-200 text-gray-700 font-medium hover:bg-gray-50"
+          >
+            İptal
+          </button>
+          <button
+            onClick={handleLogoutSubmit}
+            className="flex-1 px-4 py-3 rounded-xl bg-sky-600 text-white font-semibold hover:bg-sky-700"
+          >
+            Çıkış
+          </button>
+        </div>
+      </div>
+    </div>
+  ) : null
+
   // ==================== STEP: Language Selection ====================
   if (step === 'language') {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-gradient-to-br from-sky-50 to-blue-100">
+        {logoutModal}
         <div className="mb-10 text-center">
           <img
             src="/skytrack-logo.png"
             alt="SkyTrack"
-            className="w-28 h-28 mx-auto mb-5 rounded-3xl shadow-xl"
+            className="w-28 h-28 mx-auto mb-5 rounded-3xl shadow-xl select-none"
+            draggable={false}
+            onTouchStart={startLogoPress}
+            onTouchEnd={cancelLogoPress}
+            onTouchCancel={cancelLogoPress}
+            onMouseDown={startLogoPress}
+            onMouseUp={cancelLogoPress}
+            onMouseLeave={cancelLogoPress}
+            onContextMenu={(e) => e.preventDefault()}
           />
           <h1 className="text-3xl font-bold text-sky-800 mb-2">SkyTrack</h1>
           <p className="text-lg text-sky-600">Hoş Geldiniz · Welcome · Добро пожаловать</p>
@@ -574,10 +659,23 @@ export default function KioskPage() {
   // ==================== STEP: Registration Form ====================
   return (
     <div className="min-h-screen overflow-y-auto" dir={rtl ? 'rtl' : 'ltr'}>
+      {logoutModal}
       {/* Top Bar */}
       <div className="sticky top-0 z-10 bg-sky-700 text-white px-6 py-4 flex items-center justify-between shadow-md">
         <div className="flex items-center gap-3">
-          <img src="/skytrack-logo.png" alt="SkyTrack" className="w-9 h-9 rounded-lg" />
+          <img
+            src="/skytrack-logo.png"
+            alt="SkyTrack"
+            className="w-9 h-9 rounded-lg select-none"
+            draggable={false}
+            onTouchStart={startLogoPress}
+            onTouchEnd={cancelLogoPress}
+            onTouchCancel={cancelLogoPress}
+            onMouseDown={startLogoPress}
+            onMouseUp={cancelLogoPress}
+            onMouseLeave={cancelLogoPress}
+            onContextMenu={(e) => e.preventDefault()}
+          />
           <span className="text-xl font-bold">{tr.formTitle}</span>
         </div>
         <button
