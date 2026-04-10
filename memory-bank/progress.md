@@ -304,7 +304,7 @@
 - [x] Tıklanabilir linkler arası navigasyon (personel ↔ detay, müşteri ↔ portfolyo)
 
 ### Production Deploy (2026-04-01)
-- [x] VDS sunucu kurulumu (5.10.220.205, dehost.com.tr, Ubuntu 24.04)
+- [x] VDS sunucu kurulumu (166.1.91.9 — eski 5.10.220.205, dehost.com.tr, Ubuntu 24.04)
 - [x] PostgreSQL 16 + Redis native kurulum
 - [x] Node.js 24 (nvm) + PM2 process manager
 - [x] Nginx reverse proxy + Let's Encrypt SSL (certbot)
@@ -351,7 +351,7 @@
 
 ## Deployment Notları
 
-### Production (VDS — 5.10.220.205)
+### Production (VDS — 166.1.91.9)
 - Sunucu: dehost.com.tr, Ubuntu 24.04 LTS
 - Proje dizini: `/opt/skytrack`
 - PM2: skytrack-api (port 3001), skytrack-web (port 3000)
