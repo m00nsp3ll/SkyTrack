@@ -1,8 +1,27 @@
 # Active Context - SkyTrack
 
-## Son Çalışma Oturumu: 2026-04-09 (Oturum 40)
+## Son Çalışma Oturumu: 2026-04-10 (Oturum 41)
 
-### 🚨 YARIN DEVAM EDILECEK KRITIK SORUN
+### ✅ ÇÖZÜLDÜ — LAN hızında indirme aktif
+
+**Mimari (yeni):** Müşteri (LAN/WAN) → modem (hairpin NAT veya WAN forward) → NAS HTTPS direkt
+**VDS hiç yok** — sadece API çağrısı 302 redirect döndürüyor.
+
+**Adımlar:**
+1. NAS'ta Let's Encrypt SSL kuruldu (`skytrack.myqnapcloud.com`, expires 2026-07-08)
+2. NAS Web Server Virtual Host: HTTPS port **8443**, doc root `/share/skytrack-media`
+3. TP-Link router'da port forward: dış 8443 → 192.168.1.105:8443 TCP
+4. Modem hairpin NAT zaten çalışıyor (LAN içinden public IP çağırınca kendine dönüyor)
+5. NAS'ta `/usr/local/sbin/zip` mevcut — `/api/media/:id/download` endpoint'i artık NAS-side ZIP oluşturup `https://skytrack.myqnapcloud.com:8443/.zips/<displayId>/Alanya Paragliding.zip` URL'ine 302 redirect yapıyor
+6. Müşteri direkt NAS'tan ZIP indirir: LAN → gigabit, WAN → ofis upload
+7. ZIP'ler 24h sonra `cleanupOldZips()` ile silinir (best-effort, her download'da tetikleniyor)
+8. NAS `.htaccess`: `Options -Indexes` (directory listing kapalı, güvenlik)
+
+**Doğrulama (end-to-end):**
+- `curl -I https://api.skytrackyp.com/api/media/A0072/download` → 302 → NAS HTTPS → 200, application/zip ✅
+- Cert valid (Let's Encrypt), accept-ranges: bytes (mobile resume ✅), CORS aktif
+
+### 🚨 ÖNCEKI (2026-04-09) — Çözüldü, referans için saklı
 
 **Müşteri indirme sayfası VDS üzerinden indiriyor, ağ hızında değil!**
 

@@ -220,6 +220,17 @@
 - [x] Recursive medya dosya tarama (GoPro alt klasörleri dahil)
 - [x] Pilot klasör açma hata toleransı (klasör yoksa oluştur)
 
+### LAN İndirme Sistemi v5 — NAS HTTPS Direct (2026-04-10) ✅
+- [x] NAS'ta Let's Encrypt SSL (`skytrack.myqnapcloud.com`, exp 2026-07-08)
+- [x] NAS Virtual Host HTTPS port 8443, doc root `/share/skytrack-media`
+- [x] TP-Link port forward: 8443 → 192.168.1.105:8443
+- [x] Modem hairpin NAT — LAN içinden de public IP üzerinden NAS'a ulaşılıyor
+- [x] `/api/media/:id/download` artık NAS-side `/usr/local/sbin/zip` ile ZIP üretip 302 redirect veriyor
+- [x] Müşteri ZIP'i direkt NAS'tan alıyor: VDS bypass, LAN'da gigabit, WAN'da ofis upload
+- [x] ZIP path: `.zips/<displayId>/Alanya Paragliding.zip`, 24h sonra cleanup
+- [x] NAS `.htaccess`: `Options -Indexes` (directory listing kapalı, güvenlik)
+- [x] ZIP'ten `.DS_Store`, `Thumbs.db`, QNAP `@*` klasörleri exclude
+
 ### LAN İndirme Sistemi v4 — HTTPS + Otomatik Redirect (2026-02-20)
 - [x] LAN Download sunucusu HTTP → HTTPS (self-signed sertifika, port 3080)
 - [x] Chrome mixed content engeli çözüldü (HTTPS→HTTPS)
