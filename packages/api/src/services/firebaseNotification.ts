@@ -94,7 +94,7 @@ export async function sendNativeNotification(fcmToken: string, payload: Notifica
   }
 }
 
-// Belirli bir kullanıcıya gönder (tüm cihazlarına)
+// Belirli bir kullanıcıya gönder (tüm cihazlarına — paralel)
 export async function sendNativeToUser(userId: string, payload: NotificationPayload) {
   if (!firebaseInitialized) return;
 
@@ -102,9 +102,8 @@ export async function sendNativeToUser(userId: string, payload: NotificationPayl
     where: { userId, isActive: true },
   });
 
-  for (const t of tokens) {
-    await sendNativeNotification(t.token, payload);
-  }
+  if (tokens.length === 0) return;
+  await Promise.all(tokens.map(t => sendNativeNotification(t.token, payload)));
 }
 
 // Pilot kullanıcısına gönder (pilotId üzerinden user bul)
@@ -134,7 +133,7 @@ export async function sendNativeToPilot(pilotId: string, payload: NotificationPa
   }
 }
 
-// Tüm pilotlara gönder
+// Tüm pilotlara gönder (paralel)
 export async function sendNativeToAllPilots(payload: NotificationPayload) {
   // Log to all active pilots in DB
   try {
@@ -158,29 +157,27 @@ export async function sendNativeToAllPilots(payload: NotificationPayload) {
 
   const tokens = await prisma.fcmToken.findMany({
     where: { user: { role: 'PILOT' }, isActive: true },
+    select: { token: true },
   });
 
   if (tokens.length === 0) return;
 
-  for (const t of tokens) {
-    await sendNativeNotification(t.token, payload);
-  }
+  await Promise.all(tokens.map(t => sendNativeNotification(t.token, payload)));
   console.log(`FCM sent to ${tokens.length} pilot devices`);
 }
 
-// Tüm kullanıcılara gönder
+// Tüm kullanıcılara gönder (paralel)
 export async function sendNativeBroadcast(payload: NotificationPayload) {
   if (!firebaseInitialized) return;
 
   const tokens = await prisma.fcmToken.findMany({
     where: { isActive: true },
+    select: { token: true },
   });
 
   if (tokens.length === 0) return;
 
-  for (const t of tokens) {
-    await sendNativeNotification(t.token, payload);
-  }
+  await Promise.all(tokens.map(t => sendNativeNotification(t.token, payload)));
   console.log(`FCM broadcast sent to ${tokens.length} devices`);
 }
 

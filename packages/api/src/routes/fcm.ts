@@ -66,7 +66,7 @@ router.get('/tokens', authenticate, requireRole('ADMIN'), asyncHandler(async (re
   res.json({ success: true, data: tokens });
 }));
 
-// POST /api/fcm/broadcast - Send notification to all or by role
+// POST /api/fcm/broadcast - Send notification to all users (pilot + non-pilot)
 router.post('/broadcast', authenticate, requireRole('ADMIN'), asyncHandler(async (req: AuthRequest, res: any) => {
   const { title, body, data } = req.body;
 
@@ -74,11 +74,24 @@ router.post('/broadcast', authenticate, requireRole('ADMIN'), asyncHandler(async
     throw new AppError('Başlık ve mesaj zorunludur', 400, 'MISSING_FIELDS');
   }
 
-  // Pilotlara DB log + push, diğer herkese de push
-  await sendNativeToAllPilots({ title, body, data: { type: 'broadcast', ...data } });
-  await sendNativeBroadcast({ title, body, data: { type: 'broadcast', ...data } });
+  const payload = { title, body, data: { type: 'broadcast', ...data } };
 
-  res.json({ success: true, message: `Bildirim gönderildi` });
+  // 1) Pilotlara: DB log + FCM push (sendNativeToAllPilots içinde ikisi de yapılıyor)
+  await sendNativeToAllPilots(payload);
+
+  // 2) Pilot-dışı kullanıcılara (admin, ofis, medya, vb.) — paralel push
+  const otherTokens = await prisma.fcmToken.findMany({
+    where: {
+      isActive: true,
+      user: { role: { not: 'PILOT' } },
+    },
+    select: { token: true },
+  });
+  if (otherTokens.length > 0) {
+    await Promise.all(otherTokens.map(t => sendNativeNotification(t.token, payload)));
+  }
+
+  res.json({ success: true, message: 'Bildirim gönderildi' });
 }));
 
 // POST /api/fcm/send-role/:role - Send notification to specific role
