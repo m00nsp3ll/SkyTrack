@@ -73,4 +73,24 @@
       transform: translateY(0);
     }
   }
+
+  /* Apple-style thin scrollbar — always visible, subtle, rounded */
+  .sidebar-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(100, 116, 139, 0.45) transparent;
+  }
+  .sidebar-scrollbar::-webkit-scrollbar {
+    width: 6px;
+  }
+  .sidebar-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .sidebar-scrollbar::-webkit-scrollbar-thumb {
+    background-color: rgba(100, 116, 139, 0.45);
+    border-radius: 9999px;
+    transition: background-color 0.2s ease;
+  }
+  .sidebar-scrollbar::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(71, 85, 105, 0.75);
+  }
 }

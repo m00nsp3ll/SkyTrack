@@ -258,7 +258,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto py-2">
+      <nav className="flex-1 overflow-y-auto py-2 sidebar-scrollbar">
         {filteredGroups.map((group, groupIndex) => (
           <div key={group.title} className="mb-1">
             {/* Group Title */}
