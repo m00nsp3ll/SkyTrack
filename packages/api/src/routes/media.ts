@@ -3,7 +3,6 @@ import { PrismaClient } from '@prisma/client';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs/promises';
-import archiver from 'archiver';
 import { asyncHandler, AppError } from '../middleware/errorHandler.js';
 import { authenticate, requireRole, AuthRequest } from '../middleware/auth.js';
 import {
@@ -1270,20 +1269,16 @@ router.get(
   })
 );
 
-// GET /api/media/:customerId/download - Download all files as ZIP
+// GET /api/media/:customerId/download - NAS-side ZIP, redirect to direct HTTPS URL
+// Eski akış: VDS dosyaları SSH ile çekip archiver ile streaming ZIP yapardı (yavaş, VDS bottleneck)
+// Yeni akış: NAS'ta /usr/local/sbin/zip ile lokal disk hızında ZIP, müşteri NAS'tan direkt HTTPS ile alır
 router.get(
   '/:customerId/download',
   asyncHandler(async (req: any, res: any) => {
     const { customerId } = req.params;
 
-    // Find by customer ID or displayId
     const customer = await prisma.customer.findFirst({
-      where: {
-        OR: [
-          { id: customerId },
-          { displayId: customerId },
-        ],
-      },
+      where: { OR: [{ id: customerId }, { displayId: customerId }] },
       include: {
         flights: {
           orderBy: { createdAt: 'desc' },
@@ -1293,77 +1288,36 @@ router.get(
       },
     });
 
-    if (!customer) {
-      throw new AppError('Müşteri bulunamadı', 404, 'CUSTOMER_NOT_FOUND');
-    }
+    if (!customer) throw new AppError('Müşteri bulunamadı', 404, 'CUSTOMER_NOT_FOUND');
 
     const mediaFolder = customer.flights[0]?.mediaFolder;
-    if (!mediaFolder) {
-      throw new AppError('Medya klasörü bulunamadı', 404, 'MEDIA_FOLDER_NOT_FOUND');
-    }
+    if (!mediaFolder) throw new AppError('Medya klasörü bulunamadı', 404, 'MEDIA_FOLDER_NOT_FOUND');
 
-    // Check payment status for public downloads
     if (mediaFolder.paymentStatus !== 'PAID') {
       throw new AppError('Ödeme yapılmadan indirilemez', 403, 'PAYMENT_REQUIRED');
     }
 
-    // Get files from NAS via SSH
     const relPath = mediaFolder.folderPath.replace(/^media\//, '');
-    const nasFiles = await qnap.listFilesDetailed(relPath);
-    const mediaExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.mp4', '.mov', '.avi', '.mkv', '.webm', '.heic', '.heif'];
 
-    // Collect all media files (including subfolders)
-    const allFiles: { nasPath: string; name: string }[] = [];
-    for (const f of nasFiles) {
-      if (f.isFolder) {
-        try {
-          const subFiles = await qnap.listFilesDetailed(`${relPath}/${f.name}`);
-          for (const sf of subFiles) {
-            if (!sf.isFolder && mediaExtensions.some(ext => sf.name.toLowerCase().endsWith(ext))) {
-              allFiles.push({ nasPath: `${relPath}/${f.name}/${sf.name}`, name: sf.name });
-            }
-          }
-        } catch { /* skip */ }
-      } else if (mediaExtensions.some(ext => f.name.toLowerCase().endsWith(ext))) {
-        allFiles.push({ nasPath: `${relPath}/${f.name}`, name: f.name });
-      }
+    // Best-effort cleanup — eski zipleri sil (24h)
+    qnap.cleanupOldZips(24).catch(() => {});
+
+    // NAS'ta zip oluştur
+    const result = await qnap.createCustomerZip(customer.displayId, relPath);
+    if (!result) {
+      throw new AppError('ZIP oluşturulamadı', 500, 'ZIP_CREATE_FAILED');
     }
 
-    if (allFiles.length === 0) {
-      throw new AppError('İndirilecek dosya bulunamadı', 404, 'NO_FILES');
-    }
-
-    // Set response headers for ZIP download
-    const zipFilename = `Alanya Paragliding.zip`;
-    res.setHeader('Content-Type', 'application/zip');
-    res.setHeader('Content-Disposition', `attachment; filename="${zipFilename}"`);
-
-    // Create ZIP archive
-    const archive = archiver('zip', { zlib: { level: 5 } });
-
-    archive.on('error', () => {
-      throw new AppError('ZIP oluşturma hatası', 500, 'ZIP_ERROR');
-    });
-
-    // Pipe archive to response
-    archive.pipe(res);
-
-    // Download each file from NAS and add to ZIP
-    for (const file of allFiles) {
-      const buffer = await qnap.downloadFile(file.nasPath);
-      if (buffer && buffer.length > 0) {
-        archive.append(buffer, { name: `Alanya Paragliding/${file.name}` });
-      }
-    }
-
-    // Finalize archive
-    await archive.finalize();
-
-    // Update delivery status
+    // Delivery status güncelle
     await prisma.mediaFolder.update({
       where: { id: mediaFolder.id },
       data: { deliveryStatus: 'DELIVERED' },
     });
+
+    // NAS HTTPS URL'ine redirect — müşteri direkt NAS'tan indirir, VDS bypass
+    const NAS_PUBLIC_URL = process.env.NAS_PUBLIC_URL || 'https://skytrack.myqnapcloud.com:8443';
+    const downloadUrl = `${NAS_PUBLIC_URL}/${result.zipRelPath.split('/').map(encodeURIComponent).join('/')}`;
+    res.redirect(302, downloadUrl);
   })
 );
 
@@ -1421,8 +1375,6 @@ router.get(
   '/:customerId/lan-info',
   asyncHandler(async (req: any, res: any) => {
     const { customerId } = req.params;
-    const NAS_HTTPS_BASE = process.env.NAS_HTTPS_BASE || 'http://192.168.1.105:8082';
-    const NAS_MEDIA_WEB_PATH = process.env.NAS_MEDIA_WEB_PATH || '';
 
     const customer = await prisma.customer.findFirst({
       where: { OR: [{ id: customerId }, { displayId: customerId }] },

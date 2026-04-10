@@ -307,6 +307,43 @@ class QnapService {
     return this.uploadFile(localPdfPath, remoteRelativePath);
   }
 
+  // NAS-side ZIP oluşturma — VDS'i bypass eder, müşteri direkt NAS'tan indirir
+  // Dönen path .zips/<customerId>/Alanya Paragliding.zip — NAS_PUBLIC_URL altında servis edilir
+  async createCustomerZip(customerId: string, relPath: string): Promise<{ zipRelPath: string; size: number } | null> {
+    try {
+      const zipDir = `.zips/${customerId}`;
+      const zipName = 'Alanya Paragliding.zip';
+      const zipRelPath = `${zipDir}/${zipName}`;
+      const zipFullPath = `${this.mediaPath}/${zipRelPath}`;
+
+      // Clean previous + recreate dir (eski zip'i her seferinde yenile, mediaFolder güncellenmiş olabilir)
+      await this.execSSH(
+        `rm -rf "${this.mediaPath}/${zipDir}" && mkdir -p "${this.mediaPath}/${zipDir}"`
+      );
+
+      // -0 = no compression (medya dosyaları zaten compressed, sadece overhead olur)
+      // cd ile çalıştır ki ZIP içinde tam path değil relPath olsun
+      const cmd = `cd "${this.mediaPath}" && /usr/local/sbin/zip -r -0 -q "${zipRelPath}" "${relPath}" && stat -c '%s' "${zipFullPath}"`;
+      const output = await this.execSSH(cmd);
+      const size = parseInt(output.trim()) || 0;
+      if (!size) return null;
+      console.log(`[QNAP] ZIP oluşturuldu: ${zipRelPath} (${size} bytes)`);
+      return { zipRelPath, size };
+    } catch (err: any) {
+      console.error(`[QNAP] ZIP oluşturma hatası:`, err.message);
+      return null;
+    }
+  }
+
+  // 24 saatten eski zip klasörlerini sil — best-effort, hata fırlatmaz
+  async cleanupOldZips(maxAgeHours = 24): Promise<void> {
+    try {
+      await this.execSSH(
+        `find "${this.mediaPath}/.zips" -mindepth 1 -maxdepth 1 -type d -mmin +${maxAgeHours * 60} -exec rm -rf {} + 2>/dev/null || true`
+      );
+    } catch { /* ignore */ }
+  }
+
   async getDiskUsage(): Promise<{ total: string; used: string; available: string; percent: string } | null> {
     try {
       const output = await this.execSSH(`df -h "${this.mediaPath}" | tail -1`);
