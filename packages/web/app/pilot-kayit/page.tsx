@@ -130,18 +130,17 @@ function PilotRegisterContent() {
             </div>
           </div>
 
-          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4">
-            <p className="text-sm text-amber-800">
-              <strong>Önemli:</strong> Kullanıcı adı ve şifreni unutma. Giriş için <strong>skytrackyp.com</strong> adresine gidip "Giriş Yap" butonuna bas.
-            </p>
+          <div className="bg-sky-600 text-white rounded-2xl p-5 mb-4 text-center">
+            <p className="text-sm uppercase tracking-wide opacity-90 mb-1">Sıradaki adım</p>
+            <p className="text-xl font-bold mb-1">📱 SkyTrack uygulamasını aç</p>
+            <p className="text-base">ve bu bilgilerle giriş yap</p>
           </div>
 
-          <a
-            href="/login"
-            className="block w-full py-3 px-4 bg-sky-600 hover:bg-sky-700 text-white font-semibold text-center rounded-xl transition-colors"
-          >
-            Giriş Sayfasına Git
-          </a>
+          <div className="bg-amber-50 border-2 border-amber-300 rounded-xl p-4">
+            <p className="text-sm text-amber-900 leading-relaxed">
+              <strong>🔔 Önemli:</strong> Uygulama ilk açıldığında <strong>"Bildirimlere izin ver"</strong> diyerek onay ver. Yoksa uçuş atamalarını ve duyuruları alamazsın.
+            </p>
+          </div>
         </div>
       </div>
     )
