@@ -322,8 +322,9 @@ class QnapService {
       );
 
       // -0 = no compression (medya dosyaları zaten compressed, sadece overhead olur)
+      // -x = exclude pattern (mac/windows sistem dosyaları ve QNAP @-klasörleri)
       // cd ile çalıştır ki ZIP içinde tam path değil relPath olsun
-      const cmd = `cd "${this.mediaPath}" && /usr/local/sbin/zip -r -0 -q "${zipRelPath}" "${relPath}" && stat -c '%s' "${zipFullPath}"`;
+      const cmd = `cd "${this.mediaPath}" && /usr/local/sbin/zip -r -0 -q "${zipRelPath}" "${relPath}" -x "*.DS_Store" "*/Thumbs.db" "*/@*" && stat -c '%s' "${zipFullPath}"`;
       const output = await this.execSSH(cmd);
       const size = parseInt(output.trim()) || 0;
       if (!size) return null;
