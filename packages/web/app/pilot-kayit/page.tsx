@@ -24,6 +24,7 @@ function PilotRegisterContent() {
     username: '',
     password: '',
   })
+  const [appInstalled, setAppInstalled] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState<{ name: string; username: string } | null>(null)
@@ -76,6 +77,7 @@ function PilotRegisterContent() {
           email: form.email.trim() || null,
           username: form.username.trim().toLowerCase(),
           password: form.password,
+          appInstalled,
         }),
       })
       const json = await res.json()
@@ -244,6 +246,19 @@ function PilotRegisterContent() {
               Giriş yaparken bu bilgileri kullanacaksın, not al.
             </p>
           </div>
+
+          <label className="flex items-start gap-3 p-4 border-2 border-sky-200 bg-sky-50 rounded-xl cursor-pointer hover:bg-sky-100 transition-colors">
+            <input
+              type="checkbox"
+              checked={appInstalled}
+              onChange={(e) => setAppInstalled(e.target.checked)}
+              className="mt-0.5 w-5 h-5 text-sky-600 border-2 border-sky-300 rounded focus:ring-sky-500 cursor-pointer"
+            />
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-gray-800">📱 SkyTrack uygulamasını telefonuma kurdum</p>
+              <p className="text-xs text-gray-600 mt-0.5">Uygulamayı henüz kurmadıysan boş bırak, toplantıda kuracağız.</p>
+            </div>
+          </label>
 
           {error && (
             <div className="bg-red-50 border border-red-200 rounded-xl p-3">

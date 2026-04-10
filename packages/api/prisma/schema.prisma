@@ -100,6 +100,7 @@ model Pilot {
   inQueue          Boolean       @default(true) @map("in_queue")
   queuePosition    Int           @map("queue_position")
   status           PilotStatus   @default(AVAILABLE)
+  appInstalled     Boolean       @default(false) @map("app_installed")
   user             User?
   customers        Customer[]
   flights          Flight[]

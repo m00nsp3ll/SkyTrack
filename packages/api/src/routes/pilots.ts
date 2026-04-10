@@ -513,6 +513,28 @@ router.delete('/:id', authenticate, requireRole('ADMIN'), asyncHandler(async (re
   });
 }));
 
+// GET /api/pilots/registration-stats - Aggregate stats for self-registration + app installs
+router.get('/registration-stats', authenticate, requireRole('ADMIN'), asyncHandler(async (_req: AuthRequest, res: any) => {
+  const [total, appInstalled, notInstalled] = await Promise.all([
+    prisma.pilot.count(),
+    prisma.pilot.count({ where: { appInstalled: true } }),
+    prisma.pilot.count({ where: { appInstalled: false } }),
+  ]);
+  const pilots = await prisma.pilot.findMany({
+    select: { id: true, name: true, phone: true, appInstalled: true, createdAt: true },
+    orderBy: { createdAt: 'desc' },
+  });
+  res.json({
+    success: true,
+    data: {
+      total,
+      appInstalled,
+      notInstalled,
+      pilots,
+    },
+  });
+}));
+
 // POST /api/pilots/public-register - Public endpoint for pilot self-registration
 // Token-protected: requires PILOT_REGISTRATION_TOKEN env match
 // Creates both Pilot and User records in one go
@@ -527,7 +549,7 @@ router.post('/public-register', asyncHandler(async (req: any, res: any) => {
     throw new AppError('Geçersiz kayıt bağlantısı', 403, 'INVALID_TOKEN');
   }
 
-  const { name, phone, email, username, password } = req.body || {};
+  const { name, phone, email, username, password, appInstalled } = req.body || {};
 
   if (!name || typeof name !== 'string' || name.trim().length < 3) {
     throw new AppError('Ad Soyad en az 3 karakter olmalı', 400, 'INVALID_NAME');
@@ -570,6 +592,7 @@ router.post('/public-register', asyncHandler(async (req: any, res: any) => {
       isActive: true,
       inQueue: true,
       status: 'AVAILABLE',
+      appInstalled: appInstalled === true,
     },
   });
 
