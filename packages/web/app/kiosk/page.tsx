@@ -337,55 +337,109 @@ export default function KioskPage() {
     }
   }
 
-  const printTicket = (res: RegistrationResult, copy: 'musteri' | 'pilot') => {
-    const printWindow = window.open('', '_blank')
-    if (!printWindow) return
+  // Tek bir iframe içinde iki sayfa (müşteri + pilot kopyası) print eder
+  // iOS Safari popup blocker window.open'ı engellediği için iframe kullanılıyor
+  const printBothCopies = (res: RegistrationResult) => {
     const now = new Date()
     const dateStr = now.toLocaleDateString('tr-TR')
     const timeStr = now.toLocaleTimeString('tr-TR')
-    const label = copy === 'musteri' ? 'MÜŞTERİ KOPYASI' : 'PİLOT KOPYASI'
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>QR Kod - ${res.customer.displayId}</title>
-        <style>
-          @page { size: 7cm 9cm; margin: 0; }
-          @media print { html, body { margin: 0; padding: 0; } }
-          body { font-family: Arial, sans-serif; text-align: center; padding: 8px; margin: 0; width: 7cm; box-sizing: border-box; }
-          .label { font-size: 9px; font-weight: bold; color: #fff; background: ${copy === 'musteri' ? '#2563eb' : '#16a34a'}; padding: 2px 6px; border-radius: 4px; display: inline-block; margin-bottom: 4px; }
-          .qr-code { width: 4.5cm; height: 4.5cm; }
-          .display-id { font-size: 16px; font-weight: bold; margin-top: 4px; letter-spacing: 1px; }
-          .customer-name { font-size: 11px; color: #444; margin-top: 2px; }
-          .pilot-name { font-size: 11px; font-weight: bold; color: #16a34a; margin-top: 3px; }
-          .datetime { font-size: 9px; color: #888; margin-top: 4px; }
-          .divider { border-top: 1px dashed #ccc; margin: 4px 0; }
-        </style>
-      </head>
-      <body>
-        <div class="label">${label}</div>
-        <div><img src="${res.qrCode}" alt="QR" class="qr-code" /></div>
-        <div class="display-id">${res.customer.displayId}</div>
-        <div class="divider"></div>
-        <div class="customer-name">${res.customer.firstName} ${res.customer.lastName}</div>
-        ${res.pilot ? `<div class="pilot-name">Pilot: ${res.pilot.name}</div>` : ''}
-        <div class="datetime">${dateStr} - ${timeStr}</div>
-        <script>window.onload = () => { window.print(); setTimeout(() => window.close(), 1000); }<\/script>
-      </body>
-      </html>
-    `)
-    printWindow.document.close()
+
+    const buildTicket = (copy: 'musteri' | 'pilot') => {
+      const label = copy === 'musteri' ? 'MÜŞTERİ KOPYASI' : 'PİLOT KOPYASI'
+      const labelClass = copy === 'musteri' ? 'label-musteri' : 'label-pilot'
+      return `
+        <div class="ticket">
+          <div class="label ${labelClass}">${label}</div>
+          <div><img src="${res.qrCode}" alt="QR" class="qr-code" /></div>
+          <div class="display-id">${res.customer.displayId}</div>
+          <div class="divider"></div>
+          <div class="customer-name">${res.customer.firstName} ${res.customer.lastName}</div>
+          ${res.pilot ? `<div class="pilot-name">Pilot: ${res.pilot.name}</div>` : ''}
+          <div class="datetime">${dateStr} - ${timeStr}</div>
+        </div>
+      `
+    }
+
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Alanya Paragliding - ${res.customer.displayId}</title>
+<style>
+  @page { size: 7cm 9cm; margin: 0; }
+  @media print { html, body { margin: 0; padding: 0; } }
+  body { font-family: -apple-system, Arial, sans-serif; text-align: center; margin: 0; padding: 0; }
+  .ticket { width: 7cm; box-sizing: border-box; padding: 8px; page-break-after: always; break-after: page; }
+  .ticket:last-child { page-break-after: auto; break-after: auto; }
+  .label { font-size: 9px; font-weight: bold; color: #fff; padding: 2px 6px; border-radius: 4px; display: inline-block; margin-bottom: 4px; }
+  .label-musteri { background: #2563eb; }
+  .label-pilot { background: #16a34a; }
+  .qr-code { width: 4.5cm; height: 4.5cm; }
+  .display-id { font-size: 16px; font-weight: bold; margin-top: 4px; letter-spacing: 1px; }
+  .customer-name { font-size: 11px; color: #444; margin-top: 2px; }
+  .pilot-name { font-size: 11px; font-weight: bold; color: #16a34a; margin-top: 3px; }
+  .datetime { font-size: 9px; color: #888; margin-top: 4px; }
+  .divider { border-top: 1px dashed #ccc; margin: 4px 0; }
+</style>
+</head>
+<body>
+${buildTicket('musteri')}
+${buildTicket('pilot')}
+</body>
+</html>`
+
+    // Önceki iframe'i temizle
+    const existing = document.getElementById('print-frame')
+    if (existing) existing.remove()
+
+    const iframe = document.createElement('iframe')
+    iframe.id = 'print-frame'
+    iframe.setAttribute('aria-hidden', 'true')
+    iframe.style.position = 'fixed'
+    iframe.style.right = '0'
+    iframe.style.bottom = '0'
+    iframe.style.width = '0'
+    iframe.style.height = '0'
+    iframe.style.border = '0'
+    iframe.style.visibility = 'hidden'
+    document.body.appendChild(iframe)
+
+    const doc = iframe.contentDocument || iframe.contentWindow?.document
+    if (!doc) return
+    doc.open()
+    doc.write(html)
+    doc.close()
+
+    const triggerPrint = () => {
+      try {
+        iframe.contentWindow?.focus()
+        iframe.contentWindow?.print()
+      } catch (err) {
+        console.error('[Kiosk] Print hatası:', err)
+      }
+      // Print dialog kapatıldıktan sonra iframe'i temizle
+      setTimeout(() => {
+        try { iframe.remove() } catch {}
+      }, 3000)
+    }
+
+    // QR image'ın yüklenmesini bekle (yoksa boş sayfa basar)
+    const img = doc.querySelector('img')
+    if (img && !img.complete) {
+      img.addEventListener('load', () => setTimeout(triggerPrint, 150))
+      img.addEventListener('error', () => setTimeout(triggerPrint, 150))
+    } else {
+      setTimeout(triggerPrint, 300)
+    }
   }
 
   const handlePrint = () => {
     if (!result) return
-    printTicket(result, 'musteri')
-    setTimeout(() => printTicket(result, 'pilot'), 800)
+    printBothCopies(result)
   }
 
   const autoPrint = (res: RegistrationResult) => {
-    printTicket(res, 'musteri')
-    setTimeout(() => printTicket(res, 'pilot'), 800)
+    printBothCopies(res)
   }
 
   const getWaiverText = () => {
