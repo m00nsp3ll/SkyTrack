@@ -3,10 +3,12 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import SignatureCanvas from 'react-signature-canvas'
+import { Capacitor } from '@capacitor/core'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { api } from '@/lib/api'
+import { AirPrint } from '@/lib/airprint'
 import { Check, X, PenLine, Eraser, Printer, UserPlus } from 'lucide-react'
 import { type Language, LANGUAGES, t, isRtl } from '@/lib/translations'
 
@@ -337,58 +339,61 @@ export default function KioskPage() {
     }
   }
 
-  // Tek bir iframe içinde iki sayfa (müşteri + pilot kopyası) print eder
-  // iOS Safari popup blocker window.open'ı engellediği için iframe kullanılıyor
-  const printBothCopies = (res: RegistrationResult) => {
+  // İki kopya (müşteri + pilot) için yazdırılabilir HTML üretir
+  const buildPrintHtml = (res: RegistrationResult) => {
     const now = new Date()
     const dateStr = now.toLocaleDateString('tr-TR')
     const timeStr = now.toLocaleTimeString('tr-TR')
 
     const buildTicket = (copy: 'musteri' | 'pilot') => {
       const label = copy === 'musteri' ? 'MÜŞTERİ KOPYASI' : 'PİLOT KOPYASI'
-      const labelClass = copy === 'musteri' ? 'label-musteri' : 'label-pilot'
+      const bg = copy === 'musteri' ? '#2563eb' : '#16a34a'
+      const pilotLine = res.pilot
+        ? `<div style="font-size:13px;font-weight:bold;color:#16a34a;margin-top:6px;">Pilot: ${res.pilot.name}</div>`
+        : ''
       return `
-        <div class="ticket">
-          <div class="label ${labelClass}">${label}</div>
-          <div><img src="${res.qrCode}" alt="QR" class="qr-code" /></div>
-          <div class="display-id">${res.customer.displayId}</div>
-          <div class="divider"></div>
-          <div class="customer-name">${res.customer.firstName} ${res.customer.lastName}</div>
-          ${res.pilot ? `<div class="pilot-name">Pilot: ${res.pilot.name}</div>` : ''}
-          <div class="datetime">${dateStr} - ${timeStr}</div>
+        <div style="text-align:center;padding:12px;page-break-after:always;break-after:page;font-family:-apple-system,Arial,sans-serif;">
+          <div style="display:inline-block;font-size:11px;font-weight:bold;color:#fff;background:${bg};padding:3px 10px;border-radius:4px;margin-bottom:8px;">${label}</div>
+          <div><img src="${res.qrCode}" alt="QR" style="width:5cm;height:5cm;display:block;margin:0 auto;" /></div>
+          <div style="font-size:18px;font-weight:bold;margin-top:6px;letter-spacing:2px;">${res.customer.displayId}</div>
+          <div style="border-top:1px dashed #ccc;margin:6px 20px;"></div>
+          <div style="font-size:13px;color:#333;margin-top:4px;">${res.customer.firstName} ${res.customer.lastName}</div>
+          ${pilotLine}
+          <div style="font-size:10px;color:#888;margin-top:6px;">${dateStr} - ${timeStr}</div>
         </div>
       `
     }
 
-    const html = `<!DOCTYPE html>
+    return `<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8">
 <title>Alanya Paragliding - ${res.customer.displayId}</title>
-<style>
-  @page { size: 7cm 9cm; margin: 0; }
-  @media print { html, body { margin: 0; padding: 0; } }
-  body { font-family: -apple-system, Arial, sans-serif; text-align: center; margin: 0; padding: 0; }
-  .ticket { width: 7cm; box-sizing: border-box; padding: 8px; page-break-after: always; break-after: page; }
-  .ticket:last-child { page-break-after: auto; break-after: auto; }
-  .label { font-size: 9px; font-weight: bold; color: #fff; padding: 2px 6px; border-radius: 4px; display: inline-block; margin-bottom: 4px; }
-  .label-musteri { background: #2563eb; }
-  .label-pilot { background: #16a34a; }
-  .qr-code { width: 4.5cm; height: 4.5cm; }
-  .display-id { font-size: 16px; font-weight: bold; margin-top: 4px; letter-spacing: 1px; }
-  .customer-name { font-size: 11px; color: #444; margin-top: 2px; }
-  .pilot-name { font-size: 11px; font-weight: bold; color: #16a34a; margin-top: 3px; }
-  .datetime { font-size: 9px; color: #888; margin-top: 4px; }
-  .divider { border-top: 1px dashed #ccc; margin: 4px 0; }
-</style>
 </head>
-<body>
+<body style="margin:0;padding:0;">
 ${buildTicket('musteri')}
 ${buildTicket('pilot')}
 </body>
 </html>`
+  }
 
-    // Önceki iframe'i temizle
+  // Capacitor iOS — native AirPrint plugin üzerinden yazdır
+  const nativeAirPrint = async (res: RegistrationResult) => {
+    try {
+      const html = buildPrintHtml(res)
+      await AirPrint.print({
+        html,
+        jobName: `SkyTrack-${res.customer.displayId}`,
+      })
+    } catch (err) {
+      console.error('[Kiosk] AirPrint hatası:', err)
+    }
+  }
+
+  // Browser fallback — iframe ile print
+  const browserPrint = (res: RegistrationResult) => {
+    const html = buildPrintHtml(res)
+
     const existing = document.getElementById('print-frame')
     if (existing) existing.remove()
 
@@ -415,21 +420,27 @@ ${buildTicket('pilot')}
         iframe.contentWindow?.focus()
         iframe.contentWindow?.print()
       } catch (err) {
-        console.error('[Kiosk] Print hatası:', err)
+        console.error('[Kiosk] Browser print hatası:', err)
       }
-      // Print dialog kapatıldıktan sonra iframe'i temizle
       setTimeout(() => {
         try { iframe.remove() } catch {}
       }, 3000)
     }
 
-    // QR image'ın yüklenmesini bekle (yoksa boş sayfa basar)
     const img = doc.querySelector('img')
     if (img && !img.complete) {
       img.addEventListener('load', () => setTimeout(triggerPrint, 150))
       img.addEventListener('error', () => setTimeout(triggerPrint, 150))
     } else {
       setTimeout(triggerPrint, 300)
+    }
+  }
+
+  const printBothCopies = (res: RegistrationResult) => {
+    if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios') {
+      void nativeAirPrint(res)
+    } else {
+      browserPrint(res)
     }
   }
 
