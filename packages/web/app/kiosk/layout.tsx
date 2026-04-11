@@ -34,7 +34,7 @@ export default function KioskLayout({ children }: { children: React.ReactNode })
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-sky-50 to-blue-100">
+    <div className="h-screen overflow-hidden bg-gradient-to-br from-sky-50 to-blue-100 scrollbar-hide">
       {children}
     </div>
   )
