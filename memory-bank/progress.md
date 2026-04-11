@@ -220,6 +220,24 @@
 - [x] Recursive medya dosya tarama (GoPro alt klasörleri dahil)
 - [x] Pilot klasör açma hata toleransı (klasör yoksa oluştur)
 
+### Public Pilot Kayıt Formu + FCM Fix + Sunucu Yeniden Kurulum (2026-04-11) ✅
+- [x] **Sunucu sıfırdan kuruldu** (Dehost VDS siyah ekran, format zorunlu) — Ubuntu 24.04, Node 24, PM2, Postgres 16, Redis, Nginx, Let's Encrypt, UFW
+- [x] SSH şifresi yeni: `22a5c8d1113a!diyo@`
+- [x] Admin kullanıcı oluşturuldu: `admin / Aa19866891!`
+- [x] Kiosk kullanıcı oluşturuldu: `kiosk / kiosk2026` (role=KIOSK)
+- [x] 18 ürün seed edildi (seed.ts'ten kopyalandı)
+- [x] Public pilot kayıt sistemi: `/pilot-kayit?token=...` + `POST /api/pilots/public-register`
+- [x] Pilot `appInstalled` field + checkbox + stats endpoint (`GET /api/pilots/registration-stats`)
+- [x] FCM çift bildirim bug fix: `/broadcast` artık pilot için `sendNativeToAllPilots` (DB log + push), pilot-dışı için paralel loop. Duplike gönderim yok.
+- [x] FCM paralelleştirme: `for-await` → `Promise.all` (24 cihaz 8sn → ~1sn)
+- [x] Frontend axios timeout 15sn → 60sn (FCM slow path için)
+- [x] Sidebar Apple-tarzı ince scrollbar (`sidebar-scrollbar` utility, 6px slate)
+- [x] Kiosk scrollbar gizleme (`scrollbar-hide` utility) + dinamik iOS PWA status bar theme-color override
+- [x] 32 gerçek pilot kaydoldu (+ 10 ekstra + 15 eksik listeleme)
+- [ ] **Backup cron sistemi HÂLÂ KURULMADI** — KRİTİK TODO (Post-Launch'tan kalma, bu çöküş bunun yüzünden kaynaklı)
+- [ ] Kiosk yazdırma: native AirPrint Capacitor plugin yarım (Obj-C `CAP_PLUGIN` macro dosyası eksik)
+- [ ] Splash screen: yeni yuvarlak köşeli gradient splash yarım (PNG hazır, Xcode rebuild bekleniyor)
+
 ### LAN İndirme Sistemi v5 — NAS HTTPS Direct (2026-04-10) ✅
 - [x] NAS'ta Let's Encrypt SSL (`skytrack.myqnapcloud.com`, exp 2026-07-08)
 - [x] NAS Virtual Host HTTPS port 8443, doc root `/share/skytrack-media`

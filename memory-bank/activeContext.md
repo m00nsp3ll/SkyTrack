@@ -1,6 +1,65 @@
 # Active Context - SkyTrack
 
-## Son Çalışma Oturumu: 2026-04-10 (Oturum 41)
+## Son Çalışma Oturumu: 2026-04-11 (Oturum 42) — ⚠️ KRİTİK GÜN
+
+### 🔴 SUNUCU ÇÖKMESİ + SIFIRDAN KURULUM
+- Dehost VDS (166.1.91.9) siyah ekran verdi, format atmak zorunda kaldık
+- **Veritabanı yedeği YOKTU** (`scripts/backup.sh` crontab'a bağlanmamıştı — Post-Launch TODO'da kalmış)
+- Tek kayıp: test müşteri verileri (müşteri kayıtları test'ti, üretim kullanımı yok)
+- NAS'taki medya dosyaları + Risk Form PDF'leri güvendeydi (VDS dışında)
+
+### ✅ Yeni sunucu kurulumu (30 dk, 2026-04-11)
+- **IP:** 166.1.91.9 (aynı), **SSH şifresi YENİ:** `22a5c8d1113a!diyo@`
+- Ubuntu 24.04, Node 24.14 (nvm), PM2 6.0, PostgreSQL 16, Redis, Nginx, certbot
+- `prisma migrate deploy` + `prisma db push` (password_changed_at kolonu için)
+- Let's Encrypt SSL: skytrackyp.com + api + www (2026-07-09'a kadar)
+- UFW firewall: 22/80/443 açık, geri kalan kapalı
+- Firebase service account lokal'den scp ile kopyalandı (+symlink /opt/skytrack/firebase-service-account.json)
+
+### 🔐 Kimlik bilgileri (YENİ)
+```
+Admin:  admin / Aa19866891!
+Kiosk:  kiosk / kiosk2026
+```
+
+### ✅ Production'a eklenen özellikler (bu oturum)
+1. **Public pilot kayıt formu** — `https://skytrackyp.com/pilot-kayit?token=skytrack-pilot-2026-4139ca4d9634`
+   - `POST /api/pilots/public-register` (token-protected, Pilot + User tek seferde)
+   - Frontend: `app/pilot-kayit/page.tsx` — SkyTrack logo, gradient bg, success ekranında "uygulamayı aç + bildirim izni" yönlendirmesi
+   - Token env: `PILOT_REGISTRATION_TOKEN` (prod .env'de)
+2. **Pilot `appInstalled` field + istatistik** — schema'ya `appInstalled Boolean @default(false)`, form checkbox, `GET /api/pilots/registration-stats` (admin)
+3. **FCM çift bildirim fix** — `/broadcast` hem `sendNativeToAllPilots` hem `sendNativeBroadcast` çağırıyordu (pilotlar 2 kez alıyordu). Artık pilot için `sendNativeToAllPilots`, pilot-dışı için paralel loop. Plus: FCM fonksiyonları sequential `for-await` yerine `Promise.all` ile paralel (24 cihaz ~8sn → ~1sn). Frontend axios timeout 15sn → 60sn
+4. **18 ürün seed edildi** (6 içecek, 3 yiyecek, 5 hediyelik, 3 foto/video, 1 rest)
+5. **Sidebar Apple-tarzı ince scrollbar** — `sidebar-scrollbar` utility class, 6px, slate-500/45% thumb
+6. **Kiosk scrollbar gizleme + status bar renk override** — layout useEffect dinamik theme-color `#0ea5e9`
+
+### ⚠️ Kiosk yazdırma — YARIM KALDI (yarına)
+- iPad'de **SkyTrack native app (Capacitor 8) kullanılıyor**, browser değil
+- WKWebView'da `window.print()` ve iframe yaklaşımı çalışmıyor (AirPrint tetiklenmiyor)
+- **Custom Capacitor plugin yaratıldı:** `AppDelegate.swift` içine `AirPrintPlugin` class (CAPBridgedPlugin, UIPrintInteractionController) + `lib/airprint.ts` JS wrapper + kiosk page `Capacitor.isNativePlatform()` kontrolü
+- **SORUN:** Custom in-app Capacitor plugin için Obj-C `CAP_PLUGIN` macro dosyası ŞART — sadece Swift class + CAPBridgedPlugin yetmiyor, plugin bridge'e kayıt olmuyor. `AirPrintPlugin.m` dosyası oluşturulmadı.
+- **Yapılacak:** `ios/App/App/AirPrintPlugin.m` dosyası yarat (`CAP_PLUGIN(AirPrintPlugin, "AirPrint", CAP_PLUGIN_METHOD(print, CAPPluginReturnPromise))`), Xcode'da "Add Files to App..." ile target'a ekle, rebuild
+
+### ⚠️ Splash screen — YARIM KALDI (yarına)
+- Eski: kare logo + lacivert `#1a3a6b`
+- Yeni istenen: iOS app icon tarzı **yuvarlak köşeli kare** logo + gradient (sky-500 → blue-600 → purple-600, kayıt ekranıyla aynı)
+- **Yapıldı:** `Splash.imageset` yeni filename'lerle regenerate (skytrack-splash.png/@2x/@3x), 2732×2732, 760px logo, 170px radius (~%22 iOS icon oranı), 1.17 MB her biri. Contents.json güncellendi (eski filename'leri sil, yeni filename'leri ekle)
+- **Yapıldı:** `LaunchScreen.storyboard` — ImageView full-screen constraints + scaleAspectFill
+- **Yapıldı:** `capacitor.config.ts` — `backgroundColor: '#1a3a6b'` → `#0ea5e9`
+- **SORUN:** Xcode build eski cache'li splash gösteriyor. DerivedData silindi ama build cache yine de eski. Yeni filename yaklaşımı bunu çözmeli ama henüz test edilmedi.
+- **Yapılacak:** `npx cap sync ios` + Xcode Clean Build Folder + Run, iPad'de app'i tamamen sil yeniden yükle
+
+### 🚨 KRİTİK TODO — ASLA UNUTMA
+- **YEDEK SİSTEMİ KURULMADI** — `scripts/backup.sh`'i crontab'a bağla (her gece 03:00), yedekleri NAS'a scp, 7 gün rotation. Başka bir çöküş olursa yine aynı kayıp yaşanır.
+
+### 🎯 Yarınki toplantı için durum (2026-04-11)
+- 32 gerçek pilot kaydoldu (+ 10 ekstra listede olmayan kayıt, 15 eksik kayıt bekleniyor)
+- Yazılıma giriş yapılabiliyor, POS ürünleri hazır, pilot kayıt linki dağıtıldı
+- Kiosk yazdırma + splash screen: yarın toplantı öncesi Xcode rebuild ile bitirilecek
+
+---
+
+## Oturum 41 — LAN hızında indirme (2026-04-10)
 
 ### ✅ ÇÖZÜLDÜ — LAN hızında indirme aktif
 
@@ -82,14 +141,14 @@ Olması gereken:
 ### Production Sunucu Bilgileri
 - **IP:** 166.1.91.9 (2026-04-10 değişti — eski 5.10.220.205, Dehost altyapı/routing sorunu)
 - **Hostname:** skytrack-server
-- **SSH:** `sshpass -p '7e930a56874c!diyo@' ssh -o StrictHostKeyChecking=no root@166.1.91.9`
+- **SSH:** `sshpass -p '22a5c8d1113a!diyo@' ssh -o StrictHostKeyChecking=no root@166.1.91.9`
 - **Proje dizini:** /opt/skytrack
 - **Node PATH:** `$(ls -d /root/.nvm/versions/node/*/bin | tail -1)`
 - **PM2:** skytrack-api (id:4), skytrack-web (id:5)
 - **Domain (önerilen erişim):** skytrackyp.com, api.skytrackyp.com, www.skytrackyp.com → 166.1.91.9
 - **Deploy komutu:**
 ```bash
-sshpass -p '7e930a56874c!diyo@' ssh -o StrictHostKeyChecking=no root@166.1.91.9 "export PATH=\$PATH:\$(ls -d /root/.nvm/versions/node/*/bin 2>/dev/null | tail -1) && cd /opt/skytrack && git pull origin main && cd packages/api && npm run build && pm2 restart skytrack-api && cd /opt/skytrack/packages/web && npm run build && pm2 restart skytrack-web && echo DONE"
+sshpass -p '22a5c8d1113a!diyo@' ssh -o StrictHostKeyChecking=no root@166.1.91.9 "export PATH=\$PATH:\$(ls -d /root/.nvm/versions/node/*/bin 2>/dev/null | tail -1) && cd /opt/skytrack && git pull origin main && cd packages/api && npm run build && pm2 restart skytrack-api && cd /opt/skytrack/packages/web && npm run build && pm2 restart skytrack-web && echo DONE"
 ```
 
 ### QNAP NAS Bilgileri
