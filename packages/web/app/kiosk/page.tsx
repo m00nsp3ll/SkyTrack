@@ -483,7 +483,7 @@ ${buildTicket('pilot')}
   // ==================== STEP: Language Selection ====================
   if (step === 'language') {
     return (
-      <div className="h-screen overflow-y-auto scrollbar-hide flex flex-col items-center justify-center p-6 bg-gradient-to-br from-sky-50 to-blue-100">
+      <div className="h-screen overflow-hidden flex flex-col items-center justify-center p-6 bg-gradient-to-br from-sky-50 to-blue-100">
         {logoutModal}
         <div className="mb-10 text-center">
           <img
@@ -651,7 +651,7 @@ ${buildTicket('pilot')}
     const timeStr = now.toLocaleTimeString('tr-TR')
 
     return (
-      <div className="h-screen overflow-y-auto scrollbar-hide flex flex-col items-center justify-center p-8 bg-gradient-to-br from-green-50 to-emerald-100" dir={rtl ? 'rtl' : 'ltr'}>
+      <div className="min-h-screen flex flex-col items-center justify-center p-8 bg-gradient-to-br from-green-50 to-emerald-100" dir={rtl ? 'rtl' : 'ltr'}>
         {/* Success Banner */}
         <div className="w-full max-w-lg">
           <div className="bg-white rounded-3xl shadow-2xl overflow-hidden">
@@ -712,10 +712,10 @@ ${buildTicket('pilot')}
 
   // ==================== STEP: Registration Form ====================
   return (
-    <div className="h-screen overflow-y-auto scrollbar-hide" dir={rtl ? 'rtl' : 'ltr'}>
+    <div className="min-h-screen overflow-y-auto" dir={rtl ? 'rtl' : 'ltr'}>
       {logoutModal}
-      {/* Top Bar — gradient arka planla uyumlu, yumuşak geçiş */}
-      <div className="sticky top-0 z-10 bg-white/80 backdrop-blur-md border-b border-sky-100 text-sky-900 px-6 py-3 flex items-center justify-between">
+      {/* Top Bar */}
+      <div className="sticky top-0 z-10 bg-sky-700 text-white px-6 py-4 flex items-center justify-between shadow-md">
         <div className="flex items-center gap-3">
           <img
             src="/skytrack-logo.png"
@@ -730,15 +730,15 @@ ${buildTicket('pilot')}
             onMouseLeave={cancelLogoPress}
             onContextMenu={(e) => e.preventDefault()}
           />
-          <span className="text-lg font-bold">{tr.formTitle}</span>
+          <span className="text-xl font-bold">{tr.formTitle}</span>
         </div>
         <button
           onClick={() => setStep('language')}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-sky-100 hover:bg-sky-200 text-sky-800 text-sm font-medium transition-colors"
+          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-sm font-medium"
         >
           <span className="text-lg">{LANGUAGES.find(l => l.code === lang)?.flag}</span>
           <span>{LANGUAGES.find(l => l.code === lang)?.name}</span>
-          <span className="text-sky-500 text-xs">▾</span>
+          <span className="text-sky-300 text-xs">▾</span>
         </button>
       </div>
 
