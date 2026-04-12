@@ -340,42 +340,41 @@ export default function KioskPage() {
     }
   }
 
-  // Tek sayfa, 2 QR alt alta (müşteri + pilot kopyası, kesim çizgisiyle ayrılır)
+  // Tek QR yazdırma HTML'i
   const buildPrintHtml = (res: RegistrationResult) => {
     const now = new Date()
     const dateStr = now.toLocaleDateString('tr-TR')
     const timeStr = now.toLocaleTimeString('tr-TR')
     const pilotName = res.pilot?.name || ''
 
-    const buildTicket = (label: string, bg: string) => `
-      <div style="text-align:center;padding:8px 0;font-family:-apple-system,Arial,sans-serif;">
-        <div style="display:inline-block;font-size:10px;font-weight:bold;color:#fff;background:${bg};padding:2px 8px;border-radius:3px;">${label}</div>
-        <div style="margin:4px 0;"><img src="${res.qrCode}" alt="QR" style="width:4cm;height:4cm;" /></div>
-        <div style="font-size:16px;font-weight:bold;letter-spacing:2px;">${res.customer.displayId}</div>
-        <div style="font-size:11px;color:#333;">${res.customer.firstName} ${res.customer.lastName}</div>
-        ${pilotName ? `<div style="font-size:11px;font-weight:bold;color:#16a34a;">Pilot: ${pilotName}</div>` : ''}
-        <div style="font-size:9px;color:#888;">${dateStr} ${timeStr}</div>
-      </div>`
-
     return `<!DOCTYPE html>
 <html><head><meta charset="utf-8"></head>
-<body style="margin:0;padding:10px;">
-${buildTicket('MÜŞTERİ', '#2563eb')}
-<div style="border-top:1px dashed #999;margin:4px 0;"></div>
-${buildTicket('PİLOT', '#16a34a')}
+<body style="margin:0;padding:10px;text-align:center;font-family:-apple-system,Arial,sans-serif;">
+  <div><img src="${res.qrCode}" alt="QR" style="width:5cm;height:5cm;" /></div>
+  <div style="font-size:18px;font-weight:bold;letter-spacing:2px;margin-top:4px;">${res.customer.displayId}</div>
+  <div style="font-size:13px;color:#333;">${res.customer.firstName} ${res.customer.lastName}</div>
+  ${pilotName ? `<div style="font-size:13px;font-weight:bold;color:#16a34a;">Pilot: ${pilotName}</div>` : ''}
+  <div style="font-size:10px;color:#888;margin-top:4px;">${dateStr} ${timeStr}</div>
 </body></html>`
   }
 
-  // Native AirPrint — WKScriptMessageHandler bridge üzerinden
+  // Native AirPrint — 2 kopya yazdırma (art arda)
   const nativeAirPrint = async (res: RegistrationResult) => {
     try {
       const html = buildPrintHtml(res)
       if (typeof window._nativeAirPrint !== 'function') {
         await new Promise(resolve => setTimeout(resolve, 3000))
       }
+      // 1. kopya
       await AirPrint.print({
         html,
-        jobName: `SkyTrack-${res.customer.displayId}`,
+        jobName: `SkyTrack-${res.customer.displayId}-1`,
+      })
+      // 2. kopya — 1 saniye bekleyip tekrar yazdır
+      await new Promise(resolve => setTimeout(resolve, 1000))
+      await AirPrint.print({
+        html,
+        jobName: `SkyTrack-${res.customer.displayId}-2`,
       })
     } catch (err) {
       console.error('[Kiosk] AirPrint hatası:', err)
@@ -448,7 +447,7 @@ ${buildTicket('PİLOT', '#16a34a')}
   }
 
   const getWaiverText = () => {
-    return `${tr.waiverFullTitle}\n\n${tr.waiverIntro}\n\n${tr.waiverAccept}\n\n1. ${tr.waiverItem1}\n\n2. ${tr.waiverItem2}\n\n3. ${tr.waiverItem3}\n\n4. ${tr.waiverItem4}\n\n5. ${tr.waiverItem5}\n\n6. ${tr.waiverItem6}\n\n7. ${tr.waiverItem7}\n\n8. ${tr.waiverItem8}`
+    return `${tr.waiverFullTitle}\n${tr.waiverIntro}\n${tr.waiverAccept}\n1. ${tr.waiverItem1}\n2. ${tr.waiverItem2}\n3. ${tr.waiverItem3}\n4. ${tr.waiverItem4}\n5. ${tr.waiverItem5}\n6. ${tr.waiverItem6}\n7. ${tr.waiverItem7}\n8. ${tr.waiverItem8}`
   }
 
   const logoutModal = showLogoutModal ? (
@@ -488,7 +487,7 @@ ${buildTicket('PİLOT', '#16a34a')}
   // ==================== STEP: Language Selection ====================
   if (step === 'language') {
     return (
-      <div className="h-screen overflow-hidden flex flex-col items-center justify-center p-4 bg-gradient-to-br from-sky-50 to-blue-100">
+      <div className="fixed inset-0 flex flex-col items-center justify-center p-4 bg-gradient-to-br from-sky-50 to-blue-100">
         {logoutModal}
         <div className="mb-6 text-center">
           <img
@@ -553,7 +552,7 @@ ${buildTicket('PİLOT', '#16a34a')}
 
         {/* Scrollable Waiver Content */}
         <div className="flex-1 overflow-y-auto">
-          <div className="p-6 bg-gray-50 text-sm whitespace-pre-line leading-relaxed border-b">
+          <div className="px-6 py-3 bg-gray-50 text-xs whitespace-pre-line leading-snug border-b">
             {getWaiverText()}
           </div>
 
@@ -571,9 +570,9 @@ ${buildTicket('PİLOT', '#16a34a')}
           </div>
 
           {/* Signature */}
-          <div className="p-6">
+          <div className="px-6 py-3">
             <div className="flex items-center justify-between mb-3">
-              <p className="text-xl font-bold">{tr.signHere}</p>
+              <p className="text-xl font-bold text-green-700">{tr.signHere} ↓</p>
               <button
                 type="button"
                 onClick={() => signatureRef.current?.clear()}
@@ -584,8 +583,8 @@ ${buildTicket('PİLOT', '#16a34a')}
               </button>
             </div>
             <div
-              className="border-2 border-dashed border-gray-400 rounded-2xl bg-white overflow-hidden"
-              style={{ height: '240px' }}
+              className="border-3 border-dashed border-green-500 rounded-2xl bg-white overflow-hidden"
+              style={{ height: '200px' }}
             >
               <SignatureCanvas
                 ref={signatureRef}
@@ -717,10 +716,10 @@ ${buildTicket('PİLOT', '#16a34a')}
 
   // ==================== STEP: Registration Form ====================
   return (
-    <div className="h-screen flex flex-col overflow-hidden" dir={rtl ? 'rtl' : 'ltr'}>
+    <div className="fixed inset-0 flex flex-col" dir={rtl ? 'rtl' : 'ltr'}>
       {logoutModal}
       {/* Top Bar */}
-      <div className="flex-shrink-0 bg-sky-700 text-white px-6 py-3 flex items-center justify-between shadow-md">
+      <div className="flex-shrink-0 bg-sky-700 text-white px-6 py-2 flex items-center justify-between shadow-md z-10">
         <div className="flex items-center gap-3">
           <img
             src="/skytrack-logo.png"
@@ -747,16 +746,16 @@ ${buildTicket('PİLOT', '#16a34a')}
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
-      <div className="max-w-2xl mx-auto px-6 py-4 space-y-4">
+      <div className="flex-1 flex flex-col items-center justify-center overflow-hidden bg-gradient-to-br from-sky-50 to-blue-50">
+      <div className="w-full max-w-xl px-6 py-3 space-y-3">
         {/* Logo */}
         <div className="text-center">
-          <img src="/skytrack-logo.png" alt="SkyTrack" className="w-16 h-16 mx-auto rounded-2xl shadow-md" draggable={false} />
+          <img src="/skytrack-logo.png" alt="SkyTrack" className="w-20 h-20 mx-auto rounded-2xl shadow-lg" draggable={false} />
         </div>
 
         {/* Personal Info */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-4">
-          <h2 className="text-lg font-bold text-gray-800">{tr.personalInfo}</h2>
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 space-y-3">
+          <h2 className="text-lg font-bold text-gray-800 text-center">{tr.personalInfo}</h2>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
@@ -767,7 +766,7 @@ ${buildTicket('PİLOT', '#16a34a')}
                 value={formData.firstName}
                 onChange={handleChange}
                 placeholder={tr.firstName}
-                className="h-14 text-base rounded-xl"
+                className="h-12 text-base rounded-xl"
                 required
               />
             </div>
@@ -779,7 +778,7 @@ ${buildTicket('PİLOT', '#16a34a')}
                 value={formData.lastName}
                 onChange={handleChange}
                 placeholder={tr.lastName}
-                className="h-14 text-base rounded-xl"
+                className="h-12 text-base rounded-xl"
                 required
               />
             </div>
@@ -855,7 +854,7 @@ ${buildTicket('PİLOT', '#16a34a')}
               value={formData.email}
               onChange={handleChange}
               placeholder="ornek@email.com"
-              className="h-14 text-base rounded-xl"
+              className="h-12 text-base rounded-xl"
             />
           </div>
 
@@ -867,7 +866,7 @@ ${buildTicket('PİLOT', '#16a34a')}
               value={formData.emergencyContact}
               onChange={handleChange}
               placeholder={tr.emergencyContact}
-              className="h-14 text-base rounded-xl"
+              className="h-12 text-base rounded-xl"
             />
           </div>
 
@@ -883,7 +882,7 @@ ${buildTicket('PİLOT', '#16a34a')}
               onChange={handleChange}
               placeholder="70"
               required
-              className="h-14 text-base rounded-xl"
+              className="h-12 text-base rounded-xl"
             />
             <p className="text-sm text-gray-500">{tr.weightHelper}</p>
           </div>
