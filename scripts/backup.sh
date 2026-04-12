@@ -34,9 +34,9 @@ log() { echo -e "[$(date '+%Y-%m-%d %H:%M:%S')] $1"; }
 
 log "${YELLOW}SkyTrack Yedekleme Başlıyor...${NC}"
 
-# Load environment variables
+# Load DATABASE_URL from .env (source yerine grep — &pool_timeout bash'te sorun yapıyor)
 ENV_FILE="$PROJECT_DIR/packages/api/.env"
-source "$ENV_FILE"
+DATABASE_URL=$(grep '^DATABASE_URL=' "$ENV_FILE" | cut -d= -f2-)
 
 # Create local backup directory
 mkdir -p "$BACKUP_PATH"
@@ -59,7 +59,7 @@ fi
 log "${GREEN}   ✓ Yapılandırma dosyaları kopyalandı${NC}"
 
 # 3. SCP to NAS (web root dışında, HTTP'den erişilemez)
-log "${YELLOW}3. NAS'a yedekleniyor ($NAS_IP:$NAS_BACKUP_DIR)...${NC}"
+log "${YELLOW}3. NAS'a yedekleniyor ($NAS_HOST:$NAS_BACKUP_DIR)...${NC}"
 NAS_OK=false
 
 # NAS'ta backup klasörünü oluştur
