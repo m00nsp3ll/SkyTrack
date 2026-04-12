@@ -224,7 +224,7 @@
 - [x] **Sunucu sıfırdan kuruldu** (Dehost VDS siyah ekran, format zorunlu) — Ubuntu 24.04, Node 24, PM2, Postgres 16, Redis, Nginx, Let's Encrypt, UFW
 - [x] SSH şifresi yeni: `22a5c8d1113a!diyo@`
 - [x] Admin kullanıcı oluşturuldu: `admin / Aa19866891!`
-- [x] Kiosk kullanıcı oluşturuldu: `kiosk / kiosk2026` (role=KIOSK)
+- [x] Kiosk kullanıcı oluşturuldu: `Kiosk / Kiosk` (role=KIOSK)
 - [x] 18 ürün seed edildi (seed.ts'ten kopyalandı)
 - [x] Public pilot kayıt sistemi: `/pilot-kayit?token=...` + `POST /api/pilots/public-register`
 - [x] Pilot `appInstalled` field + checkbox + stats endpoint (`GET /api/pilots/registration-stats`)
@@ -234,9 +234,11 @@
 - [x] Sidebar Apple-tarzı ince scrollbar (`sidebar-scrollbar` utility, 6px slate)
 - [x] Kiosk scrollbar gizleme (`scrollbar-hide` utility) + dinamik iOS PWA status bar theme-color override
 - [x] 32 gerçek pilot kaydoldu (+ 10 ekstra + 15 eksik listeleme)
-- [ ] **Backup cron sistemi HÂLÂ KURULMADI** — KRİTİK TODO (Post-Launch'tan kalma, bu çöküş bunun yüzünden kaynaklı)
-- [ ] Kiosk yazdırma: native AirPrint Capacitor plugin yarım (Obj-C `CAP_PLUGIN` macro dosyası eksik)
-- [ ] Splash screen: yeni yuvarlak köşeli gradient splash yarım (PNG hazır, Xcode rebuild bekleniyor)
+- [x] **Backup cron sistemi KURULDU** (2026-04-12) — Her gece 03:00, PostgreSQL dump + .env + firebase → VDS lokal + NAS SSH
+- [x] **Kiosk AirPrint ÇALIŞIYOR** (2026-04-12) — WKScriptMessageHandler native bridge (Capacitor plugin remote URL'de çalışmıyor), tek sayfa 2 QR (müşteri+pilot), kayıt sonrası otomatik yazdırma
+- [x] **Splash screen TAMAMLANDI** (2026-04-12) — Gradient (sky→blue→indigo) + yuvarlak köşeli logo + "© Coded by Harun S.", LaunchScreen.storyboard Splash asset catalog kullanıyor
+- [x] Kiosk şifresi güncellendi: Kiosk / Kiosk
+- [x] Kiosk UI iyileştirmeleri: scroll fix (fixed inset-0), kompakt dil butonları, waiver maddeler boşluksuz, imza kutusu yeşil kesikli border
 
 ### LAN İndirme Sistemi v5 — NAS HTTPS Direct (2026-04-10) ✅
 - [x] NAS'ta Let's Encrypt SSL (`skytrack.myqnapcloud.com`, exp 2026-07-08)

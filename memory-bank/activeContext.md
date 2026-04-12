@@ -1,61 +1,40 @@
 # Active Context - SkyTrack
 
-## Son Çalışma Oturumu: 2026-04-11 (Oturum 42) — ⚠️ KRİTİK GÜN
+## Son Çalışma Oturumu: 2026-04-12 (Oturum 43)
 
-### 🔴 SUNUCU ÇÖKMESİ + SIFIRDAN KURULUM
-- Dehost VDS (166.1.91.9) siyah ekran verdi, format atmak zorunda kaldık
-- **Veritabanı yedeği YOKTU** (`scripts/backup.sh` crontab'a bağlanmamıştı — Post-Launch TODO'da kalmış)
-- Tek kayıp: test müşteri verileri (müşteri kayıtları test'ti, üretim kullanımı yok)
-- NAS'taki medya dosyaları + Risk Form PDF'leri güvendeydi (VDS dışında)
+### ✅ Backup Cron Sistemi KURULDU
+- Crontab: `0 3 * * *` — her gece 03:00
+- PostgreSQL dump + api.env + web.env + firebase-service-account.json
+- VDS lokal: `/backups/` + NAS: `/share/skytrack-backups/` (web root dışı, HTTP erişilemez)
+- VDS → NAS: SSH cat pipe (QNAP SCP subsystem kapalı, `sshpass` + `skytrack.myqnapcloud.com:2222`)
+- 7 gün retention (lokal + NAS otomatik temizlik)
+- Restore: `./scripts/restore.sh <backup-folder> [--from-nas]`
+- Test backup başarılı: 96KB database.sql.gz
 
-### ✅ Yeni sunucu kurulumu (30 dk, 2026-04-11)
-- **IP:** 166.1.91.9 (aynı), **SSH şifresi YENİ:** `22a5c8d1113a!diyo@`
-- Ubuntu 24.04, Node 24.14 (nvm), PM2 6.0, PostgreSQL 16, Redis, Nginx, certbot
-- `prisma migrate deploy` + `prisma db push` (password_changed_at kolonu için)
-- Let's Encrypt SSL: skytrackyp.com + api + www (2026-07-09'a kadar)
-- UFW firewall: 22/80/443 açık, geri kalan kapalı
-- Firebase service account lokal'den scp ile kopyalandı (+symlink /opt/skytrack/firebase-service-account.json)
+### ✅ iOS AirPrint Yazdırma ÇALIŞIYOR
+- **Capacitor plugin sistemi remote URL'de çalışmıyor** — `registerPlugin` native plugin'i bulamıyor
+- **Çözüm:** `WKScriptMessageHandler` native bridge — AppDelegate'ten `window._nativeAirPrint` JS fonksiyonu inject ediliyor
+- AirPrint test butonu ile doğrulandı, kayıt sonrası otomatik yazdırma çalışıyor
+- Print: tek sayfa, 2 QR alt alta (MÜŞTERİ + PİLOT), siyah beyaz, kesikli çizgiyle ayrılmış
+- `AirPrintPlugin.swift` + `AirPrintPlugin.m` ayrı dosyalarda (pbxproj'a eklendi)
 
-### 🔐 Kimlik bilgileri (YENİ)
+### ✅ iOS Splash Screen TAMAMLANDI
+- Gradient arka plan (sky-500 → blue-600 → indigo-700) + yuvarlak köşeli SkyTrack logosu
+- `Splash.imageset` asset catalog (2732×2732, 900KB)
+- `LaunchScreen.storyboard` → `Splash` asset referansı + scaleAspectFill + "© Coded by Harun S."
+- iOS LaunchScreen cache agresif — app silinince temizleniyor
+
+### ✅ Kiosk UI İyileştirmeleri
+- Dil seçim: `fixed inset-0` + `overscrollBehavior: none` — scroll kesin engellendi
+- Form: üstte yuvarlak logo (80px), top bar sticky, form ortalanmış
+- Waiver: maddeler arası boşluk yok (kompakt), `waiverAccept` sonrası 1 boşluk, imza kutusu **yeşil kesikli** border
+- Kiosk şifresi: `Kiosk / Kiosk`
+
+### 🔐 Kimlik bilgileri
 ```
 Admin:  admin / Aa19866891!
-Kiosk:  kiosk / kiosk2026
+Kiosk:  Kiosk / Kiosk
 ```
-
-### ✅ Production'a eklenen özellikler (bu oturum)
-1. **Public pilot kayıt formu** — `https://skytrackyp.com/pilot-kayit?token=skytrack-pilot-2026-4139ca4d9634`
-   - `POST /api/pilots/public-register` (token-protected, Pilot + User tek seferde)
-   - Frontend: `app/pilot-kayit/page.tsx` — SkyTrack logo, gradient bg, success ekranında "uygulamayı aç + bildirim izni" yönlendirmesi
-   - Token env: `PILOT_REGISTRATION_TOKEN` (prod .env'de)
-2. **Pilot `appInstalled` field + istatistik** — schema'ya `appInstalled Boolean @default(false)`, form checkbox, `GET /api/pilots/registration-stats` (admin)
-3. **FCM çift bildirim fix** — `/broadcast` hem `sendNativeToAllPilots` hem `sendNativeBroadcast` çağırıyordu (pilotlar 2 kez alıyordu). Artık pilot için `sendNativeToAllPilots`, pilot-dışı için paralel loop. Plus: FCM fonksiyonları sequential `for-await` yerine `Promise.all` ile paralel (24 cihaz ~8sn → ~1sn). Frontend axios timeout 15sn → 60sn
-4. **18 ürün seed edildi** (6 içecek, 3 yiyecek, 5 hediyelik, 3 foto/video, 1 rest)
-5. **Sidebar Apple-tarzı ince scrollbar** — `sidebar-scrollbar` utility class, 6px, slate-500/45% thumb
-6. **Kiosk scrollbar gizleme + status bar renk override** — layout useEffect dinamik theme-color `#0ea5e9`
-
-### ⚠️ Kiosk yazdırma — YARIM KALDI (yarına)
-- iPad'de **SkyTrack native app (Capacitor 8) kullanılıyor**, browser değil
-- WKWebView'da `window.print()` ve iframe yaklaşımı çalışmıyor (AirPrint tetiklenmiyor)
-- **Custom Capacitor plugin yaratıldı:** `AppDelegate.swift` içine `AirPrintPlugin` class (CAPBridgedPlugin, UIPrintInteractionController) + `lib/airprint.ts` JS wrapper + kiosk page `Capacitor.isNativePlatform()` kontrolü
-- **SORUN:** Custom in-app Capacitor plugin için Obj-C `CAP_PLUGIN` macro dosyası ŞART — sadece Swift class + CAPBridgedPlugin yetmiyor, plugin bridge'e kayıt olmuyor. `AirPrintPlugin.m` dosyası oluşturulmadı.
-- **Yapılacak:** `ios/App/App/AirPrintPlugin.m` dosyası yarat (`CAP_PLUGIN(AirPrintPlugin, "AirPrint", CAP_PLUGIN_METHOD(print, CAPPluginReturnPromise))`), Xcode'da "Add Files to App..." ile target'a ekle, rebuild
-
-### ⚠️ Splash screen — YARIM KALDI (yarına)
-- Eski: kare logo + lacivert `#1a3a6b`
-- Yeni istenen: iOS app icon tarzı **yuvarlak köşeli kare** logo + gradient (sky-500 → blue-600 → purple-600, kayıt ekranıyla aynı)
-- **Yapıldı:** `Splash.imageset` yeni filename'lerle regenerate (skytrack-splash.png/@2x/@3x), 2732×2732, 760px logo, 170px radius (~%22 iOS icon oranı), 1.17 MB her biri. Contents.json güncellendi (eski filename'leri sil, yeni filename'leri ekle)
-- **Yapıldı:** `LaunchScreen.storyboard` — ImageView full-screen constraints + scaleAspectFill
-- **Yapıldı:** `capacitor.config.ts` — `backgroundColor: '#1a3a6b'` → `#0ea5e9`
-- **SORUN:** Xcode build eski cache'li splash gösteriyor. DerivedData silindi ama build cache yine de eski. Yeni filename yaklaşımı bunu çözmeli ama henüz test edilmedi.
-- **Yapılacak:** `npx cap sync ios` + Xcode Clean Build Folder + Run, iPad'de app'i tamamen sil yeniden yükle
-
-### 🚨 KRİTİK TODO — ASLA UNUTMA
-- **YEDEK SİSTEMİ KURULMADI** — `scripts/backup.sh`'i crontab'a bağla (her gece 03:00), yedekleri NAS'a scp, 7 gün rotation. Başka bir çöküş olursa yine aynı kayıp yaşanır.
-
-### 🎯 Yarınki toplantı için durum (2026-04-11)
-- 32 gerçek pilot kaydoldu (+ 10 ekstra listede olmayan kayıt, 15 eksik kayıt bekleniyor)
-- Yazılıma giriş yapılabiliyor, POS ürünleri hazır, pilot kayıt linki dağıtıldı
-- Kiosk yazdırma + splash screen: yarın toplantı öncesi Xcode rebuild ile bitirilecek
 
 ---
 
