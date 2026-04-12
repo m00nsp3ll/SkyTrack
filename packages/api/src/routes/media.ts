@@ -1784,14 +1784,13 @@ router.post(
   asyncHandler(async (req: AuthRequest, res: any) => {
     const { customerId } = req.params;
 
-    const customer = await prisma.customer.findUnique({
-      where: { id: customerId },
+    const customer = await prisma.customer.findFirst({
+      where: { OR: [{ id: customerId }, { displayId: customerId }] },
       include: {
-        mediaFolders: { orderBy: { createdAt: 'desc' }, take: 1 },
         flights: {
           orderBy: { createdAt: 'desc' },
           take: 1,
-          include: { mediaFolder: true },
+          include: { mediaFolder: true, pilot: true },
         },
       },
     }) as any;
@@ -1800,10 +1799,22 @@ router.post(
       throw new AppError('Müşteri bulunamadı', 404, 'CUSTOMER_NOT_FOUND');
     }
 
-    const nasPath = (customer as any).mediaFolderPath ||
-                    customer.mediaFolders[0]?.folderPath ||
-                    customer.flights[0]?.mediaFolder?.folderPath;
-
+    // DB'den path al veya NAS'ta ara
+    let nasPath = customer.flights[0]?.mediaFolder?.folderPath;
+    if (!nasPath) {
+      // NAS'ta recursive ara
+      const found = await qnap.findCustomerFolder(customer.displayId);
+      if (found) nasPath = found;
+    }
+    if (!nasPath) {
+      // Pilot adıyla oluştur
+      const pilot = customer.flights[0]?.pilot;
+      if (pilot) {
+        const safeName = sanitizePilotName(pilot.name);
+        const dateStr = new Date().toISOString().split('T')[0];
+        nasPath = `${dateStr}/${safeName}`;
+      }
+    }
     if (!nasPath) {
       throw new AppError('Medya klasörü bulunamadı', 404, 'FOLDER_NOT_FOUND');
     }
