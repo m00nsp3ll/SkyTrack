@@ -37,11 +37,11 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
 
         // JS'e bridge fonksiyonunu inject et
         let js = """
-        window._nativeAirPrint = function(html, jobName, auto) {
+        window._nativeAirPrint = function(html, jobName) {
             return new Promise(function(resolve, reject) {
                 window._airprintResolve = resolve;
                 window._airprintReject = reject;
-                window.webkit.messageHandlers.airprint.postMessage({html: html, jobName: jobName || 'SkyTrack', auto: auto || false});
+                window.webkit.messageHandlers.airprint.postMessage({html: html, jobName: jobName || 'SkyTrack'});
             });
         };
         console.log('[AirPrint] Native bridge ready');
@@ -153,9 +153,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
 
 // MARK: - AirPrint WKScriptMessageHandler
 class AirPrintHandler: NSObject, WKScriptMessageHandler {
-    // Son kullanılan yazıcıyı hatırla — otomatik yazdırmada kullan
-    static var lastPrinter: UIPrinter?
-
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
         guard let body = message.body as? [String: Any],
               let html = body["html"] as? String, !html.isEmpty else {
@@ -164,7 +161,6 @@ class AirPrintHandler: NSObject, WKScriptMessageHandler {
         }
 
         let jobName = body["jobName"] as? String ?? "SkyTrack"
-        let autoPrint = body["auto"] as? Bool ?? false
 
         DispatchQueue.main.async {
             let printController = UIPrintInteractionController.shared
@@ -174,16 +170,12 @@ class AirPrintHandler: NSObject, WKScriptMessageHandler {
             printController.printInfo = printInfo
 
             let formatter = UIMarkupTextPrintFormatter(markupText: html)
-            formatter.perPageContentInsets = UIEdgeInsets(top: 20, left: 20, bottom: 20, right: 20)
+            formatter.perPageContentInsets = UIEdgeInsets(top: 10, left: 10, bottom: 10, right: 10)
             printController.printFormatter = formatter
 
             let webView = message.webView
 
-            let completion: UIPrintInteractionController.CompletionHandler = { controller, completed, printError in
-                // Başarılıysa yazıcıyı hatırla
-                if completed, let printer = controller.printInfo?.printerID {
-                    AirPrintHandler.lastPrinter = UIPrinter(url: URL(string: printer)!)
-                }
+            let completion: UIPrintInteractionController.CompletionHandler = { _, completed, printError in
                 if let printError = printError {
                     self.resolveJS(webView, success: false, error: printError.localizedDescription)
                 } else {
@@ -191,13 +183,7 @@ class AirPrintHandler: NSObject, WKScriptMessageHandler {
                 }
             }
 
-            // Otomatik yazdırma + önceki yazıcı varsa direkt gönder
-            if autoPrint, let printer = AirPrintHandler.lastPrinter {
-                printController.print(to: printer, completionHandler: completion)
-                return
-            }
-
-            // Manuel: yazıcı seçme dialog'u göster
+            // Her zaman yazıcı seçme dialog'u göster (iOS son yazıcıyı otomatik hatırlar)
             let keyWindow = UIApplication.shared.connectedScenes
                 .compactMap { $0 as? UIWindowScene }
                 .flatMap { $0.windows }

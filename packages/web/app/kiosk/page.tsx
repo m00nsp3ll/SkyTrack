@@ -340,48 +340,34 @@ export default function KioskPage() {
     }
   }
 
-  // İki kopya (müşteri + pilot) için yazdırılabilir HTML üretir
+  // Tek sayfa, 2 QR alt alta (müşteri + pilot kopyası, kesim çizgisiyle ayrılır)
   const buildPrintHtml = (res: RegistrationResult) => {
     const now = new Date()
     const dateStr = now.toLocaleDateString('tr-TR')
     const timeStr = now.toLocaleTimeString('tr-TR')
+    const pilotName = res.pilot?.name || ''
 
-    const buildTicket = (copy: 'musteri' | 'pilot') => {
-      const label = copy === 'musteri' ? 'MÜŞTERİ KOPYASI' : 'PİLOT KOPYASI'
-      const bg = copy === 'musteri' ? '#2563eb' : '#16a34a'
-      const pilotLine = res.pilot
-        ? `<div style="font-size:13px;font-weight:bold;color:#16a34a;margin-top:6px;">Pilot: ${res.pilot.name}</div>`
-        : ''
-      return `
-        <div style="text-align:center;padding:12px;page-break-after:always;break-after:page;font-family:-apple-system,Arial,sans-serif;">
-          <div style="display:inline-block;font-size:11px;font-weight:bold;color:#fff;background:${bg};padding:3px 10px;border-radius:4px;margin-bottom:8px;">${label}</div>
-          <div><img src="${res.qrCode}" alt="QR" style="width:5cm;height:5cm;display:block;margin:0 auto;" /></div>
-          <div style="font-size:18px;font-weight:bold;margin-top:6px;letter-spacing:2px;">${res.customer.displayId}</div>
-          <div style="border-top:1px dashed #ccc;margin:6px 20px;"></div>
-          <div style="font-size:13px;color:#333;margin-top:4px;">${res.customer.firstName} ${res.customer.lastName}</div>
-          ${pilotLine}
-          <div style="font-size:10px;color:#888;margin-top:6px;">${dateStr} - ${timeStr}</div>
-        </div>
-      `
-    }
+    const buildTicket = (label: string, bg: string) => `
+      <div style="text-align:center;padding:8px 0;font-family:-apple-system,Arial,sans-serif;">
+        <div style="display:inline-block;font-size:10px;font-weight:bold;color:#fff;background:${bg};padding:2px 8px;border-radius:3px;">${label}</div>
+        <div style="margin:4px 0;"><img src="${res.qrCode}" alt="QR" style="width:4cm;height:4cm;" /></div>
+        <div style="font-size:16px;font-weight:bold;letter-spacing:2px;">${res.customer.displayId}</div>
+        <div style="font-size:11px;color:#333;">${res.customer.firstName} ${res.customer.lastName}</div>
+        ${pilotName ? `<div style="font-size:11px;font-weight:bold;color:#16a34a;">Pilot: ${pilotName}</div>` : ''}
+        <div style="font-size:9px;color:#888;">${dateStr} ${timeStr}</div>
+      </div>`
 
     return `<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8">
-<title>Alanya Paragliding - ${res.customer.displayId}</title>
-</head>
-<body style="margin:0;padding:0;">
-${buildTicket('musteri')}
-${buildTicket('pilot')}
-</body>
-</html>`
+<html><head><meta charset="utf-8"></head>
+<body style="margin:0;padding:10px;">
+${buildTicket('MÜŞTERİ', '#2563eb')}
+<div style="border-top:1px dashed #999;margin:4px 0;"></div>
+${buildTicket('PİLOT', '#16a34a')}
+</body></html>`
   }
 
   // Native AirPrint — WKScriptMessageHandler bridge üzerinden
-  // auto=true: daha önce seçilmiş yazıcıya direkt gönder (dialog yok)
-  // auto=false: yazıcı seçme dialog'u göster
-  const nativeAirPrint = async (res: RegistrationResult, auto = false) => {
+  const nativeAirPrint = async (res: RegistrationResult) => {
     try {
       const html = buildPrintHtml(res)
       if (typeof window._nativeAirPrint !== 'function') {
@@ -390,7 +376,6 @@ ${buildTicket('pilot')}
       await AirPrint.print({
         html,
         jobName: `SkyTrack-${res.customer.displayId}`,
-        auto,
       })
     } catch (err) {
       console.error('[Kiosk] AirPrint hatası:', err)
@@ -443,11 +428,11 @@ ${buildTicket('pilot')}
     }
   }
 
-  const printBothCopies = (res: RegistrationResult, auto = false) => {
+  const printBothCopies = (res: RegistrationResult) => {
     if (typeof window._nativeAirPrint === 'function') {
-      void nativeAirPrint(res, auto)
+      void nativeAirPrint(res)
     } else if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios') {
-      setTimeout(() => void nativeAirPrint(res, auto), 3000)
+      setTimeout(() => void nativeAirPrint(res), 3000)
     } else {
       browserPrint(res)
     }
@@ -459,8 +444,7 @@ ${buildTicket('pilot')}
   }
 
   const autoPrint = (res: RegistrationResult) => {
-    // auto=true: daha önce seçilmiş yazıcıya direkt gönder
-    printBothCopies(res, true)
+    printBothCopies(res)
   }
 
   const getWaiverText = () => {
