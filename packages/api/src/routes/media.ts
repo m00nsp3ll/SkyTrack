@@ -1093,42 +1093,45 @@ router.get(
     }
 
     const mediaFolder = customer.flights[0]?.mediaFolder;
-    if (!mediaFolder) {
-      return res.json({
-        success: true,
-        data: {
-          files: [],
-          totalSize: 0,
-        },
-      });
-    }
-
-    // NAS üzerinden dosya listele
+    const displayId = customer.displayId;
     const pilotName = customer.flights[0]?.pilot?.name || '';
     const originalPilotFolder = pilotName.replace(/\s+/g, '_');
-    const displayId = customer.displayId;
-    const folderPath = mediaFolder.folderPath;
-    const relativePath = folderPath.replace(/^media\//, '');
     const mediaExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.mp4', '.mov', '.avi', '.mkv', '.webm', '.heic', '.heif'];
-
-    // Tarihi çıkar
-    let dateIso = '';
-    const isoMatch = relativePath.match(/^(\d{4}-\d{2}-\d{2})/);
-    const ddMatch = relativePath.match(/^(\d{2})-(\d{2})-(\d{4})/);
-    if (isoMatch) dateIso = isoMatch[1];
-    else if (ddMatch) dateIso = `${ddMatch[3]}-${ddMatch[2]}-${ddMatch[1]}`;
-    else dateIso = new Date().toISOString().split('T')[0];
 
     const { sanitizePilotName: spn } = await import('../services/media.js');
     const sanitizedPilot = spn(pilotName);
 
+    // Tarihi belirle
+    let dateIso = new Date().toISOString().split('T')[0];
+    if (mediaFolder?.folderPath) {
+      const rel = mediaFolder.folderPath.replace(/^media\//, '');
+      const isoMatch = rel.match(/^(\d{4}-\d{2}-\d{2})/);
+      const ddMatch = rel.match(/^(\d{2})-(\d{2})-(\d{4})/);
+      if (isoMatch) dateIso = isoMatch[1];
+      else if (ddMatch) dateIso = `${ddMatch[3]}-${ddMatch[2]}-${ddMatch[1]}`;
+    }
+
+    // Tüm olası yolları dene (sorti klasörlü formatlar dahil)
     const pathsToTry = [
+      // NAS'taki gerçek path'i direkt ara (findCustomerFolder ile)
+      null, // placeholder — aşağıda findCustomerFolder çağrılacak
+      // DB'deki folderPath
+      ...(mediaFolder?.folderPath ? [mediaFolder.folderPath.replace(/^media\//, '')] : []),
+      // Türkçe karakterli pilot adı
       `${dateIso}/${originalPilotFolder}/${displayId}`,
       `${dateIso}/${sanitizedPilot}/${displayId}`,
+      // Pilot klasörünü tara (sorti alt klasörleri dahil)
       `${dateIso}/${originalPilotFolder}`,
       `${dateIso}/${sanitizedPilot}`,
-      relativePath,
     ];
+
+    // Önce findCustomerFolder ile NAS'ta recursive ara
+    const foundBySearch = await qnap.findCustomerFolder(displayId);
+    if (foundBySearch) {
+      pathsToTry[0] = foundBySearch;
+    } else {
+      pathsToTry.shift(); // null'ı kaldır
+    }
 
     let nasFiles: Array<{ name: string; size: number; isFolder: boolean; modified: string }> = [];
     let foundPath = '';
@@ -1164,8 +1167,8 @@ router.get(
             }
             break;
           }
-          // Sorti klasörlerinde ara
-          for (const sf of items.filter(f => f.isFolder && f.name.includes('Sorti'))) {
+          // Sorti klasörlerinde ara (hem "Sorti" hem "sorti" formatı)
+          for (const sf of items.filter(f => f.isFolder && f.name.toLowerCase().includes('sorti'))) {
             try {
               const sfExists = await qnap.folderExists(`${tryPath}/${sf.name}/${displayId}`);
               if (sfExists) {
