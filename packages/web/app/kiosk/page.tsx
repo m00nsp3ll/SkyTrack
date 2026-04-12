@@ -488,13 +488,13 @@ ${buildTicket('PİLOT', '#16a34a')}
   // ==================== STEP: Language Selection ====================
   if (step === 'language') {
     return (
-      <div className="h-screen overflow-hidden flex flex-col items-center justify-center p-6 bg-gradient-to-br from-sky-50 to-blue-100">
+      <div className="h-screen overflow-hidden flex flex-col items-center justify-center p-4 bg-gradient-to-br from-sky-50 to-blue-100">
         {logoutModal}
-        <div className="mb-10 text-center">
+        <div className="mb-6 text-center">
           <img
             src="/skytrack-logo.png"
             alt="SkyTrack"
-            className="w-28 h-28 mx-auto mb-5 rounded-3xl shadow-xl select-none"
+            className="w-20 h-20 mx-auto mb-3 rounded-3xl shadow-xl select-none"
             draggable={false}
             onTouchStart={startLogoPress}
             onTouchEnd={cancelLogoPress}
@@ -504,11 +504,11 @@ ${buildTicket('PİLOT', '#16a34a')}
             onMouseLeave={cancelLogoPress}
             onContextMenu={(e) => e.preventDefault()}
           />
-          <h1 className="text-3xl font-bold text-sky-800 mb-2">SkyTrack</h1>
-          <p className="text-lg text-sky-600">Hoş Geldiniz · Welcome · Добро пожаловать</p>
+          <h1 className="text-2xl font-bold text-sky-800 mb-1">SkyTrack</h1>
+          <p className="text-base text-sky-600">Hoş Geldiniz · Welcome · Добро пожаловать</p>
         </div>
 
-        <div className="w-full max-w-lg grid grid-cols-2 gap-4">
+        <div className="w-full max-w-lg grid grid-cols-2 gap-3">
           {LANGUAGES.map((l) => (
             <button
               key={l.code}
@@ -516,37 +516,13 @@ ${buildTicket('PİLOT', '#16a34a')}
                 setSelectedLanguage(l.code)
                 setStep('form')
               }}
-              className="flex items-center justify-center gap-3 px-5 py-5 bg-white border-2 border-sky-200 rounded-2xl text-xl font-semibold hover:border-sky-500 hover:bg-sky-50 active:scale-95 transition-all shadow-md min-h-[80px]"
+              className="flex items-center justify-center gap-2 px-4 py-3 bg-white border-2 border-sky-200 rounded-2xl text-lg font-semibold hover:border-sky-500 hover:bg-sky-50 active:scale-95 transition-all shadow-md"
             >
-              <span className="text-3xl">{l.flag}</span>
+              <span className="text-2xl">{l.flag}</span>
               <span>{l.name}</span>
             </button>
           ))}
         </div>
-
-        {/* AirPrint Test Butonu — native bridge hazır olunca göster */}
-        <button
-          onClick={async () => {
-            try {
-              if (typeof window._nativeAirPrint !== 'function') {
-                alert('AirPrint bridge henüz hazır değil. 3 saniye bekleyip tekrar deneyin.')
-                return
-              }
-              const testHtml = `<html><body style="font-family:sans-serif;text-align:center;padding:40px;">
-                <h1 style="font-size:28px;">SkyTrack AirPrint Test</h1>
-                <p style="font-size:18px;margin-top:20px;">Yazdırma testi başarılı!</p>
-                <p style="font-size:14px;color:#666;margin-top:10px;">${new Date().toLocaleString('tr-TR')}</p>
-              </body></html>`
-              await AirPrint.print({ html: testHtml, jobName: 'SkyTrack-Test' })
-              alert('Yazdırma başarılı!')
-            } catch (err) {
-              alert('Yazdırma hatası: ' + (err instanceof Error ? err.message : String(err)))
-            }
-          }}
-          className="mt-6 px-6 py-3 bg-sky-600 text-white rounded-xl text-lg font-semibold shadow-md active:scale-95 transition-all flex items-center gap-2"
-        >
-          🖨️ AirPrint Test
-        </button>
       </div>
     )
   }
@@ -741,10 +717,10 @@ ${buildTicket('PİLOT', '#16a34a')}
 
   // ==================== STEP: Registration Form ====================
   return (
-    <div className="min-h-screen overflow-y-auto" dir={rtl ? 'rtl' : 'ltr'}>
+    <div className="h-screen flex flex-col overflow-hidden" dir={rtl ? 'rtl' : 'ltr'}>
       {logoutModal}
       {/* Top Bar */}
-      <div className="sticky top-0 z-10 bg-sky-700 text-white px-6 py-4 flex items-center justify-between shadow-md">
+      <div className="flex-shrink-0 bg-sky-700 text-white px-6 py-3 flex items-center justify-between shadow-md">
         <div className="flex items-center gap-3">
           <img
             src="/skytrack-logo.png"
@@ -771,10 +747,16 @@ ${buildTicket('PİLOT', '#16a34a')}
         </button>
       </div>
 
-      <div className="max-w-2xl mx-auto p-6 space-y-5 pb-10">
+      <div className="flex-1 overflow-y-auto">
+      <div className="max-w-2xl mx-auto px-6 py-4 space-y-4">
+        {/* Logo */}
+        <div className="text-center">
+          <img src="/skytrack-logo.png" alt="SkyTrack" className="w-16 h-16 mx-auto rounded-2xl shadow-md" draggable={false} />
+        </div>
+
         {/* Personal Info */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-5">
-          <h2 className="text-xl font-bold text-gray-800">{tr.personalInfo}</h2>
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-4">
+          <h2 className="text-lg font-bold text-gray-800">{tr.personalInfo}</h2>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
@@ -909,14 +891,14 @@ ${buildTicket('PİLOT', '#16a34a')}
 
         {/* Error */}
         {error && (
-          <div className="p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl text-base">
+          <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-base">
             {error}
           </div>
         )}
 
         {/* Loading overlay message */}
         {loading && (
-          <div className="p-4 bg-sky-50 border border-sky-200 text-sky-700 rounded-xl text-base text-center animate-pulse">
+          <div className="p-3 bg-sky-50 border border-sky-200 text-sky-700 rounded-xl text-base text-center animate-pulse">
             {tr.saving}
           </div>
         )}
@@ -925,11 +907,12 @@ ${buildTicket('PİLOT', '#16a34a')}
         <button
           onClick={openWaiver}
           disabled={loading}
-          className="w-full h-20 text-xl font-bold rounded-2xl bg-green-600 hover:bg-green-700 active:scale-95 text-white flex items-center justify-center gap-4 transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full h-16 text-lg font-bold rounded-2xl bg-green-600 hover:bg-green-700 active:scale-95 text-white flex items-center justify-center gap-3 transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          <PenLine className="w-7 h-7" />
+          <PenLine className="w-6 h-6" />
           {tr.signViewAndSign}
         </button>
+      </div>
       </div>
     </div>
   )
