@@ -448,7 +448,7 @@ ${ticket('PILOT')}
   }
 
   const getWaiverText = () => {
-    return `${tr.waiverFullTitle}\n\n${tr.waiverIntro}\n\n${tr.waiverAccept}\n\n1. ${tr.waiverItem1}\n\n2. ${tr.waiverItem2}\n\n3. ${tr.waiverItem3}\n\n4. ${tr.waiverItem4}\n\n5. ${tr.waiverItem5}\n\n6. ${tr.waiverItem6}\n\n7. ${tr.waiverItem7}\n\n8. ${tr.waiverItem8}`
+    return `${tr.waiverFullTitle}\n\n${tr.waiverIntro}\n\n${tr.waiverAccept}\n\n1. ${tr.waiverItem1}\n2. ${tr.waiverItem2}\n3. ${tr.waiverItem3}\n4. ${tr.waiverItem4}\n5. ${tr.waiverItem5}\n6. ${tr.waiverItem6}\n7. ${tr.waiverItem7}\n8. ${tr.waiverItem8}`
   }
 
   const logoutModal = showLogoutModal ? (
@@ -516,7 +516,7 @@ ${ticket('PILOT')}
                 setSelectedLanguage(l.code)
                 setStep('form')
               }}
-              className="flex items-center justify-center gap-2 px-4 py-3 bg-white border-2 border-sky-200 rounded-2xl text-lg font-semibold hover:border-sky-500 hover:bg-sky-50 active:scale-95 transition-all shadow-md"
+              className="flex items-center justify-center gap-3 px-5 py-5 bg-white border-2 border-sky-200 rounded-2xl text-xl font-semibold hover:border-sky-500 hover:bg-sky-50 active:scale-95 transition-all shadow-md"
             >
               <span className="text-2xl">{l.flag}</span>
               <span>{l.name}</span>
