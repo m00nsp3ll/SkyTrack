@@ -4,7 +4,7 @@
 # Medya zaten NAS'ta, sadece DB + .env yedeklenir
 # Crontab: 0 3 * * * /opt/skytrack/scripts/backup.sh >> /var/log/skytrack-backup.log 2>&1
 
-set -e
+set -eo pipefail
 
 # Configuration
 PROJECT_DIR="/opt/skytrack"
@@ -36,7 +36,8 @@ log "${YELLOW}SkyTrack Yedekleme Başlıyor...${NC}"
 
 # Load DATABASE_URL from .env (source yerine grep — &pool_timeout bash'te sorun yapıyor)
 ENV_FILE="$PROJECT_DIR/packages/api/.env"
-DATABASE_URL=$(grep '^DATABASE_URL=' "$ENV_FILE" | cut -d= -f2-)
+# Prisma query parametrelerini kaldır (connection_limit, pool_timeout pg_dump'ta geçersiz)
+DATABASE_URL=$(grep '^DATABASE_URL=' "$ENV_FILE" | cut -d= -f2- | sed 's/?.*//')
 
 # Create local backup directory
 mkdir -p "$BACKUP_PATH"
