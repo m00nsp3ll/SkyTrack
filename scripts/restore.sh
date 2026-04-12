@@ -46,7 +46,11 @@ BACKUP_NAME="$1"
 if [ "$FROM_NAS" = true ]; then
     echo -e "${YELLOW}NAS'tan yedek indiriliyor...${NC}"
     mkdir -p "$BACKUP_DIR/$BACKUP_NAME"
-    sshpass -p "$NAS_PASS" scp -o StrictHostKeyChecking=no -o PreferredAuthentications=password -P $NAS_SSH_PORT -r ${NAS_USER}@${NAS_HOST}:${NAS_BACKUP_DIR}/${BACKUP_NAME}/* "$BACKUP_DIR/$BACKUP_NAME/"
+    NAS_SSH="sshpass -p $NAS_PASS ssh -o StrictHostKeyChecking=no -o PreferredAuthentications=password -p $NAS_SSH_PORT ${NAS_USER}@${NAS_HOST}"
+    # NAS'taki dosyaları listele ve SSH cat ile indir (SCP subsystem QNAP'ta kapalı)
+    for FNAME in $($NAS_SSH "ls $NAS_BACKUP_DIR/$BACKUP_NAME/" 2>/dev/null); do
+        $NAS_SSH "cat $NAS_BACKUP_DIR/$BACKUP_NAME/$FNAME" > "$BACKUP_DIR/$BACKUP_NAME/$FNAME"
+    done
     echo -e "${GREEN}   ✓ NAS'tan indirildi${NC}"
 fi
 

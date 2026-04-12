@@ -59,22 +59,31 @@ if [ -f "$PROJECT_DIR/firebase-service-account.json" ]; then
 fi
 log "${GREEN}   ✓ Yapılandırma dosyaları kopyalandı${NC}"
 
-# 3. SCP to NAS (web root dışında, HTTP'den erişilemez)
+# 3. SSH ile NAS'a aktar (SCP subsystem QNAP'ta kapalı, cat pipe kullanıyoruz)
 log "${YELLOW}3. NAS'a yedekleniyor ($NAS_HOST:$NAS_BACKUP_DIR)...${NC}"
 NAS_OK=false
+NAS_SSH="sshpass -p $NAS_PASS ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 -o PreferredAuthentications=password -p $NAS_SSH_PORT ${NAS_USER}@${NAS_HOST}"
 
-# NAS'ta backup klasörünü oluştur
-if sshpass -p "$NAS_PASS" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 -o PreferredAuthentications=password -p $NAS_SSH_PORT ${NAS_USER}@${NAS_HOST} "mkdir -p $NAS_BACKUP_DIR/$DATE" 2>/dev/null; then
-    # Dosyaları kopyala
-    if sshpass -p "$NAS_PASS" scp -o StrictHostKeyChecking=no -o ConnectTimeout=10 -o PreferredAuthentications=password -P $NAS_SSH_PORT "$BACKUP_PATH"/* ${NAS_USER}@${NAS_HOST}:${NAS_BACKUP_DIR}/${DATE}/ 2>/dev/null; then
+# NAS'ta backup klasörünü oluştur ve dosyaları aktar
+if $NAS_SSH "mkdir -p $NAS_BACKUP_DIR/$DATE" 2>/dev/null; then
+    TRANSFER_OK=true
+    for f in "$BACKUP_PATH"/*; do
+        FNAME=$(basename "$f")
+        if ! cat "$f" | $NAS_SSH "cat > $NAS_BACKUP_DIR/$DATE/$FNAME" 2>/dev/null; then
+            TRANSFER_OK=false
+            log "${RED}   ✗ $FNAME aktarılamadı${NC}"
+        fi
+    done
+
+    if [ "$TRANSFER_OK" = true ]; then
         NAS_OK=true
         log "${GREEN}   ✓ NAS'a kopyalandı${NC}"
 
         # NAS'ta eski yedekleri temizle
-        sshpass -p "$NAS_PASS" ssh -o StrictHostKeyChecking=no -o PreferredAuthentications=password -p $NAS_SSH_PORT ${NAS_USER}@${NAS_HOST} "find $NAS_BACKUP_DIR -maxdepth 1 -type d -mtime +$RETENTION_DAYS -exec rm -rf {} \;" 2>/dev/null || true
+        $NAS_SSH "find $NAS_BACKUP_DIR -maxdepth 1 -type d -mtime +$RETENTION_DAYS -exec rm -rf {} \;" 2>/dev/null || true
         log "${GREEN}   ✓ NAS eski yedekler temizlendi (${RETENTION_DAYS} gün)${NC}"
     else
-        log "${RED}   ✗ NAS SCP başarısız${NC}"
+        log "${RED}   ✗ NAS dosya aktarımı kısmen başarısız${NC}"
     fi
 else
     log "${RED}   ✗ NAS SSH bağlantısı başarısız${NC}"
