@@ -1095,7 +1095,6 @@ router.get(
     const mediaFolder = customer.flights[0]?.mediaFolder;
     const displayId = customer.displayId;
     const pilotName = customer.flights[0]?.pilot?.name || '';
-    const originalPilotFolder = pilotName.replace(/\s+/g, '_');
     const mediaExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.mp4', '.mov', '.avi', '.mkv', '.webm', '.heic', '.heif'];
 
     const { sanitizePilotName: spn } = await import('../services/media.js');
@@ -1112,26 +1111,20 @@ router.get(
     }
 
     // Tüm olası yolları dene (sorti klasörlü formatlar dahil)
-    const pathsToTry = [
-      // NAS'taki gerçek path'i direkt ara (findCustomerFolder ile)
-      null, // placeholder — aşağıda findCustomerFolder çağrılacak
-      // DB'deki folderPath
-      ...(mediaFolder?.folderPath ? [mediaFolder.folderPath.replace(/^media\//, '')] : []),
-      // Türkçe karakterli pilot adı
-      `${dateIso}/${originalPilotFolder}/${displayId}`,
-      `${dateIso}/${sanitizedPilot}/${displayId}`,
-      // Pilot klasörünü tara (sorti alt klasörleri dahil)
-      `${dateIso}/${originalPilotFolder}`,
-      `${dateIso}/${sanitizedPilot}`,
-    ];
+    const pathsToTry: string[] = [];
 
     // Önce findCustomerFolder ile NAS'ta recursive ara
     const foundBySearch = await qnap.findCustomerFolder(displayId);
-    if (foundBySearch) {
-      pathsToTry[0] = foundBySearch;
-    } else {
-      pathsToTry.shift(); // null'ı kaldır
-    }
+    if (foundBySearch) pathsToTry.push(foundBySearch);
+
+    // DB'deki folderPath
+    if (mediaFolder?.folderPath) pathsToTry.push(mediaFolder.folderPath.replace(/^media\//, ''));
+
+    // Sanitize edilmiş pilot adı ile ara
+    pathsToTry.push(
+      `${dateIso}/${sanitizedPilot}/${displayId}`,
+      `${dateIso}/${sanitizedPilot}`,
+    );
 
     let nasFiles: Array<{ name: string; size: number; isFolder: boolean; modified: string }> = [];
     let foundPath = '';
@@ -1213,8 +1206,8 @@ router.get(
       data: {
         files: filesWithUrls,
         totalSize: filesWithUrls.reduce((sum, f) => sum + f.size, 0),
-        paymentStatus: mediaFolder.paymentStatus,
-        deliveryStatus: mediaFolder.deliveryStatus,
+        paymentStatus: mediaFolder?.paymentStatus || 'UNPAID',
+        deliveryStatus: mediaFolder?.deliveryStatus || 'PENDING',
       },
     });
   })

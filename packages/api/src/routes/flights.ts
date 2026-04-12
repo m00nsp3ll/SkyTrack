@@ -10,11 +10,17 @@ import path from 'path';
 const router = Router();
 const prisma = new PrismaClient();
 
-// Helper: Pilot adını NAS klasörü için güvenli formata çevir
+// Helper: Pilot adını NAS klasörü için güvenli formata çevir (Türkçe → ASCII)
 function safePilotName(name: string): string {
   return name
+    .replace(/[şŞ]/g, c => c === 'ş' ? 's' : 'S')
+    .replace(/[ğĞ]/g, c => c === 'ğ' ? 'g' : 'G')
+    .replace(/[üÜ]/g, c => c === 'ü' ? 'u' : 'U')
+    .replace(/[öÖ]/g, c => c === 'ö' ? 'o' : 'O')
+    .replace(/[ıİ]/g, c => c === 'ı' ? 'i' : 'I')
+    .replace(/[çÇ]/g, c => c === 'ç' ? 'c' : 'C')
     .replace(/\s+/g, '_')
-    .replace(/[^a-zA-Z0-9_çÇğĞıİöÖşŞüÜ-]/g, '')
+    .replace(/[^a-zA-Z0-9_-]/g, '')
     .trim();
 }
 

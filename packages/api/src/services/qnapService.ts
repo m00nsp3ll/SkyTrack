@@ -82,9 +82,16 @@ class QnapService {
 
   async createCustomerFolder(date: string, pilotName: string, customerCode: string): Promise<string | null> {
     try {
+      // Türkçe karakterleri ASCII'ye çevir (Ömer → Omer, Şek → Sek)
       const safePilotName = pilotName
+        .replace(/[şŞ]/g, c => c === 'ş' ? 's' : 'S')
+        .replace(/[ğĞ]/g, c => c === 'ğ' ? 'g' : 'G')
+        .replace(/[üÜ]/g, c => c === 'ü' ? 'u' : 'U')
+        .replace(/[öÖ]/g, c => c === 'ö' ? 'o' : 'O')
+        .replace(/[ıİ]/g, c => c === 'ı' ? 'i' : 'I')
+        .replace(/[çÇ]/g, c => c === 'ç' ? 'c' : 'C')
         .replace(/\s+/g, '_')
-        .replace(/[^a-zA-Z0-9_çÇğĞıİöÖşŞüÜ-]/g, '')
+        .replace(/[^a-zA-Z0-9_-]/g, '')
         .trim();
 
       const basePath = `${date}/${safePilotName}/${customerCode}`;
