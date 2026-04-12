@@ -193,7 +193,9 @@ class AirPrintHandler: NSObject, WKScriptMessageHandler {
                     .first
 
             if let rootView = keyWindow?.rootViewController?.view {
-                printController.present(from: rootView.bounds, in: rootView, animated: true, completionHandler: completion)
+                // iPad: ekranın üst ortasından küçük rect (popover düzgün kapansın)
+                let centerRect = CGRect(x: rootView.bounds.midX - 1, y: 50, width: 2, height: 2)
+                printController.present(from: centerRect, in: rootView, animated: true, completionHandler: completion)
             } else {
                 printController.present(animated: true, completionHandler: completion)
             }

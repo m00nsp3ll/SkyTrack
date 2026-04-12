@@ -330,7 +330,8 @@ export default function KioskPage() {
       })
       setResult(response.data.data)
       setStep('success')
-      autoPrint(response.data.data)
+      // UI render + AirPrint discovery için 2 saniye bekle
+      setTimeout(() => autoPrint(response.data.data), 2000)
     } catch (err: any) {
       setError(err.response?.data?.error?.message || tr.registrationFailed)
       setStep('form')
