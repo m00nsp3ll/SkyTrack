@@ -1,22 +1,22 @@
-// AirPrint native plugin wrapper
-// AppDelegate.swift içinde tanımlı AirPrintPlugin'i çağırır (iOS Capacitor)
-// Android ve web'de çalışmaz — çağıran taraf Capacitor.isNativePlatform() kontrol etmeli
+// AirPrint native bridge wrapper
+// AppDelegate.swift WKScriptMessageHandler üzerinden çalışır (Capacitor plugin değil)
+// window._nativeAirPrint fonksiyonu native taraftan inject edilir
 
-import { Capacitor, registerPlugin } from '@capacitor/core'
+declare global {
+  interface Window {
+    _nativeAirPrint?: (html: string, jobName?: string) => Promise<{ completed?: boolean; cancelled?: boolean }>
+  }
+}
 
 export interface AirPrintPlugin {
   print(options: { html: string; jobName?: string }): Promise<{ completed?: boolean; cancelled?: boolean }>
 }
 
-// Önce Capacitor.Plugins üzerinden dene (native bridge), sonra registerPlugin fallback
-function getAirPrint(): AirPrintPlugin {
-  const cap = (window as any).Capacitor
-  if (cap?.Plugins?.AirPrint) {
-    return cap.Plugins.AirPrint as AirPrintPlugin
-  }
-  return registerPlugin<AirPrintPlugin>('AirPrint')
-}
-
 export const AirPrint: AirPrintPlugin = {
-  print: (options) => getAirPrint().print(options)
+  async print(options) {
+    if (typeof window._nativeAirPrint === 'function') {
+      return window._nativeAirPrint(options.html, options.jobName)
+    }
+    throw new Error('AirPrint bridge not available — native iOS app required')
+  }
 }

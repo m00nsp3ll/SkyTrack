@@ -1,4 +1,5 @@
 import UIKit
+import WebKit
 import Capacitor
 import FirebaseCore
 import FirebaseMessaging
@@ -14,7 +15,55 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         UNUserNotificationCenter.current().delegate = self
         Messaging.messaging().delegate = self
         application.registerForRemoteNotifications()
+
+        // AirPrint bridge'i WebView'a inject et (Capacitor plugin sistemi remote URL'de çalışmıyor)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            self.setupAirPrintBridge()
+        }
+
         return true
+    }
+
+    // MARK: - AirPrint Native Bridge
+    private func setupAirPrintBridge() {
+        guard let webView = self.getWebView() else {
+            // WebView henüz hazır değilse tekrar dene
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { self.setupAirPrintBridge() }
+            return
+        }
+
+        // JS handler ekle
+        webView.configuration.userContentController.add(AirPrintHandler(), name: "airprint")
+
+        // JS'e bridge fonksiyonunu inject et
+        let js = """
+        window._nativeAirPrint = function(html, jobName) {
+            return new Promise(function(resolve, reject) {
+                window._airprintResolve = resolve;
+                window._airprintReject = reject;
+                window.webkit.messageHandlers.airprint.postMessage({html: html, jobName: jobName || 'SkyTrack'});
+            });
+        };
+        console.log('[AirPrint] Native bridge ready');
+        """
+        webView.evaluateJavaScript(js) { _, error in
+            if let error = error {
+                print("[AirPrint] JS inject error: \(error)")
+            } else {
+                print("[AirPrint] Bridge injected successfully")
+            }
+        }
+    }
+
+    private func getWebView() -> WKWebView? {
+        let window = UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap { $0.windows }
+            .first(where: { $0.isKeyWindow })
+        if let bridgeVC = window?.rootViewController as? CAPBridgeViewController {
+            return bridgeVC.bridge?.webView
+        }
+        return nil
     }
 
     func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
@@ -102,4 +151,64 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
     }
 }
 
-// AirPrintPlugin artık ayrı dosyada: AirPrintPlugin.swift + AirPrintPlugin.m
+// MARK: - AirPrint WKScriptMessageHandler
+class AirPrintHandler: NSObject, WKScriptMessageHandler {
+    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        guard let body = message.body as? [String: Any],
+              let html = body["html"] as? String, !html.isEmpty else {
+            resolveJS(message.webView, success: false, error: "html parameter required")
+            return
+        }
+
+        let jobName = body["jobName"] as? String ?? "SkyTrack"
+
+        DispatchQueue.main.async {
+            let printController = UIPrintInteractionController.shared
+            let printInfo = UIPrintInfo(dictionary: nil)
+            printInfo.outputType = .general
+            printInfo.jobName = jobName
+            printController.printInfo = printInfo
+
+            let formatter = UIMarkupTextPrintFormatter(markupText: html)
+            formatter.perPageContentInsets = UIEdgeInsets(top: 20, left: 20, bottom: 20, right: 20)
+            printController.printFormatter = formatter
+
+            let webView = message.webView
+
+            let completion: UIPrintInteractionController.CompletionHandler = { _, completed, printError in
+                if let printError = printError {
+                    self.resolveJS(webView, success: false, error: printError.localizedDescription)
+                } else {
+                    self.resolveJS(webView, success: completed, error: nil)
+                }
+            }
+
+            let keyWindow = UIApplication.shared.connectedScenes
+                .compactMap { $0 as? UIWindowScene }
+                .flatMap { $0.windows }
+                .first(where: { $0.isKeyWindow })
+                ?? UIApplication.shared.connectedScenes
+                    .compactMap { $0 as? UIWindowScene }
+                    .flatMap { $0.windows }
+                    .first
+
+            if let rootView = keyWindow?.rootViewController?.view {
+                printController.present(from: rootView.bounds, in: rootView, animated: true, completionHandler: completion)
+            } else {
+                printController.present(animated: true, completionHandler: completion)
+            }
+        }
+    }
+
+    private func resolveJS(_ webView: WKWebView?, success: Bool, error: String?) {
+        DispatchQueue.main.async {
+            if success {
+                webView?.evaluateJavaScript("window._airprintResolve && window._airprintResolve({completed: true})", completionHandler: nil)
+            } else if let error = error {
+                webView?.evaluateJavaScript("window._airprintReject && window._airprintReject(new Error('\(error)'))", completionHandler: nil)
+            } else {
+                webView?.evaluateJavaScript("window._airprintResolve && window._airprintResolve({completed: false, cancelled: true})", completionHandler: nil)
+            }
+        }
+    }
+}
