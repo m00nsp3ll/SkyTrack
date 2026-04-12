@@ -35,7 +35,8 @@ log() { echo -e "[$(date '+%Y-%m-%d %H:%M:%S')] $1"; }
 log "${YELLOW}SkyTrack Yedekleme Başlıyor...${NC}"
 
 # Load environment variables
-source "$PROJECT_DIR/.env"
+ENV_FILE="$PROJECT_DIR/packages/api/.env"
+source "$ENV_FILE"
 
 # Create local backup directory
 mkdir -p "$BACKUP_PATH"
@@ -48,7 +49,10 @@ log "${GREEN}   ✓ database.sql.gz ($DB_SIZE)${NC}"
 
 # 2. Backup .env + firebase credentials
 log "${YELLOW}2. Yapılandırma yedekleniyor...${NC}"
-cp "$PROJECT_DIR/.env" "$BACKUP_PATH/env.backup"
+cp "$ENV_FILE" "$BACKUP_PATH/api.env.backup"
+if [ -f "$PROJECT_DIR/packages/web/.env.local" ]; then
+    cp "$PROJECT_DIR/packages/web/.env.local" "$BACKUP_PATH/web.env.backup"
+fi
 if [ -f "$PROJECT_DIR/firebase-service-account.json" ]; then
     cp "$PROJECT_DIR/firebase-service-account.json" "$BACKUP_PATH/firebase-service-account.json"
 fi

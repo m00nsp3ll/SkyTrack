@@ -71,7 +71,7 @@ if [ "$CONFIRM" != "evet" ]; then
 fi
 
 # Load environment
-source "$PROJECT_DIR/.env"
+source "$PROJECT_DIR/packages/api/.env"
 
 echo ""
 echo "🔄 SkyTrack Geri Yükleme Başlıyor..."
@@ -91,13 +91,9 @@ else
 fi
 
 # Restore .env if needed
-if [ -f "$BACKUP_PATH/env.backup" ]; then
-    echo -e "${YELLOW}3. .env dosyası kontrol ediliyor...${NC}"
-    if ! diff -q "$PROJECT_DIR/.env" "$BACKUP_PATH/env.backup" > /dev/null 2>&1; then
-        echo -e "${YELLOW}   .env farklı — mevcut .env korunuyor, yedek: $BACKUP_PATH/env.backup${NC}"
-    else
-        echo -e "${GREEN}   ✓ .env aynı${NC}"
-    fi
+if [ -f "$BACKUP_PATH/api.env.backup" ]; then
+    echo -e "${YELLOW}3. .env dosyaları kontrol ediliyor...${NC}"
+    echo -e "${YELLOW}   Mevcut .env korunuyor, yedek: $BACKUP_PATH/api.env.backup${NC}"
 fi
 
 # Restore firebase credentials if missing
