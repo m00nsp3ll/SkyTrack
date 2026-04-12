@@ -529,6 +529,28 @@ ${buildTicket('pilot')}
             </button>
           ))}
         </div>
+
+        {/* AirPrint Test Butonu */}
+        {Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios' && (
+          <button
+            onClick={async () => {
+              try {
+                const testHtml = `<html><body style="font-family:sans-serif;text-align:center;padding:40px;">
+                  <h1 style="font-size:28px;">SkyTrack AirPrint Test</h1>
+                  <p style="font-size:18px;margin-top:20px;">Yazdırma testi başarılı!</p>
+                  <p style="font-size:14px;color:#666;margin-top:10px;">${new Date().toLocaleString('tr-TR')}</p>
+                </body></html>`
+                await AirPrint.print({ html: testHtml, jobName: 'SkyTrack-Test' })
+                alert('Yazdırma başarılı!')
+              } catch (err) {
+                alert('Yazdırma hatası: ' + (err instanceof Error ? err.message : String(err)))
+              }
+            }}
+            className="mt-6 px-6 py-3 bg-sky-600 text-white rounded-xl text-lg font-semibold shadow-md active:scale-95 transition-all flex items-center gap-2"
+          >
+            🖨️ AirPrint Test
+          </button>
+        )}
       </div>
     )
   }
