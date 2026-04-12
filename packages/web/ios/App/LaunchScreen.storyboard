@@ -13,12 +13,9 @@
                         <rect key="frame" x="0.0" y="0.0" width="375" height="812"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                         <subviews>
-                            <!-- Gradient arka plan (tam ekran) -->
-                            <imageView opaque="NO" clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFill" translatesAutoresizingMaskIntoConstraints="NO" id="img-bg">
+                            <imageView opaque="NO" clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFill" image="SkyTrackLogo" translatesAutoresizingMaskIntoConstraints="NO" id="img-bg">
                                 <rect key="frame" x="0" y="0" width="375" height="812"/>
-                                <image name="Splash" width="2732" height="2732"/>
                             </imageView>
-                            <!-- Alt copyright -->
                             <label opaque="NO" userInteractionEnabled="NO" contentMode="center" text="© Coded by Harun S." textAlignment="center" lineBreakMode="middleTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="lbl-bot">
                                 <fontDescription key="fontDescription" type="system" pointSize="15"/>
                                 <color key="textColor" white="1" alpha="0.45" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
@@ -27,12 +24,10 @@
                         </subviews>
                         <color key="backgroundColor" red="0.0549" green="0.6471" blue="0.9137" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
                         <constraints>
-                            <!-- Gradient bg: tam ekran -->
                             <constraint firstItem="img-bg" firstAttribute="leading" secondItem="Ze5-6b-2t3" secondAttribute="leading" id="bg1"/>
                             <constraint firstItem="img-bg" firstAttribute="trailing" secondItem="Ze5-6b-2t3" secondAttribute="trailing" id="bg2"/>
                             <constraint firstItem="img-bg" firstAttribute="top" secondItem="Ze5-6b-2t3" secondAttribute="top" id="bg3"/>
                             <constraint firstItem="img-bg" firstAttribute="bottom" secondItem="Ze5-6b-2t3" secondAttribute="bottom" id="bg4"/>
-                            <!-- Alt yazı: ekranın altından 50pt yukarıda -->
                             <constraint firstItem="lbl-bot" firstAttribute="centerX" secondItem="Ze5-6b-2t3" secondAttribute="centerX" id="c9"/>
                             <constraint firstItem="Ze5-6b-2t3" firstAttribute="bottom" secondItem="lbl-bot" secondAttribute="bottom" constant="50" id="c10"/>
                             <constraint firstItem="lbl-bot" firstAttribute="leading" secondItem="Ze5-6b-2t3" secondAttribute="leading" constant="20" id="c11"/>
@@ -47,6 +42,6 @@
         </scene>
     </scenes>
     <resources>
-        <image name="Splash" width="2732" height="2732"/>
+        <image name="SkyTrackLogo" width="2732" height="2732"/>
     </resources>
 </document>

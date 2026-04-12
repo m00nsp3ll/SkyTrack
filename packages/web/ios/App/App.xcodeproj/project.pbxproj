@@ -20,6 +20,7 @@
 		7DCCC48A2F795FE400BDE297 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 7DCCC4892F795FE400BDE297 /* LaunchScreen.storyboard */; };
 		7DCCC48C2F79654200BDE297 /* SkyTrackLogo.png in Resources */ = {isa = PBXBuildFile; fileRef = 7DCCC48B2F79654200BDE297 /* SkyTrackLogo.png */; };
 		7D0FA2A22F43AB0300BAEADD /* AirPrintPlugin.m in Sources */ = {isa = PBXBuildFile; fileRef = 7D0FA2A12F43AB0200BAEADC /* AirPrintPlugin.m */; };
+		7D0FA2A42F43AB0500BAEADF /* AirPrintPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D0FA2A32F43AB0400BAEADE /* AirPrintPlugin.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -37,6 +38,7 @@
 		7DCCC48B2F79654200BDE297 /* SkyTrackLogo.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = SkyTrackLogo.png; sourceTree = "<group>"; };
 		958DCC722DB07C7200EA8C5F /* debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = debug.xcconfig; path = ../debug.xcconfig; sourceTree = SOURCE_ROOT; };
 		7D0FA2A12F43AB0200BAEADC /* AirPrintPlugin.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AirPrintPlugin.m; sourceTree = "<group>"; };
+		7D0FA2A32F43AB0400BAEADE /* AirPrintPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AirPrintPlugin.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -79,6 +81,7 @@
 				7D0FA1A12F439A0200BAEADB /* App.entitlements */,
 				50379B222058CBB4000EE86E /* capacitor.config.json */,
 				504EC3071FED79650016851F /* AppDelegate.swift */,
+				7D0FA2A32F43AB0400BAEADE /* AirPrintPlugin.swift */,
 				7D0FA2A12F43AB0200BAEADC /* AirPrintPlugin.m */,
 				504EC30B1FED79650016851F /* Main.storyboard */,
 				504EC30E1FED79650016851F /* Assets.xcassets */,
@@ -175,6 +178,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
+				7D0FA2A42F43AB0500BAEADF /* AirPrintPlugin.swift in Sources */,
 				7D0FA2A22F43AB0300BAEADD /* AirPrintPlugin.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
