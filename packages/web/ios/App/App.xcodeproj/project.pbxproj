@@ -18,7 +18,7 @@
 		7D67C25E2F7946E300E7E349 /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = 7D67C25D2F7946E300E7E349 /* FirebaseCore */; };
 		7D67C2602F7946E300E7E349 /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = 7D67C25F2F7946E300E7E349 /* FirebaseMessaging */; };
 		7DCCC48A2F795FE400BDE297 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 7DCCC4892F795FE400BDE297 /* LaunchScreen.storyboard */; };
-		7DCCC48C2F79654200BDE297 /* SkyTrackLogo.png in Resources */ = {isa = PBXBuildFile; fileRef = 7DCCC48B2F79654200BDE297 /* SkyTrackLogo.png */; };
+
 		7D0FA2A22F43AB0300BAEADD /* AirPrintPlugin.m in Sources */ = {isa = PBXBuildFile; fileRef = 7D0FA2A12F43AB0200BAEADC /* AirPrintPlugin.m */; };
 		7D0FA2A42F43AB0500BAEADF /* AirPrintPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D0FA2A32F43AB0400BAEADE /* AirPrintPlugin.swift */; };
 /* End PBXBuildFile section */
@@ -35,7 +35,7 @@
 		7D0FA1A12F439A0200BAEADB /* App.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = App.entitlements; sourceTree = "<group>"; };
 		7D0FA1A22F439AB400BAEADB /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 		7DCCC4892F795FE400BDE297 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
-		7DCCC48B2F79654200BDE297 /* SkyTrackLogo.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = SkyTrackLogo.png; sourceTree = "<group>"; };
+
 		958DCC722DB07C7200EA8C5F /* debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = debug.xcconfig; path = ../debug.xcconfig; sourceTree = SOURCE_ROOT; };
 		7D0FA2A12F43AB0200BAEADC /* AirPrintPlugin.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AirPrintPlugin.m; sourceTree = "<group>"; };
 		7D0FA2A32F43AB0400BAEADE /* AirPrintPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AirPrintPlugin.swift; sourceTree = "<group>"; };
@@ -58,7 +58,7 @@
 		504EC2FB1FED79650016851F = {
 			isa = PBXGroup;
 			children = (
-				7DCCC48B2F79654200BDE297 /* SkyTrackLogo.png */,
+
 				7DCCC4892F795FE400BDE297 /* LaunchScreen.storyboard */,
 				958DCC722DB07C7200EA8C5F /* debug.xcconfig */,
 				504EC3061FED79650016851F /* App */,
@@ -159,7 +159,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				7DCCC48C2F79654200BDE297 /* SkyTrackLogo.png in Resources */,
+
 				50B271D11FEDC1A000F3C39B /* public in Resources */,
 				504EC30F1FED79650016851F /* Assets.xcassets in Resources */,
 				50379B232058CBB4000EE86E /* capacitor.config.json in Resources */,

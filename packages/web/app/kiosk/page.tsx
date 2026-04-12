@@ -379,16 +379,18 @@ ${buildTicket('pilot')}
   }
 
   // Native AirPrint — WKScriptMessageHandler bridge üzerinden
-  const nativeAirPrint = async (res: RegistrationResult) => {
+  // auto=true: daha önce seçilmiş yazıcıya direkt gönder (dialog yok)
+  // auto=false: yazıcı seçme dialog'u göster
+  const nativeAirPrint = async (res: RegistrationResult, auto = false) => {
     try {
       const html = buildPrintHtml(res)
-      // Bridge henüz hazır değilse 3 saniye bekle
       if (typeof window._nativeAirPrint !== 'function') {
         await new Promise(resolve => setTimeout(resolve, 3000))
       }
       await AirPrint.print({
         html,
         jobName: `SkyTrack-${res.customer.displayId}`,
+        auto,
       })
     } catch (err) {
       console.error('[Kiosk] AirPrint hatası:', err)
@@ -441,12 +443,11 @@ ${buildTicket('pilot')}
     }
   }
 
-  const printBothCopies = (res: RegistrationResult) => {
+  const printBothCopies = (res: RegistrationResult, auto = false) => {
     if (typeof window._nativeAirPrint === 'function') {
-      void nativeAirPrint(res)
+      void nativeAirPrint(res, auto)
     } else if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios') {
-      // Bridge henüz hazır değilse biraz bekleyip tekrar dene
-      setTimeout(() => void nativeAirPrint(res), 3000)
+      setTimeout(() => void nativeAirPrint(res, auto), 3000)
     } else {
       browserPrint(res)
     }
@@ -458,7 +459,8 @@ ${buildTicket('pilot')}
   }
 
   const autoPrint = (res: RegistrationResult) => {
-    printBothCopies(res)
+    // auto=true: daha önce seçilmiş yazıcıya direkt gönder
+    printBothCopies(res, true)
   }
 
   const getWaiverText = () => {
