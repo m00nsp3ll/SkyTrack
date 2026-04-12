@@ -377,10 +377,14 @@ ${buildTicket('pilot')}
 </html>`
   }
 
-  // Capacitor iOS — native AirPrint plugin üzerinden yazdır
+  // Native AirPrint — WKScriptMessageHandler bridge üzerinden
   const nativeAirPrint = async (res: RegistrationResult) => {
     try {
       const html = buildPrintHtml(res)
+      // Bridge henüz hazır değilse 3 saniye bekle
+      if (typeof window._nativeAirPrint !== 'function') {
+        await new Promise(resolve => setTimeout(resolve, 3000))
+      }
       await AirPrint.print({
         html,
         jobName: `SkyTrack-${res.customer.displayId}`,
@@ -437,8 +441,11 @@ ${buildTicket('pilot')}
   }
 
   const printBothCopies = (res: RegistrationResult) => {
-    if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios') {
+    if (typeof window._nativeAirPrint === 'function') {
       void nativeAirPrint(res)
+    } else if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios') {
+      // Bridge henüz hazır değilse biraz bekleyip tekrar dene
+      setTimeout(() => void nativeAirPrint(res), 3000)
     } else {
       browserPrint(res)
     }
