@@ -3,5 +3,7 @@
 set "url=%~1"
 :: "skytrack:" prefix'ini kaldır
 set "url=%url:skytrack:=%"
-:: Explorer tam yol ile aç
+:: Forward slash'ı backslash'a çevir
+set "url=%url:/=\%"
+:: Explorer ile aç
 start "" "C:\Windows\explorer.exe" "%url%"

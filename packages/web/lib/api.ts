@@ -336,8 +336,9 @@ export function openNetworkFolder(data: { smbPath?: string; uncPath?: string }) 
   const isWindows = /Windows/.test(ua)
   if (isWindows && data.uncPath) {
     // Windows: skytrack: custom protocol → C:\SkyTrack\skytrack-open.bat → explorer.exe
-    // Kurulum: skytrack-folder-handler.reg + skytrack-open.bat (C:\SkyTrack\)
-    window.location.href = `skytrack:${data.uncPath}`
+    // Backslash → forward slash (URL'de backslash sorun yapar, bat'ta geri çeviriyoruz)
+    const safePath = data.uncPath.replace(/\\/g, '/')
+    window.location.href = `skytrack:${safePath}`
   } else if (data.smbPath) {
     window.open(data.smbPath)
   }
