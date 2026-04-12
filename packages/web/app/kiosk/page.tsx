@@ -340,41 +340,42 @@ export default function KioskPage() {
     }
   }
 
-  // Tek QR yazdırma HTML'i
+  // Tek sayfa, 2 QR alt alta (siyah beyaz)
   const buildPrintHtml = (res: RegistrationResult) => {
     const now = new Date()
     const dateStr = now.toLocaleDateString('tr-TR')
     const timeStr = now.toLocaleTimeString('tr-TR')
     const pilotName = res.pilot?.name || ''
 
+    const ticket = (label: string) => `
+      <div style="text-align:center;padding:6px 0;font-family:-apple-system,Arial,sans-serif;">
+        <div style="font-size:10px;font-weight:bold;margin-bottom:2px;">${label}</div>
+        <img src="${res.qrCode}" alt="QR" style="width:4cm;height:4cm;" />
+        <div style="font-size:16px;font-weight:bold;letter-spacing:2px;">${res.customer.displayId}</div>
+        <div style="font-size:11px;">${res.customer.firstName} ${res.customer.lastName}</div>
+        ${pilotName ? `<div style="font-size:11px;font-weight:bold;">Pilot: ${pilotName}</div>` : ''}
+        <div style="font-size:9px;color:#666;">${dateStr} ${timeStr}</div>
+      </div>`
+
     return `<!DOCTYPE html>
 <html><head><meta charset="utf-8"></head>
-<body style="margin:0;padding:10px;text-align:center;font-family:-apple-system,Arial,sans-serif;">
-  <div><img src="${res.qrCode}" alt="QR" style="width:5cm;height:5cm;" /></div>
-  <div style="font-size:18px;font-weight:bold;letter-spacing:2px;margin-top:4px;">${res.customer.displayId}</div>
-  <div style="font-size:13px;color:#333;">${res.customer.firstName} ${res.customer.lastName}</div>
-  ${pilotName ? `<div style="font-size:13px;font-weight:bold;color:#16a34a;">Pilot: ${pilotName}</div>` : ''}
-  <div style="font-size:10px;color:#888;margin-top:4px;">${dateStr} ${timeStr}</div>
+<body style="margin:0;padding:5px;">
+${ticket('MUSTERI')}
+<div style="border-top:1px dashed #000;margin:2px 10px;"></div>
+${ticket('PILOT')}
 </body></html>`
   }
 
-  // Native AirPrint — 2 kopya yazdırma (art arda)
+  // Native AirPrint
   const nativeAirPrint = async (res: RegistrationResult) => {
     try {
       const html = buildPrintHtml(res)
       if (typeof window._nativeAirPrint !== 'function') {
         await new Promise(resolve => setTimeout(resolve, 3000))
       }
-      // 1. kopya
       await AirPrint.print({
         html,
-        jobName: `SkyTrack-${res.customer.displayId}-1`,
-      })
-      // 2. kopya — 1 saniye bekleyip tekrar yazdır
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      await AirPrint.print({
-        html,
-        jobName: `SkyTrack-${res.customer.displayId}-2`,
+        jobName: `SkyTrack-${res.customer.displayId}`,
       })
     } catch (err) {
       console.error('[Kiosk] AirPrint hatası:', err)
@@ -447,7 +448,7 @@ export default function KioskPage() {
   }
 
   const getWaiverText = () => {
-    return `${tr.waiverFullTitle}\n${tr.waiverIntro}\n${tr.waiverAccept}\n1. ${tr.waiverItem1}\n2. ${tr.waiverItem2}\n3. ${tr.waiverItem3}\n4. ${tr.waiverItem4}\n5. ${tr.waiverItem5}\n6. ${tr.waiverItem6}\n7. ${tr.waiverItem7}\n8. ${tr.waiverItem8}`
+    return `${tr.waiverFullTitle}\n\n${tr.waiverIntro}\n\n${tr.waiverAccept}\n\n1. ${tr.waiverItem1}\n\n2. ${tr.waiverItem2}\n\n3. ${tr.waiverItem3}\n\n4. ${tr.waiverItem4}\n\n5. ${tr.waiverItem5}\n\n6. ${tr.waiverItem6}\n\n7. ${tr.waiverItem7}\n\n8. ${tr.waiverItem8}`
   }
 
   const logoutModal = showLogoutModal ? (
@@ -487,7 +488,7 @@ export default function KioskPage() {
   // ==================== STEP: Language Selection ====================
   if (step === 'language') {
     return (
-      <div className="fixed inset-0 flex flex-col items-center justify-center p-4 bg-gradient-to-br from-sky-50 to-blue-100">
+      <div className="fixed inset-0 flex flex-col items-center justify-center p-4 bg-gradient-to-br from-sky-50 to-blue-100 overflow-hidden" style={{ overscrollBehavior: 'none', touchAction: 'manipulation' }}>
         {logoutModal}
         <div className="mb-6 text-center">
           <img
@@ -552,7 +553,7 @@ export default function KioskPage() {
 
         {/* Scrollable Waiver Content */}
         <div className="flex-1 overflow-y-auto">
-          <div className="px-6 py-3 bg-gray-50 text-xs whitespace-pre-line leading-snug border-b">
+          <div className="p-6 bg-gray-50 text-sm whitespace-pre-line leading-relaxed border-b">
             {getWaiverText()}
           </div>
 
@@ -570,7 +571,7 @@ export default function KioskPage() {
           </div>
 
           {/* Signature */}
-          <div className="px-6 py-3">
+          <div className="p-6">
             <div className="flex items-center justify-between mb-3">
               <p className="text-xl font-bold text-green-700">{tr.signHere} ↓</p>
               <button
@@ -583,8 +584,8 @@ export default function KioskPage() {
               </button>
             </div>
             <div
-              className="border-3 border-dashed border-green-500 rounded-2xl bg-white overflow-hidden"
-              style={{ height: '200px' }}
+              className="border-2 border-dashed border-green-500 rounded-2xl bg-white overflow-hidden"
+              style={{ height: '240px' }}
             >
               <SignatureCanvas
                 ref={signatureRef}
@@ -746,7 +747,7 @@ export default function KioskPage() {
         </button>
       </div>
 
-      <div className="flex-1 flex flex-col items-center justify-center overflow-hidden bg-gradient-to-br from-sky-50 to-blue-50">
+      <div className="flex-1 flex flex-col items-center overflow-hidden bg-gradient-to-br from-sky-50 to-blue-50" style={{ overscrollBehavior: 'none', touchAction: 'manipulation' }}>
       <div className="w-full max-w-xl px-6 py-3 space-y-3">
         {/* Logo */}
         <div className="text-center">
