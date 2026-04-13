@@ -18,6 +18,7 @@ import {
   RefreshCw,
   GripVertical,
   Edit,
+  SkipForward,
 } from 'lucide-react'
 
 interface Pilot {
@@ -25,12 +26,14 @@ interface Pilot {
   name: string
   phone: string
   email?: string
-  status: 'AVAILABLE' | 'ASSIGNED' | 'PICKED_UP' | 'IN_FLIGHT' | 'ON_BREAK' | 'OFF_DUTY'
+  status: 'AVAILABLE' | 'ASSIGNED' | 'PICKED_UP' | 'IN_FLIGHT' | 'ON_BREAK' | 'OFF_DUTY' | 'UNAVAILABLE'
   dailyFlightCount: number
   maxDailyFlights: number
   queuePosition: number
   isActive: boolean
   inQueue: boolean
+  forfeitCount?: number
+  lockedUntilRound?: number | null
   _count?: { flights: number }
 }
 
@@ -41,6 +44,7 @@ const statusConfig = {
   IN_FLIGHT: { label: 'Uçuşta', color: 'bg-blue-500', icon: Plane },
   ON_BREAK: { label: 'Molada', color: 'bg-yellow-500', icon: Coffee },
   OFF_DUTY: { label: 'Mesai Dışı', color: 'bg-gray-500', icon: Moon },
+  UNAVAILABLE: { label: 'Müsait Değil', color: 'bg-orange-500', icon: Moon },
 }
 
 export default function PilotsPage() {
@@ -48,6 +52,22 @@ export default function PilotsPage() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<string>('all')
+  const [forfeitConfirm, setForfeitConfirm] = useState<{ id: string; name: string } | null>(null)
+  const [forfeiting, setForfeiting] = useState(false)
+
+  const handleForfeit = async () => {
+    if (!forfeitConfirm) return
+    setForfeiting(true)
+    try {
+      await pilotsApi.forfeit(forfeitConfirm.id)
+      setForfeitConfirm(null)
+      fetchPilots()
+    } catch (e: any) {
+      alert(e.response?.data?.error?.message || 'Feragat başarısız')
+    } finally {
+      setForfeiting(false)
+    }
+  }
 
   const fetchPilots = async () => {
     try {
@@ -272,12 +292,24 @@ export default function PilotsPage() {
                         </div>
 
                         {/* Actions */}
-                        <Link href={`/admin/pilots/${pilot.id}`}>
-                          <Button variant="outline" size="sm">
-                            <Edit className="h-4 w-4 mr-1" />
-                            Detay
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="border-orange-300 text-orange-700 hover:bg-orange-50"
+                            onClick={() => setForfeitConfirm({ id: pilot.id, name: pilot.name })}
+                            title="Feragat — pilotu kuyruğun sonuna at"
+                          >
+                            <SkipForward className="h-4 w-4 mr-1" />
+                            Feragat
                           </Button>
-                        </Link>
+                          <Link href={`/admin/pilots/${pilot.id}`}>
+                            <Button variant="outline" size="sm">
+                              <Edit className="h-4 w-4 mr-1" />
+                              Detay
+                            </Button>
+                          </Link>
+                        </div>
                       </div>
                     </CardContent>
                   </Card>
@@ -500,6 +532,33 @@ export default function PilotsPage() {
           </Link>
         </CardContent>
       </Card>
+
+      {/* Forfeit Confirmation Modal */}
+      {forfeitConfirm && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+            <h2 className="text-xl font-bold mb-2 text-orange-700">⏭️ Feragat Onayı</h2>
+            <p className="text-gray-700 mb-4">
+              <strong>{forfeitConfirm.name}</strong> pilotunu feragat ettirmek istediğinize emin misiniz?
+            </p>
+            <p className="text-sm text-muted-foreground mb-4">
+              Pilot kuyruğun en sonuna gönderilir ve <strong>1 tam tur sonrasına</strong> kadar sıraya giremez.
+            </p>
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" onClick={() => setForfeitConfirm(null)} disabled={forfeiting}>
+                İptal
+              </Button>
+              <Button
+                className="bg-orange-600 hover:bg-orange-700"
+                onClick={handleForfeit}
+                disabled={forfeiting}
+              >
+                {forfeiting ? 'İşleniyor...' : 'Evet, Feragat Et'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

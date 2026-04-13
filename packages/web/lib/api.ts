@@ -109,6 +109,8 @@ export const pilotsApi = {
     api.patch(`/pilots/${id}/status`, { status }),
   toggleQueue: (id: string) =>
     api.patch(`/pilots/${id}/queue-toggle`),
+  forfeit: (id: string) => api.post(`/pilots/${id}/forfeit`),
+  forfeitMe: () => api.post('/pilots/me/forfeit'),
 }
 
 // FCM / Notification API
@@ -142,8 +144,8 @@ export const flightsApi = {
     api.patch(`/flights/${id}/status`, { status, notes }),
   addNotes: (id: string, notes: string) =>
     api.post(`/flights/${id}/notes`, { notes }),
-  cancel: (id: string, reason?: string) =>
-    api.post(`/flights/${id}/cancel`, { reason }),
+  cancel: (id: string, reason?: 'WEATHER' | 'CUSTOMER_CANCEL' | 'OTHER' | string, note?: string) =>
+    api.post(`/flights/${id}/cancel`, { reason, note }),
   bulkCancel: (reason?: string) =>
     api.post('/flights/bulk-cancel', { reason }),
   reassign: (id: string, pilotId: string) =>

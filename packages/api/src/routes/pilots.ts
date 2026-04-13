@@ -542,7 +542,7 @@ router.patch('/:id/status', authenticate, asyncHandler(async (req: AuthRequest, 
     throw new AppError('Sadece kendi durumunuzu değiştirebilirsiniz', 403, 'FORBIDDEN');
   }
 
-  const validStatuses: PilotStatus[] = ['AVAILABLE', 'IN_FLIGHT', 'ON_BREAK', 'OFF_DUTY'];
+  const validStatuses: PilotStatus[] = ['AVAILABLE', 'IN_FLIGHT', 'ON_BREAK', 'OFF_DUTY', 'UNAVAILABLE'];
 
   if (!status || !validStatuses.includes(status)) {
     throw new AppError('Geçersiz durum', 400, 'INVALID_STATUS');
@@ -553,6 +553,8 @@ router.patch('/:id/status', authenticate, asyncHandler(async (req: AuthRequest, 
     throw new AppError('Bu durum uçuş sırasında otomatik ayarlanır', 400, 'INVALID_STATUS_CHANGE');
   }
 
+  // UNAVAILABLE → AVAILABLE geçişinde queue position korunur (preserveQueuePosition flight'lar için)
+  // Bu zaten queuePosition'ı değiştirmediğimiz için doğal olarak korunuyor
   const pilot = await prisma.pilot.update({
     where: { id },
     data: { status },
@@ -573,6 +575,71 @@ router.patch('/:id/status', authenticate, asyncHandler(async (req: AuthRequest, 
     success: true,
     data: pilot,
   });
+}));
+
+// POST /api/pilots/:id/forfeit - Pilot feragat (admin)
+// Pilot kuyruğun en sonuna gönderilir, lockedUntilRound = currentRound + 1
+router.post('/:id/forfeit', authenticate, requireRole('ADMIN'), asyncHandler(async (req: AuthRequest, res: any) => {
+  const { id } = req.params;
+
+  const pilot = await prisma.pilot.findUnique({ where: { id } });
+  if (!pilot) throw new AppError('Pilot bulunamadı', 404, 'PILOT_NOT_FOUND');
+
+  // Aktif bir uçuşu varsa feragat olmaz
+  const activeFlight = await prisma.flight.findFirst({
+    where: { pilotId: id, status: { in: ['ASSIGNED', 'PICKED_UP', 'IN_FLIGHT'] } },
+  });
+  if (activeFlight) {
+    throw new AppError('Aktif uçuşu olan pilot feragat edemez. Önce uçuşu iptal edin.', 400, 'PILOT_HAS_ACTIVE_FLIGHT');
+  }
+
+  const { forfeitPilot } = await import('../services/roundCounter.js');
+  await forfeitPilot(id);
+
+  await cache.pilotQueue.invalidate();
+  await cache.pilot.invalidate(id);
+
+  const io = req.app.get('io');
+  if (io) io.emit('pilot:queue-updated');
+
+  // FCM bildirimi
+  try {
+    const { sendNativeToPilot } = await import('../services/firebaseNotification.js');
+    sendNativeToPilot(id, {
+      title: '⏭️ Sıranız Feragat Edildi',
+      body: '1 tam tur sonra sıraya tekrar dahil olacaksınız.',
+      data: { type: 'pilot_forfeited' },
+    }).catch(() => {});
+  } catch {}
+
+  res.json({ success: true, message: 'Pilot feragat etti' });
+}));
+
+// POST /api/pilots/me/forfeit - Pilot kendisi feragat eder
+router.post('/me/forfeit', authenticate, asyncHandler(async (req: AuthRequest, res: any) => {
+  if (!req.user?.pilotId) {
+    throw new AppError('Sadece pilotlar feragat edebilir', 403, 'NOT_PILOT');
+  }
+  const pilotId = req.user.pilotId;
+
+  // Aktif uçuş kontrolü
+  const activeFlight = await prisma.flight.findFirst({
+    where: { pilotId, status: { in: ['ASSIGNED', 'PICKED_UP', 'IN_FLIGHT'] } },
+  });
+  if (activeFlight) {
+    throw new AppError('Aktif uçuşu olan pilot feragat edemez', 400, 'PILOT_HAS_ACTIVE_FLIGHT');
+  }
+
+  const { forfeitPilot } = await import('../services/roundCounter.js');
+  await forfeitPilot(pilotId);
+
+  await cache.pilotQueue.invalidate();
+  await cache.pilot.invalidate(pilotId);
+
+  const io = req.app.get('io');
+  if (io) io.emit('pilot:queue-updated');
+
+  res.json({ success: true, message: 'Feragat ettiniz' });
 }));
 
 // DELETE /api/pilots/:id - Delete pilot (admin only)

@@ -45,6 +45,7 @@ export const pilotQueueService = {
     const pilot = await prisma.pilot.findFirst({
       where: {
         isActive: true,
+        inQueue: true, // Sıradan çıkarılan pilotlar atanmaz
         status: 'AVAILABLE',
         dailyFlightCount: { lt: prisma.pilot.fields.maxDailyFlights },
       },
@@ -207,6 +208,14 @@ export const pilotQueueService = {
 
       return flight;
     });
+
+    // Round counter — atama yapıldı, tur ilerlesin
+    try {
+      const { recordAssignment } = await import('./roundCounter.js');
+      await recordAssignment();
+    } catch (e) {
+      console.error('Round counter error:', e);
+    }
 
     // Invalidate cache
     await cache.pilotQueue.invalidate();

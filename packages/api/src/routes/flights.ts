@@ -390,9 +390,12 @@ router.get('/:id', authenticate, asyncHandler(async (req: AuthRequest, res: any)
 }));
 
 // POST /api/flights/:id/cancel - Cancel a flight
+// Body: { reason: 'WEATHER' | 'CUSTOMER_CANCEL' | 'OTHER', note?: string }
+// WEATHER ve CUSTOMER_CANCEL: pilot UNAVAILABLE'a düşer, queue position korunur
+// OTHER: feragat mantığı (en arkaya gider, lockedUntilRound = currentRound + 1)
 router.post('/:id/cancel', authenticate, asyncHandler(async (req: AuthRequest, res: any) => {
   const { id } = req.params;
-  const { reason } = req.body;
+  const { reason, note } = req.body;
 
   const flight = await prisma.flight.findUnique({
     where: { id },
@@ -403,36 +406,52 @@ router.post('/:id/cancel', authenticate, asyncHandler(async (req: AuthRequest, r
     throw new AppError('Uçuş bulunamadı', 404, 'FLIGHT_NOT_FOUND');
   }
 
-  // Cannot cancel completed flights
   if (flight.status === 'COMPLETED') {
     throw new AppError('Tamamlanmış uçuş iptal edilemez', 400, 'CANNOT_CANCEL_COMPLETED');
   }
-
   if (flight.status === 'CANCELLED') {
     throw new AppError('Uçuş zaten iptal edilmiş', 400, 'ALREADY_CANCELLED');
   }
 
-  // Transaction to update flight, pilot, and customer
+  // Reason validation (eski API uyumluluğu için reason yoksa OTHER)
+  const cancelReason = reason && ['WEATHER', 'CUSTOMER_CANCEL', 'OTHER'].includes(reason)
+    ? reason
+    : 'OTHER';
+
+  // İlk iki neden: queue position korunur (pilot UNAVAILABLE'a düşer, sonra AVAILABLE olunca aynı pozisyonda)
+  const preserveQueue = cancelReason === 'WEATHER' || cancelReason === 'CUSTOMER_CANCEL';
+
   const updatedFlight = await prisma.$transaction(async (tx) => {
-    // Update flight
     const updated = await tx.flight.update({
       where: { id },
       data: {
         status: 'CANCELLED',
-        notes: reason ? `İptal nedeni: ${reason}` : flight.notes,
+        cancellationReason: cancelReason,
+        cancellationNote: note || null,
+        preserveQueuePosition: preserveQueue,
+        notes: note ? `İptal: ${cancelReason} - ${note}` : `İptal: ${cancelReason}`,
       },
       include: { customer: true, pilot: true },
     });
 
-    // If pilot was in flight, set back to available
-    if (flight.status === 'IN_FLIGHT') {
+    // Pilot status değişimi
+    if (preserveQueue) {
+      // Kötü hava / müşteri iptal: pilot UNAVAILABLE'a geçer, dailyFlightCount geri al
       await tx.pilot.update({
         where: { id: flight.pilotId },
-        data: { status: 'AVAILABLE' },
+        data: {
+          status: 'UNAVAILABLE',
+          dailyFlightCount: { decrement: 1 },
+        },
+      });
+    } else {
+      // Diğer (forfeit): AVAILABLE'a döndür ama feragat mantığı tetiklenir
+      await tx.pilot.update({
+        where: { id: flight.pilotId },
+        data: { status: 'AVAILABLE', dailyFlightCount: { decrement: 1 } },
       });
     }
 
-    // Update customer status
     await tx.customer.update({
       where: { id: flight.customerId },
       data: { status: 'CANCELLED' },
@@ -440,6 +459,16 @@ router.post('/:id/cancel', authenticate, asyncHandler(async (req: AuthRequest, r
 
     return updated;
   });
+
+  // Eğer "Diğer" sebebiyse forfeit logic uygula
+  if (!preserveQueue) {
+    try {
+      const { forfeitPilot } = await import('../services/roundCounter.js');
+      await forfeitPilot(flight.pilotId);
+    } catch (e) {
+      console.error('Forfeit (cancel-other) error:', e);
+    }
+  }
 
   // Invalidate caches
   await cache.pilotQueue.invalidate();

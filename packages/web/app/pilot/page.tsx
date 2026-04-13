@@ -113,6 +113,14 @@ export default function PilotPanel() {
   const [flightHistoryTo, setFlightHistoryTo] = useState('')
   const [flightHistoryCount, setFlightHistoryCount] = useState<number | null>(null)
   const [loadingHistory, setLoadingHistory] = useState(false)
+  // Cancel modal state
+  const [cancelModal, setCancelModal] = useState<{ flightId: string; customerName: string } | null>(null)
+  const [cancelReason, setCancelReason] = useState<'WEATHER' | 'CUSTOMER_CANCEL' | 'OTHER'>('WEATHER')
+  const [cancelNote, setCancelNote] = useState('')
+  const [cancelling, setCancelling] = useState(false)
+  // Forfeit modal
+  const [forfeitModal, setForfeitModal] = useState(false)
+  const [forfeiting, setForfeiting] = useState(false)
 
   // WebSocket: bağlantıyı user bekleme — token varsa hemen bağlan
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
@@ -364,6 +372,35 @@ export default function PilotPanel() {
       setError(err.response?.data?.message || 'İşlem başarısız')
     } finally {
       setUpdating(null)
+    }
+  }
+
+  const handleCancelFlight = async () => {
+    if (!cancelModal) return
+    setCancelling(true)
+    try {
+      await flightsApi.cancel(cancelModal.flightId, cancelReason, cancelReason === 'OTHER' ? cancelNote : undefined)
+      setCancelModal(null)
+      setCancelReason('WEATHER')
+      setCancelNote('')
+      if (user) await fetchPanelData(user.pilotId)
+    } catch (err: any) {
+      setError(err.response?.data?.error?.message || 'İptal başarısız')
+    } finally {
+      setCancelling(false)
+    }
+  }
+
+  const handleForfeit = async () => {
+    setForfeiting(true)
+    try {
+      await pilotsApi.forfeitMe()
+      setForfeitModal(false)
+      if (user) await fetchPanelData(user.pilotId)
+    } catch (err: any) {
+      setError(err.response?.data?.error?.message || 'Feragat başarısız')
+    } finally {
+      setForfeiting(false)
     }
   }
 
@@ -619,21 +656,32 @@ export default function PilotPanel() {
                         )}
 
                         {flight.status === 'PICKED_UP' && (
-                          <Button
-                            size="lg"
-                            className="w-full h-14 text-lg bg-blue-500 hover:bg-blue-600"
-                            onClick={() => handleFlightAction(flight.id, 'IN_FLIGHT')}
-                            disabled={updating === flight.id}
-                          >
-                            {updating === flight.id ? (
-                              <RefreshCw className="h-5 w-5 animate-spin" />
-                            ) : (
-                              <>
-                                <Plane className="h-5 w-5 mr-2" />
-                                Uçuşa Başladım
-                              </>
-                            )}
-                          </Button>
+                          <>
+                            <Button
+                              size="lg"
+                              className="w-full h-14 text-lg bg-blue-500 hover:bg-blue-600"
+                              onClick={() => handleFlightAction(flight.id, 'IN_FLIGHT')}
+                              disabled={updating === flight.id}
+                            >
+                              {updating === flight.id ? (
+                                <RefreshCw className="h-5 w-5 animate-spin" />
+                              ) : (
+                                <>
+                                  <Plane className="h-5 w-5 mr-2" />
+                                  Uçuşa Başladım
+                                </>
+                              )}
+                            </Button>
+                            <Button
+                              size="lg"
+                              variant="outline"
+                              className="w-full h-12 text-base border-red-300 text-red-700 hover:bg-red-50"
+                              onClick={() => setCancelModal({ flightId: flight.id, customerName: `${customer.firstName} ${customer.lastName}` })}
+                            >
+                              <X className="h-5 w-5 mr-2" />
+                              Uçuş İptal
+                            </Button>
+                          </>
                         )}
 
                         {flight.status === 'IN_FLIGHT' && (
@@ -782,6 +830,20 @@ export default function PilotPanel() {
                   <p className="text-xs text-muted-foreground mt-2">
                     Uçuştayken durum değiştiremezsiniz
                   </p>
+                )}
+
+                {/* Feragat Butonu */}
+                {pilot?.status !== 'IN_FLIGHT' && pilot?.status !== 'PICKED_UP' && pilot?.status !== 'ASSIGNED' && (
+                  <Button
+                    variant="outline"
+                    className="w-full mt-3 border-orange-300 text-orange-700 hover:bg-orange-50 h-11"
+                    onClick={() => {
+                      setForfeitModal(true)
+                      setShowProfileSidebar(false)
+                    }}
+                  >
+                    ⏭️ Feragat Et
+                  </Button>
                 )}
               </div>
 
@@ -1223,6 +1285,88 @@ export default function PilotPanel() {
             </div>
           </div>
         </>
+      )}
+
+      {/* Cancel Flight Modal */}
+      {cancelModal && (
+        <div className="fixed inset-0 z-[100] bg-black/60 flex items-end sm:items-center justify-center p-4">
+          <div className="bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl w-full max-w-md p-6">
+            <h2 className="text-xl font-bold mb-1 text-red-700">Uçuş İptal</h2>
+            <p className="text-sm text-muted-foreground mb-4">{cancelModal.customerName}</p>
+
+            <div className="space-y-2 mb-4">
+              <p className="text-sm font-medium">İptal Nedeni:</p>
+              {[
+                { value: 'WEATHER', label: '🌧️ Kötü Hava', desc: 'Sıranız korunur' },
+                { value: 'CUSTOMER_CANCEL', label: '👤 Müşteri İptal Etti', desc: 'Sıranız korunur' },
+                { value: 'OTHER', label: '⚠️ Diğer', desc: '1 tur sonrasına atılır (feragat)' },
+              ].map(opt => (
+                <button
+                  key={opt.value}
+                  onClick={() => setCancelReason(opt.value as any)}
+                  className={`w-full text-left p-3 rounded-xl border-2 transition-all ${
+                    cancelReason === opt.value
+                      ? 'border-red-500 bg-red-50'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <div className="font-medium">{opt.label}</div>
+                  <div className="text-xs text-muted-foreground">{opt.desc}</div>
+                </button>
+              ))}
+            </div>
+
+            {cancelReason === 'OTHER' && (
+              <div className="mb-4">
+                <label className="text-sm font-medium">Açıklama (opsiyonel)</label>
+                <textarea
+                  value={cancelNote}
+                  onChange={e => setCancelNote(e.target.value)}
+                  placeholder="Neden iptal ettiğinizi yazın..."
+                  className="w-full mt-1 p-2 border rounded-lg text-sm"
+                  rows={2}
+                />
+              </div>
+            )}
+
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1" onClick={() => setCancelModal(null)} disabled={cancelling}>
+                Vazgeç
+              </Button>
+              <Button
+                className="flex-1 bg-red-600 hover:bg-red-700"
+                onClick={handleCancelFlight}
+                disabled={cancelling}
+              >
+                {cancelling ? 'İptal Ediliyor...' : 'Uçuşu İptal Et'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Forfeit Modal */}
+      {forfeitModal && (
+        <div className="fixed inset-0 z-[100] bg-black/60 flex items-end sm:items-center justify-center p-4">
+          <div className="bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl w-full max-w-md p-6">
+            <h2 className="text-xl font-bold mb-1 text-orange-700">⏭️ Feragat Et</h2>
+            <p className="text-sm text-muted-foreground mb-4">
+              Sıranızı feragat etmek istediğinize emin misiniz? <strong>1 tam tur sonrasına</strong> atılırsınız ve sıraya tekrar dahil olana kadar müşteri almazsınız.
+            </p>
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1" onClick={() => setForfeitModal(false)} disabled={forfeiting}>
+                Vazgeç
+              </Button>
+              <Button
+                className="flex-1 bg-orange-600 hover:bg-orange-700"
+                onClick={handleForfeit}
+                disabled={forfeiting}
+              >
+                {forfeiting ? 'İşleniyor...' : 'Evet, Feragat Et'}
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
