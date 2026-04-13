@@ -226,7 +226,7 @@ export async function getSwappablePilots(excludePilotId: string) {
     },
     include: {
       pilot: { select: { id: true, name: true } },
-      customer: { select: { displayId: true, firstName: true, lastName: true } },
+      customer: { select: { displayId: true, firstName: true, lastName: true, weight: true } },
     },
   });
 }

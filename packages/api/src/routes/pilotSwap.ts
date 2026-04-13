@@ -25,7 +25,12 @@ router.post('/:id/approve', authenticate, asyncHandler(async (req: AuthRequest, 
   try {
     const result = await swapService.approveSwap(req.params.id, req.user.pilotId);
     const io = req.app.get('io');
-    if (io) io.emit('pilot:queue-updated');
+    if (io) {
+      io.emit('pilot:queue-updated');
+      // İki pilota da anlık bildirim — UI hemen güncellenir
+      io.to(`pilot:${result.requesterPilotId}`).emit('pilot:swap-completed', { swapId: result.id });
+      io.to(`pilot:${result.targetPilotId}`).emit('pilot:swap-completed', { swapId: result.id });
+    }
     res.json({ success: true, data: result, message: 'Değişim onaylandı' });
   } catch (e: any) {
     throw new AppError(e.message, 400, 'SWAP_APPROVE_FAILED');

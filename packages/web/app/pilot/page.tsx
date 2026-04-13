@@ -327,6 +327,15 @@ export default function PilotPanel() {
     // Queue reorder veya toggle → anlık güncelle
     const unsubQueueUpdated = on(SOCKET_EVENTS.PILOT_QUEUE_UPDATED, () => {
       fetchQueueList()
+      // Panel datasını da güncelle (swap sonrası müşteri değişmiş olabilir)
+      if (user?.pilotId) fetchPanelData(user.pilotId)
+    })
+
+    // Pilot Swap tamamlandı (onaylandı) → anlık güncelle
+    const unsubSwapCompleted = on('pilot:swap-completed' as any, () => {
+      if (user?.pilotId) fetchPanelData(user.pilotId)
+      setPendingSwap(null)
+      setSwapModal(null)
     })
 
     // Queue'yu her 30sn yenile
@@ -342,6 +351,7 @@ export default function PilotPanel() {
       unsubLimitReached()
       unsubStatusChanged()
       unsubQueueUpdated()
+      unsubSwapCompleted()
       clearInterval(queueInterval)
     }
   }, [user?.pilotId, on, fetchPanelData, fetchQueueList])
@@ -1379,8 +1389,8 @@ export default function PilotPanel() {
 
       {/* Pilot Swap - Hedef Pilot Seç Modal */}
       {swapModal && (
-        <div className="fixed inset-0 z-[100] bg-black/60 flex items-end sm:items-center justify-center p-4">
-          <div className="bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl w-full max-w-md p-6 max-h-[80vh] flex flex-col">
+        <div className="fixed inset-0 z-[100] bg-black/60 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md my-auto p-6 max-h-[90vh] flex flex-col">
             <h2 className="text-xl font-bold mb-1 text-purple-700">🔄 Pilot Değiştir</h2>
             <p className="text-sm text-muted-foreground mb-1">Mevcut müşteri: <strong>{swapModal.customerName}</strong></p>
             <p className="text-xs text-muted-foreground mb-4">Aşağıdaki pilotlardan biriyle müşterileri değiştirebilirsiniz.</p>
@@ -1397,8 +1407,11 @@ export default function PilotPanel() {
                   >
                     <div className="font-bold">{f.pilot.name}</div>
                     <div className="text-sm text-muted-foreground">
-                      Müşteri: {f.customer.firstName} {f.customer.lastName} ({f.customer.displayId})
+                      Yolcu: <strong>{f.customer.firstName} {f.customer.lastName}</strong> ({f.customer.displayId})
                     </div>
+                    {f.customer.weight && (
+                      <div className="text-xs text-blue-600 mt-0.5">⚖️ {f.customer.weight} kg</div>
+                    )}
                   </button>
                 ))}
               </div>
@@ -1434,8 +1447,8 @@ export default function PilotPanel() {
 
       {/* Cancel Flight Modal */}
       {cancelModal && (
-        <div className="fixed inset-0 z-[100] bg-black/60 flex items-end sm:items-center justify-center p-4">
-          <div className="bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl w-full max-w-md p-6">
+        <div className="fixed inset-0 z-[100] bg-black/60 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md my-auto p-6 max-h-[90vh] overflow-y-auto">
             <h2 className="text-xl font-bold mb-1 text-red-700">Uçuş İptal</h2>
             <p className="text-sm text-muted-foreground mb-4">{cancelModal.customerName}</p>
 
@@ -1492,8 +1505,8 @@ export default function PilotPanel() {
 
       {/* Forfeit Modal */}
       {forfeitModal && (
-        <div className="fixed inset-0 z-[100] bg-black/60 flex items-end sm:items-center justify-center p-4">
-          <div className="bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl w-full max-w-md p-6">
+        <div className="fixed inset-0 z-[100] bg-black/60 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md my-auto p-6">
             <h2 className="text-xl font-bold mb-1 text-orange-700">⏭️ Feragat Et</h2>
             <p className="text-sm text-muted-foreground mb-4">
               Sıranızı feragat etmek istediğinize emin misiniz? <strong>1 tam tur sonrasına</strong> atılırsınız ve sıraya tekrar dahil olana kadar müşteri almazsınız.
