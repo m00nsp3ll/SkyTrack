@@ -483,7 +483,7 @@ export default function PilotPanel() {
       if (res.data.data) {
         setPendingSwap(res.data.data)
       } else {
-        setPendingSwap((prev) => (prev ? null : prev))
+        setPendingSwap((prev: any) => (prev ? null : prev))
       }
     } catch {}
   }, [])
