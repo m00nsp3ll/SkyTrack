@@ -50,8 +50,17 @@ interface Flight {
   durationMinutes?: number
   elapsedMinutes?: number
   waitMinutes?: number
+  cancellationReason?: 'WEATHER' | 'CUSTOMER_CANCEL' | 'OTHER' | null
+  cancellationNote?: string | null
+  notes?: string | null
   customer: Customer
   pilot: Pilot
+}
+
+const cancelReasonLabels: Record<string, { label: string; emoji: string; color: string }> = {
+  WEATHER: { label: 'Kötü Hava', emoji: '🌧️', color: 'bg-gray-100 text-gray-700' },
+  CUSTOMER_CANCEL: { label: 'Müşteri İptal', emoji: '👤', color: 'bg-purple-100 text-purple-700' },
+  OTHER: { label: 'Diğer', emoji: '⚠️', color: 'bg-orange-100 text-orange-700' },
 }
 
 interface LiveData {
@@ -471,6 +480,52 @@ export default function LiveFlightsPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Cancelled Flights — iptal edilen uçuşlar ve nedenleri */}
+      {data && data.cancelled && data.cancelled.length > 0 && (
+        <Card className="border-red-200">
+          <CardHeader className="bg-red-50 border-b border-red-200">
+            <CardTitle className="flex items-center gap-2 text-red-700">
+              <XCircle className="h-5 w-5" />
+              İptal Edilen Uçuşlar ({data.cancelled.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-4">
+            <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
+              {data.cancelled.map((flight) => {
+                const reason = flight.cancellationReason ? cancelReasonLabels[flight.cancellationReason] : null
+                return (
+                  <div key={flight.id} className="p-3 bg-red-50 rounded-lg border border-red-100">
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="flex-1 min-w-0">
+                        <Link href={`/admin/customers/${flight.customer.displayId}`}>
+                          <p className="font-bold truncate hover:underline cursor-pointer">{flight.pilot.name}</p>
+                        </Link>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {flight.customer.firstName} {flight.customer.lastName} ({flight.customer.displayId})
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {new Date(flight.createdAt).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                      </div>
+                      {reason && (
+                        <span className={`px-2 py-1 rounded text-xs font-semibold whitespace-nowrap ${reason.color}`}>
+                          {reason.emoji} {reason.label}
+                        </span>
+                      )}
+                    </div>
+                    {flight.cancellationNote && (
+                      <p className="text-sm text-gray-700 italic border-t pt-2 mt-2">
+                        💬 {flight.cancellationNote}
+                      </p>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Pilot Status Grid */}
       <Card>

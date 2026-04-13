@@ -245,7 +245,16 @@ router.get('/live', authenticate, asyncHandler(async (req: AuthRequest, res: any
     where: {
       createdAt: { gte: today },
     },
-    include: {
+    select: {
+      id: true,
+      status: true,
+      createdAt: true,
+      takeoffAt: true,
+      landingAt: true,
+      durationMinutes: true,
+      notes: true,
+      cancellationReason: true,
+      cancellationNote: true,
       customer: {
         select: {
           id: true,
