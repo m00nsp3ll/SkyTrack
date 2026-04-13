@@ -833,7 +833,7 @@ export default function PilotPanel() {
                 )}
 
                 {/* Feragat Butonu */}
-                {pilot?.status !== 'IN_FLIGHT' && pilot?.status !== 'PICKED_UP' && pilot?.status !== 'ASSIGNED' && (
+                {pilot?.status === 'AVAILABLE' && (
                   <Button
                     variant="outline"
                     className="w-full mt-3 border-orange-300 text-orange-700 hover:bg-orange-50 h-11"
