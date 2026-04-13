@@ -142,28 +142,50 @@ export default function TeamsPage() {
                 <p className="text-sm text-muted-foreground italic text-center py-2">Atanmış pilot yok</p>
               ) : (
                 team.pilots.map(pilot => (
-                  <div key={pilot.id} className="flex items-center justify-between p-2 rounded hover:bg-gray-50 group">
-                    <div className="flex items-center gap-2 flex-1">
-                      {pilot.isTeamLeader && <Crown className="h-4 w-4 text-amber-500 flex-shrink-0" />}
+                  <div key={pilot.id} className={`flex items-center justify-between p-2 rounded hover:bg-gray-50 ${pilot.isTeamLeader ? 'bg-amber-50' : ''}`}>
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
                       <span className="text-sm truncate">{pilot.name}</span>
+                      {pilot.isTeamLeader && (
+                        <Badge variant="outline" className="bg-amber-100 text-amber-700 border-amber-300 text-xs flex-shrink-0">
+                          <Crown className="h-3 w-3 mr-1" />Lider
+                        </Badge>
+                      )}
                     </div>
-                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="flex items-center gap-1 flex-shrink-0">
                       <Button
-                        variant="ghost"
+                        variant={pilot.isTeamLeader ? 'default' : 'outline'}
                         size="sm"
                         onClick={() => toggleLeader(pilot.id)}
                         title={pilot.isTeamLeader ? 'Liderliği kaldır' : 'Lider yap'}
-                        className="h-7 px-2"
+                        className={`h-7 px-2 ${pilot.isTeamLeader ? 'bg-amber-500 hover:bg-amber-600 border-amber-500' : ''}`}
                       >
-                        <Crown className={`h-3 w-3 ${pilot.isTeamLeader ? 'text-amber-500' : 'text-gray-400'}`} />
+                        <Crown className={`h-3.5 w-3.5 ${pilot.isTeamLeader ? 'text-white' : 'text-gray-500'}`} />
                       </Button>
                       <Button
-                        variant="ghost"
+                        variant="outline"
                         size="sm"
                         onClick={() => setAssignPilot({ pilotId: pilot.id, pilotName: pilot.name, currentTeamId: team.id })}
                         className="h-7 px-2"
+                        title="Takım değiştir"
                       >
                         <Edit className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={async () => {
+                          if (!confirm(`${pilot.name} takımdan çıkarılsın mı?`)) return
+                          try {
+                            await teamsApi.setPilotTeam(pilot.id, null)
+                            fetchData()
+                          } catch (e: any) {
+                            alert(e.response?.data?.error?.message || 'Çıkarılamadı')
+                          }
+                        }}
+                        className="h-7 px-2 text-red-600 border-red-200 hover:bg-red-50"
+                        title="Takımdan çıkar"
+                      >
+                        <X className="h-3 w-3" />
                       </Button>
                     </div>
                   </div>

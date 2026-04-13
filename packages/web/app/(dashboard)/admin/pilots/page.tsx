@@ -19,6 +19,7 @@ import {
   GripVertical,
   Edit,
   SkipForward,
+  Users,
 } from 'lucide-react'
 
 interface Pilot {
@@ -521,17 +522,21 @@ export default function PilotsPage() {
         )}
       </div>
 
-      {/* Queue Reorder Link */}
-      <Card>
-        <CardContent className="p-4">
-          <Link href="/admin/pilots/queue">
-            <Button variant="outline" className="w-full">
-              <GripVertical className="h-4 w-4 mr-2" />
-              Pilot Sırasını Düzenle
-            </Button>
-          </Link>
-        </CardContent>
-      </Card>
+      {/* Queue Reorder + Team Management Links */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <Link href="/admin/pilots/queue">
+          <Button variant="outline" className="w-full h-14">
+            <GripVertical className="h-4 w-4 mr-2" />
+            Pilot Sırasını Düzenle
+          </Button>
+        </Link>
+        <Link href="/admin/teams">
+          <Button variant="outline" className="w-full h-14 border-purple-300 text-purple-700 hover:bg-purple-50">
+            <Users className="h-4 w-4 mr-2" />
+            Takım Yönetimi
+          </Button>
+        </Link>
+      </div>
 
       {/* Forfeit Confirmation Modal */}
       {forfeitConfirm && (
