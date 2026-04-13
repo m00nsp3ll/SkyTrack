@@ -8,9 +8,26 @@ const prisma = new PrismaClient();
 const SWAP_EXPIRE_SECONDS = 60;
 
 /**
+ * Süresi dolmuş PENDING talepleri EXPIRED olarak işaretle (cleanup)
+ */
+export async function expireOldRequests() {
+  const result = await prisma.pilotSwapRequest.updateMany({
+    where: { status: 'PENDING', expiresAt: { lt: new Date() } },
+    data: { status: 'EXPIRED' },
+  });
+  if (result.count > 0) {
+    console.log(`[Swap] ${result.count} eski PENDING talep EXPIRED yapıldı`);
+  }
+  return result.count;
+}
+
+/**
  * Swap request oluştur — hedef pilota FCM bildirim gönderir
  */
 export async function createSwapRequest(requesterPilotId: string, targetPilotId: string) {
+  // Önce eskimiş PENDING'leri temizle
+  await expireOldRequests();
+
   // Her iki pilotun da PICKED_UP durumunda aktif uçuşu olmalı
   const [requesterFlight, targetFlight] = await Promise.all([
     prisma.flight.findFirst({
@@ -30,11 +47,12 @@ export async function createSwapRequest(requesterPilotId: string, targetPilotId:
     throw new Error('Hedef pilotun PICKED_UP durumunda aktif uçuşu yok');
   }
 
-  // Aynı hedefe PENDING istek var mı kontrol et
+  // Aynı hedefe AKTİF (süresi dolmamış) PENDING istek var mı kontrol et
   const existing = await prisma.pilotSwapRequest.findFirst({
     where: {
       targetPilotId,
       status: 'PENDING',
+      expiresAt: { gt: new Date() },
     },
   });
   if (existing) {

@@ -186,6 +186,16 @@ const protocol = httpsServer ? 'https' : 'http';
   console.log(`🛡️ Rate limiting: ${process.env.RATE_LIMIT_MAX_REQUESTS || 100} req/min`);
 });
 
+// Pilot Swap expire cleanup — her 30 saniyede süresi dolmuş PENDING'leri EXPIRED yap
+setInterval(async () => {
+  try {
+    const { expireOldRequests } = await import('./services/pilotSwap.js');
+    await expireOldRequests();
+  } catch (e: any) {
+    console.error('[Swap Expire Cron] Hata:', e?.message);
+  }
+}, 30000);
+
 // ═══════════════════════════════════════════════════════════════════
 // LAN HTTPS Download Server (port 3080)
 // Self-signed HTTPS — HTTPS→HTTPS yönlendirme Chrome'da çalışır.
