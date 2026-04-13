@@ -21,7 +21,7 @@ import {
 interface Pilot {
   id: string
   name: string
-  status: 'AVAILABLE' | 'ASSIGNED' | 'PICKED_UP' | 'IN_FLIGHT' | 'ON_BREAK' | 'OFF_DUTY'
+  status: 'AVAILABLE' | 'ASSIGNED' | 'PICKED_UP' | 'IN_FLIGHT' | 'ON_BREAK' | 'OFF_DUTY' | 'UNAVAILABLE'
   dailyFlightCount: number
   maxDailyFlights: number
   queuePosition: number
@@ -35,7 +35,8 @@ const statusConfig = {
   IN_FLIGHT: { label: 'Uçuşta', color: 'text-blue-600', icon: Plane },
   ON_BREAK: { label: 'Molada', color: 'text-yellow-600', icon: Coffee },
   OFF_DUTY: { label: 'Mesai Dışı', color: 'text-gray-500', icon: Moon },
-}
+  UNAVAILABLE: { label: 'Müsait Değil', color: 'text-orange-600', icon: Moon },
+} as const
 
 export default function PilotQueuePage() {
   const [pilots, setPilots] = useState<Pilot[]>([])
@@ -205,7 +206,7 @@ export default function PilotQueuePage() {
         <CardContent className="p-0">
           <div className="divide-y">
             {inQueuePilots.map((pilot, index) => {
-              const status = statusConfig[pilot.status]
+              const status = statusConfig[pilot.status] || statusConfig.AVAILABLE
               const StatusIcon = status.icon
               const isAtLimit = pilot.dailyFlightCount >= pilot.maxDailyFlights
               const isDragging = draggedId === pilot.id
@@ -262,7 +263,7 @@ export default function PilotQueuePage() {
             <CardContent className="p-0">
               <div className="divide-y">
                 {outOfQueuePilots.map((pilot) => {
-                  const status = statusConfig[pilot.status]
+                  const status = statusConfig[pilot.status] || statusConfig.AVAILABLE
                   const StatusIcon = status.icon
                   const isAtLimit = pilot.dailyFlightCount >= pilot.maxDailyFlights
                   return (

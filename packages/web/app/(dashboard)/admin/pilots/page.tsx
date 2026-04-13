@@ -235,7 +235,7 @@ export default function PilotsPage() {
             </div>
             <div className="grid gap-3">
               {queuePilots.map((pilot, index) => {
-                const status = statusConfig[pilot.status]
+                const status = statusConfig[pilot.status] || statusConfig.AVAILABLE
                 const StatusIcon = status.icon
                 const isNext = pilot.id === nextPilotId
 
@@ -330,7 +330,7 @@ export default function PilotsPage() {
             </div>
             <div className="grid gap-3">
               {limitReachedPilots.map((pilot) => {
-                const status = statusConfig[pilot.status]
+                const status = statusConfig[pilot.status] || statusConfig.AVAILABLE
                 const StatusIcon = status.icon
                 return (
                   <Card key={pilot.id} className="opacity-75 bg-red-50 border-red-200">
@@ -432,7 +432,7 @@ export default function PilotsPage() {
             </div>
             <div className="grid gap-3">
               {notInQueuePilots.map((pilot) => {
-                const status = statusConfig[pilot.status]
+                const status = statusConfig[pilot.status] || statusConfig.AVAILABLE
                 const StatusIcon = status.icon
                 return (
                   <Card key={pilot.id} className="opacity-60 bg-orange-50 border-orange-200">
@@ -470,7 +470,7 @@ export default function PilotsPage() {
             </div>
             <div className="grid gap-4">
               {inactivePilots.map((pilot) => {
-                const status = statusConfig[pilot.status]
+                const status = statusConfig[pilot.status] || statusConfig.AVAILABLE
                 const StatusIcon = status.icon
 
                 return (

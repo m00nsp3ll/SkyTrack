@@ -64,7 +64,7 @@ interface Flight {
 interface PilotData {
   id: string
   name: string
-  status: 'AVAILABLE' | 'IN_FLIGHT' | 'ON_BREAK' | 'OFF_DUTY'
+  status: 'AVAILABLE' | 'IN_FLIGHT' | 'ON_BREAK' | 'OFF_DUTY' | 'UNAVAILABLE' | 'ASSIGNED' | 'PICKED_UP'
   dailyFlightCount: number
   maxDailyFlights: number
   queuePosition: number
@@ -87,7 +87,10 @@ const statusConfig = {
   IN_FLIGHT: { label: 'Uçuşta', color: 'bg-blue-500', icon: Plane },
   ON_BREAK: { label: 'Molada', color: 'bg-yellow-500', icon: Coffee },
   OFF_DUTY: { label: 'Mesai Dışı', color: 'bg-gray-500', icon: Moon },
-}
+  UNAVAILABLE: { label: 'Müsait Değil', color: 'bg-orange-500', icon: Moon },
+  ASSIGNED: { label: 'Müşteri Atandı', color: 'bg-purple-500', icon: CheckCircle },
+  PICKED_UP: { label: 'Müşteri Alındı', color: 'bg-blue-400', icon: CheckCircle },
+} as const
 
 export default function PilotPanel() {
   const router = useRouter()
@@ -933,7 +936,7 @@ export default function PilotPanel() {
                 )}
 
                 {/* Feragat Butonu */}
-                {pilot?.status === 'AVAILABLE' && (
+                {(pilot?.status === 'AVAILABLE' || pilot?.status === 'UNAVAILABLE' || pilot?.status === 'ON_BREAK') && (
                   <Button
                     variant="outline"
                     className="w-full mt-3 border-orange-300 text-orange-700 hover:bg-orange-50 h-11"
