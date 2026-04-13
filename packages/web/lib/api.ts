@@ -332,6 +332,29 @@ export const reportsApi = {
   getSystem: () => api.get('/reports/system'),
 }
 
+// Pilot Swap API
+export const swapApi = {
+  create: (targetPilotId: string) => api.post('/swap-requests', { targetPilotId }),
+  approve: (id: string) => api.post(`/swap-requests/${id}/approve`),
+  decline: (id: string) => api.post(`/swap-requests/${id}/decline`),
+  getPending: () => api.get('/swap-requests/pending'),
+  getSwappable: () => api.get('/swap-requests/swappable'),
+}
+
+// Teams API
+export const teamsApi = {
+  getAll: () => api.get('/teams'),
+  create: (data: { name: string; color?: string; sortOrder?: number }) =>
+    api.post('/teams', data),
+  update: (id: string, data: { name?: string; color?: string; sortOrder?: number }) =>
+    api.patch(`/teams/${id}`, data),
+  delete: (id: string) => api.delete(`/teams/${id}`),
+  setPilotTeam: (pilotId: string, teamId: string | null) =>
+    api.patch(`/teams/pilots/${pilotId}/team`, { teamId }),
+  toggleLeader: (pilotId: string) =>
+    api.patch(`/teams/pilots/${pilotId}/leader`),
+}
+
 // Settings API (Super Admin için)
 export const settingsApi = {
   get: (key: string) => api.get(`/settings/${key}`),

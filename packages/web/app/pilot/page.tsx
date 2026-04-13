@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { pilotsApi, flightsApi, mediaApi, fcmApi } from '@/lib/api'
+import { pilotsApi, flightsApi, mediaApi, fcmApi, swapApi } from '@/lib/api'
 import { useSocket } from '@/hooks/useSocket'
 import { SOCKET_EVENTS } from '@/lib/socket'
 import { PushNotificationManager } from '@/components/pwa/PushNotificationManager'
@@ -121,6 +121,12 @@ export default function PilotPanel() {
   // Forfeit modal
   const [forfeitModal, setForfeitModal] = useState(false)
   const [forfeiting, setForfeiting] = useState(false)
+  // Pilot Swap modals
+  const [swapModal, setSwapModal] = useState<{ flightId: string; customerName: string } | null>(null)
+  const [swappablePilots, setSwappablePilots] = useState<any[]>([])
+  const [swapRequesting, setSwapRequesting] = useState(false)
+  const [pendingSwap, setPendingSwap] = useState<any | null>(null)
+  const [swapTimeLeft, setSwapTimeLeft] = useState(0)
 
   // WebSocket: bağlantıyı user bekleme — token varsa hemen bağlan
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
@@ -404,6 +410,80 @@ export default function PilotPanel() {
     }
   }
 
+  // Pilot Swap — modal aç ve swap yapılabilir pilotları getir
+  const openSwapModal = async (flightId: string, customerName: string) => {
+    setSwapModal({ flightId, customerName })
+    try {
+      const res = await swapApi.getSwappable()
+      setSwappablePilots(res.data.data || [])
+    } catch (err: any) {
+      setError('Pilot listesi alınamadı')
+    }
+  }
+
+  const requestSwap = async (targetPilotId: string) => {
+    setSwapRequesting(true)
+    try {
+      await swapApi.create(targetPilotId)
+      setSwapModal(null)
+      alert('Değişim talebi gönderildi. Hedef pilotun onayını bekleyin (60 saniye).')
+    } catch (err: any) {
+      alert(err.response?.data?.error?.message || 'Talep gönderilemedi')
+    } finally {
+      setSwapRequesting(false)
+    }
+  }
+
+  const approveSwap = async () => {
+    if (!pendingSwap) return
+    try {
+      await swapApi.approve(pendingSwap.id)
+      setPendingSwap(null)
+      if (user) await fetchPanelData(user.pilotId)
+    } catch (err: any) {
+      alert(err.response?.data?.error?.message || 'Onaylanamadı')
+    }
+  }
+
+  const declineSwap = async () => {
+    if (!pendingSwap) return
+    try {
+      await swapApi.decline(pendingSwap.id)
+      setPendingSwap(null)
+    } catch {}
+  }
+
+  // Bekleyen swap taleplerini polle (FCM ile gelmese bile yakalasın)
+  useEffect(() => {
+    if (!user?.pilotId) return
+    const pollSwap = async () => {
+      try {
+        const res = await swapApi.getPending()
+        if (res.data.data) {
+          setPendingSwap(res.data.data)
+        } else if (pendingSwap) {
+          setPendingSwap(null)
+        }
+      } catch {}
+    }
+    pollSwap()
+    const interval = setInterval(pollSwap, 5000)
+    return () => clearInterval(interval)
+  }, [user?.pilotId])
+
+  // Countdown timer
+  useEffect(() => {
+    if (!pendingSwap) return
+    const calc = () => {
+      const left = Math.max(0, Math.floor((new Date(pendingSwap.expiresAt).getTime() - Date.now()) / 1000))
+      setSwapTimeLeft(left)
+      if (left === 0) setPendingSwap(null)
+    }
+    calc()
+    const interval = setInterval(calc, 1000)
+    return () => clearInterval(interval)
+  }, [pendingSwap])
+
   const handleScanMedia = async (customerId: string) => {
     setScanningMedia(customerId)
     try {
@@ -672,15 +752,25 @@ export default function PilotPanel() {
                                 </>
                               )}
                             </Button>
-                            <Button
-                              size="lg"
-                              variant="outline"
-                              className="w-full h-12 text-base border-red-300 text-red-700 hover:bg-red-50"
-                              onClick={() => setCancelModal({ flightId: flight.id, customerName: `${customer.firstName} ${customer.lastName}` })}
-                            >
-                              <X className="h-5 w-5 mr-2" />
-                              Uçuş İptal
-                            </Button>
+                            <div className="grid grid-cols-2 gap-2">
+                              <Button
+                                size="lg"
+                                variant="outline"
+                                className="h-12 text-sm border-purple-300 text-purple-700 hover:bg-purple-50"
+                                onClick={() => openSwapModal(flight.id, `${customer.firstName} ${customer.lastName}`)}
+                              >
+                                🔄 Pilot Değiştir
+                              </Button>
+                              <Button
+                                size="lg"
+                                variant="outline"
+                                className="h-12 text-sm border-red-300 text-red-700 hover:bg-red-50"
+                                onClick={() => setCancelModal({ flightId: flight.id, customerName: `${customer.firstName} ${customer.lastName}` })}
+                              >
+                                <X className="h-4 w-4 mr-1" />
+                                Uçuş İptal
+                              </Button>
+                            </div>
                           </>
                         )}
 
@@ -1285,6 +1375,61 @@ export default function PilotPanel() {
             </div>
           </div>
         </>
+      )}
+
+      {/* Pilot Swap - Hedef Pilot Seç Modal */}
+      {swapModal && (
+        <div className="fixed inset-0 z-[100] bg-black/60 flex items-end sm:items-center justify-center p-4">
+          <div className="bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl w-full max-w-md p-6 max-h-[80vh] flex flex-col">
+            <h2 className="text-xl font-bold mb-1 text-purple-700">🔄 Pilot Değiştir</h2>
+            <p className="text-sm text-muted-foreground mb-1">Mevcut müşteri: <strong>{swapModal.customerName}</strong></p>
+            <p className="text-xs text-muted-foreground mb-4">Aşağıdaki pilotlardan biriyle müşterileri değiştirebilirsiniz.</p>
+            {swappablePilots.length === 0 ? (
+              <p className="text-center text-muted-foreground py-8">Şu an değişim yapılabilecek pilot yok</p>
+            ) : (
+              <div className="flex-1 overflow-y-auto space-y-2 mb-4">
+                {swappablePilots.map((f: any) => (
+                  <button
+                    key={f.id}
+                    onClick={() => requestSwap(f.pilot.id)}
+                    disabled={swapRequesting}
+                    className="w-full text-left p-3 rounded-xl border-2 border-gray-200 hover:border-purple-400 hover:bg-purple-50 transition-all disabled:opacity-50"
+                  >
+                    <div className="font-bold">{f.pilot.name}</div>
+                    <div className="text-sm text-muted-foreground">
+                      Müşteri: {f.customer.firstName} {f.customer.lastName} ({f.customer.displayId})
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+            <Button variant="outline" onClick={() => setSwapModal(null)}>Vazgeç</Button>
+          </div>
+        </div>
+      )}
+
+      {/* Pilot Swap - Hedef Pilot Onay Modal (gelen istek için) */}
+      {pendingSwap && (
+        <div className="fixed inset-0 z-[110] bg-black/70 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-6">
+            <h2 className="text-xl font-bold mb-1 text-purple-700">🔄 Değişim Talebi</h2>
+            <p className="text-sm text-muted-foreground mb-3">
+              <strong>{pendingSwap.requester?.name || 'Bir pilot'}</strong> müşterisini sizinkiyle değiştirmek istiyor.
+            </p>
+            <div className="text-center bg-purple-50 rounded-xl p-3 mb-4">
+              <p className="text-3xl font-bold text-purple-700">{swapTimeLeft}</p>
+              <p className="text-xs text-muted-foreground">saniye sonra otomatik iptal</p>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1 h-14 text-base border-red-300 text-red-700" onClick={declineSwap}>
+                ❌ Reddet
+              </Button>
+              <Button className="flex-1 h-14 text-base bg-green-600 hover:bg-green-700" onClick={approveSwap}>
+                ✅ Onayla
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Cancel Flight Modal */}
