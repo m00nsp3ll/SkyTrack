@@ -36,7 +36,7 @@ interface Customer {
 interface Pilot {
   id: string
   name: string
-  status: 'AVAILABLE' | 'ASSIGNED' | 'PICKED_UP' | 'IN_FLIGHT' | 'ON_BREAK' | 'OFF_DUTY'
+  status: 'AVAILABLE' | 'ASSIGNED' | 'PICKED_UP' | 'IN_FLIGHT' | 'ON_BREAK' | 'OFF_DUTY' | 'UNAVAILABLE'
   dailyFlightCount: number
   maxDailyFlights: number
 }
@@ -78,7 +78,8 @@ const pilotStatusConfig = {
   IN_FLIGHT: { label: 'Uçuşta', color: 'bg-blue-500', textColor: 'text-blue-600', icon: Plane },
   ON_BREAK: { label: 'Molada', color: 'bg-yellow-500', textColor: 'text-yellow-600', icon: Coffee },
   OFF_DUTY: { label: 'Mesai Dışı', color: 'bg-gray-500', textColor: 'text-gray-500', icon: Moon },
-}
+  UNAVAILABLE: { label: 'Müsait Değil', color: 'bg-orange-500', textColor: 'text-orange-600', icon: Moon },
+} as const
 
 export default function LiveFlightsPage() {
   const [data, setData] = useState<LiveData | null>(null)
@@ -430,7 +431,7 @@ export default function LiveFlightsPage() {
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
             {pilots.map((pilot) => {
-              const status = pilotStatusConfig[pilot.status]
+              const status = pilotStatusConfig[pilot.status] || pilotStatusConfig.AVAILABLE
               const StatusIcon = status.icon
               const isAtLimit = pilot.dailyFlightCount >= pilot.maxDailyFlights
 
