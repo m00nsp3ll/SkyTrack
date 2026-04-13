@@ -8,6 +8,7 @@ datasource db {
 }
 
 enum UserRole {
+  SUPER_ADMIN
   ADMIN
   OFFICE_STAFF
   PILOT
@@ -32,6 +33,19 @@ enum FlightStatus {
   CANCELLED
 }
 
+enum CancelReason {
+  WEATHER
+  CUSTOMER_CANCEL
+  OTHER
+}
+
+enum SwapStatus {
+  PENDING
+  APPROVED
+  DECLINED
+  EXPIRED
+}
+
 enum PaymentStatus {
   PAID
   UNPAID
@@ -51,6 +65,7 @@ enum PilotStatus {
   IN_FLIGHT
   ON_BREAK
   OFF_DUTY
+  UNAVAILABLE
 }
 
 enum Currency {
@@ -90,27 +105,40 @@ model User {
 }
 
 model Pilot {
-  id               String        @id @default(uuid())
+  id               String             @id @default(uuid())
   name             String
   phone            String
   email            String?
-  dailyFlightCount Int           @default(0) @map("daily_flight_count")
-  maxDailyFlights  Int           @default(7) @map("max_daily_flights")
-  isActive         Boolean       @default(true) @map("is_active")
-  inQueue          Boolean       @default(true) @map("in_queue")
-  queuePosition    Int           @map("queue_position")
-  status           PilotStatus   @default(AVAILABLE)
-  appInstalled     Boolean       @default(false) @map("app_installed")
+  dailyFlightCount Int                @default(0) @map("daily_flight_count")
+  maxDailyFlights  Int                @default(7) @map("max_daily_flights")
+  isActive         Boolean            @default(true) @map("is_active")
+  inQueue          Boolean            @default(true) @map("in_queue")
+  queuePosition    Int                @map("queue_position")
+  status           PilotStatus        @default(AVAILABLE)
+  appInstalled     Boolean            @default(false) @map("app_installed")
+  // Feragat (forfeit) sistemi
+  forfeitCount     Int                @default(0) @map("forfeit_count")
+  lastForfeitRound Int?               @map("last_forfeit_round")
+  lockedUntilRound Int?               @map("locked_until_round")
+  // Takım
+  teamId           String?            @map("team_id")
+  team             Team?              @relation(fields: [teamId], references: [id])
+  isTeamLeader     Boolean            @default(false) @map("is_team_leader")
+  // Pilotaj ücreti (null ise global ayar kullanılır)
+  flightFee        Decimal?           @db.Decimal(10, 2) @map("flight_fee")
   user             User?
   customers        Customer[]
   flights          Flight[]
   mediaFolders     MediaFolder[]
-  createdAt        DateTime      @default(now()) @map("created_at")
-  updatedAt        DateTime      @updatedAt @map("updated_at")
+  requesterSwaps   PilotSwapRequest[] @relation("RequesterSwaps")
+  targetSwaps      PilotSwapRequest[] @relation("TargetSwaps")
+  createdAt        DateTime           @default(now()) @map("created_at")
+  updatedAt        DateTime           @updatedAt @map("updated_at")
 
   @@index([status])
   @@index([dailyFlightCount])
   @@index([isActive, status, dailyFlightCount])
+  @@index([teamId])
   @@map("pilots")
 }
 
@@ -149,21 +177,29 @@ model Customer {
 }
 
 model Flight {
-  id              String       @id @default(uuid())
-  customerId      String       @map("customer_id")
-  customer        Customer     @relation(fields: [customerId], references: [id])
-  pilotId         String       @map("pilot_id")
-  pilot           Pilot        @relation(fields: [pilotId], references: [id])
-  status          FlightStatus @default(ASSIGNED)
-  assignedAt      DateTime     @default(now()) @map("assigned_at")
-  pickupAt        DateTime?    @map("pickup_at")
-  takeoffAt       DateTime?    @map("takeoff_at")
-  landingAt       DateTime?    @map("landing_at")
-  durationMinutes Int?         @map("duration_minutes")
-  notes           String?
-  mediaFolder     MediaFolder?
-  createdAt       DateTime     @default(now()) @map("created_at")
-  updatedAt       DateTime     @updatedAt @map("updated_at")
+  id                      String        @id @default(uuid())
+  customerId              String        @map("customer_id")
+  customer                Customer      @relation(fields: [customerId], references: [id])
+  pilotId                 String        @map("pilot_id")
+  pilot                   Pilot         @relation(fields: [pilotId], references: [id])
+  status                  FlightStatus  @default(ASSIGNED)
+  assignedAt              DateTime      @default(now()) @map("assigned_at")
+  pickupAt                DateTime?     @map("pickup_at")
+  takeoffAt               DateTime?     @map("takeoff_at")
+  landingAt               DateTime?     @map("landing_at")
+  durationMinutes         Int?          @map("duration_minutes")
+  notes                   String?
+  // İptal detayları
+  cancellationReason      CancelReason? @map("cancellation_reason")
+  cancellationNote        String?       @map("cancellation_note")
+  preserveQueuePosition   Boolean       @default(false) @map("preserve_queue_position")
+  // Yeniden aktifleştirme
+  reactivatedFromFlightId String?       @map("reactivated_from_flight_id")
+  reactivatedFrom         Flight?       @relation("FlightReactivation", fields: [reactivatedFromFlightId], references: [id])
+  reactivations           Flight[]      @relation("FlightReactivation")
+  mediaFolder             MediaFolder?
+  createdAt               DateTime      @default(now()) @map("created_at")
+  updatedAt               DateTime      @updatedAt @map("updated_at")
 
   @@index([status])
   @@index([pilotId])
@@ -350,4 +386,56 @@ model PilotNotification {
 
   @@index([pilotId, createdAt])
   @@map("pilot_notifications")
+}
+
+// Takım modeli — 8'li pilot grupları
+model Team {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  color     String   @default("#3b82f6")
+  sortOrder Int      @default(0) @map("sort_order")
+  pilots    Pilot[]
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("teams")
+}
+
+// Global kuyruk durumu — tek satırlık singleton
+model QueueState {
+  id                 String   @id @default("singleton")
+  currentRound       Int      @default(0) @map("current_round")
+  assignmentsInRound Int      @default(0) @map("assignments_in_round")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  @@map("queue_state")
+}
+
+// Global ayarlar (pilotaj ücreti vs.)
+model Setting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("settings")
+}
+
+// Pilot Swap Request — müşteri transferi için onay sistemi
+model PilotSwapRequest {
+  id                String     @id @default(uuid())
+  requesterPilotId  String     @map("requester_pilot_id")
+  requester         Pilot      @relation("RequesterSwaps", fields: [requesterPilotId], references: [id])
+  requesterFlightId String     @map("requester_flight_id")
+  targetPilotId     String     @map("target_pilot_id")
+  target            Pilot      @relation("TargetSwaps", fields: [targetPilotId], references: [id])
+  targetFlightId    String     @map("target_flight_id")
+  status            SwapStatus @default(PENDING)
+  createdAt         DateTime   @default(now()) @map("created_at")
+  respondedAt       DateTime?  @map("responded_at")
+  expiresAt         DateTime   @map("expires_at")
+
+  @@index([status])
+  @@index([targetPilotId, status])
+  @@index([requesterPilotId, status])
+  @@map("pilot_swap_requests")
 }
