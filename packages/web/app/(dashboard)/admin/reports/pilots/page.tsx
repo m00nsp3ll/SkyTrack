@@ -14,8 +14,10 @@ import {
   Award,
   AlertTriangle,
   CheckCircle,
+  Settings,
+  Crown,
 } from 'lucide-react'
-import { reportsApi } from '@/lib/api'
+import { reportsApi, settingsApi } from '@/lib/api'
 import {
   BarChart,
   Bar,
@@ -29,7 +31,13 @@ import {
 interface PilotStats {
   id: string
   name: string
+  tur: number
   totalFlights: number
+  flightFee: number
+  earnings: number
+  forfeitCount: number
+  isTeamLeader: boolean
+  team?: { id: string; name: string; color: string } | null
   avgDuration: number
   totalCustomers: number
   avgDailyFlights: string
@@ -46,6 +54,8 @@ interface FairnessData {
 
 interface ReportData {
   pilots: PilotStats[]
+  currentRound: number
+  globalFlightFee: number
   fairness: FairnessData
   dateRange: { from: string; to: string }
 }
@@ -80,6 +90,49 @@ export default function PilotPerformanceReport() {
   const [quickFilter, setQuickFilter] = useState<QuickFilter>('month')
   const [dateFrom, setDateFrom] = useState(() => getQuickDates('month').from)
   const [dateTo, setDateTo] = useState(() => getQuickDates('month').to)
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false)
+  const [editingPilotFee, setEditingPilotFee] = useState<{ id: string; name: string; fee: number } | null>(null)
+  const [editingGlobalFee, setEditingGlobalFee] = useState<number | null>(null)
+  const [feeInput, setFeeInput] = useState('')
+
+  useEffect(() => {
+    try {
+      const userStr = localStorage.getItem('user')
+      if (userStr) {
+        const user = JSON.parse(userStr)
+        setIsSuperAdmin(user.role === 'SUPER_ADMIN')
+      }
+    } catch {}
+  }, [])
+
+  const savePilotFee = async () => {
+    if (!editingPilotFee) return
+    const fee = feeInput === '' ? null : parseFloat(feeInput)
+    try {
+      await settingsApi.setPilotFee(editingPilotFee.id, fee)
+      setEditingPilotFee(null)
+      setFeeInput('')
+      fetchData(dateFrom, dateTo)
+    } catch (e: any) {
+      alert(e.response?.data?.error?.message || 'Pilotaj güncellenemedi')
+    }
+  }
+
+  const saveGlobalFee = async () => {
+    const fee = parseFloat(feeInput)
+    if (isNaN(fee) || fee < 0) {
+      alert('Geçerli bir tutar girin')
+      return
+    }
+    try {
+      await settingsApi.set('flightFee', fee)
+      setEditingGlobalFee(null)
+      setFeeInput('')
+      fetchData(dateFrom, dateTo)
+    } catch (e: any) {
+      alert(e.response?.data?.error?.message || 'Pilotaj güncellenemedi')
+    }
+  }
 
   const fetchData = async (from: string, to: string) => {
     setLoading(true)
@@ -306,6 +359,36 @@ export default function PilotPerformanceReport() {
         </Card>
       </div>
 
+      {/* Tur + Global Pilotaj Bilgisi */}
+      <Card className="bg-gradient-to-r from-blue-50 to-purple-50 border-blue-200">
+        <CardContent className="pt-6 flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-6">
+            <div>
+              <p className="text-xs text-muted-foreground">Mevcut Tur</p>
+              <p className="text-3xl font-bold text-blue-700">{data?.currentRound || 0}</p>
+            </div>
+            <div className="border-l pl-6">
+              <p className="text-xs text-muted-foreground">Global Pilotaj Ücreti</p>
+              <p className="text-3xl font-bold text-green-700">₺{data?.globalFlightFee?.toLocaleString('tr-TR') || '1.000'}</p>
+            </div>
+          </div>
+          {isSuperAdmin && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setFeeInput(String(data?.globalFlightFee || 1000))
+                setEditingGlobalFee(data?.globalFlightFee || 1000)
+              }}
+              className="gap-2"
+            >
+              <Settings className="h-4 w-4" />
+              Pilotajı Belirle
+            </Button>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Pilot Table */}
       <Card>
         <CardHeader>
@@ -321,12 +404,13 @@ export default function PilotPerformanceReport() {
                 <tr className="border-b">
                   <th className="text-left py-3 px-2 font-medium text-sm">#</th>
                   <th className="text-left py-3 px-2 font-medium text-sm">Pilot</th>
+                  <th className="text-center py-3 px-2 font-medium text-sm bg-blue-50">TUR</th>
                   <th className="text-center py-3 px-2 font-medium text-sm">Toplam Uçuş</th>
+                  <th className="text-center py-3 px-2 font-medium text-sm bg-green-50">Pilotaj</th>
+                  <th className="text-center py-3 px-2 font-medium text-sm bg-green-100">Kazanç</th>
+                  <th className="text-center py-3 px-2 font-medium text-sm">Feragat</th>
                   <th className="text-center py-3 px-2 font-medium text-sm">Ort. Süre</th>
-                  <th className="text-center py-3 px-2 font-medium text-sm">Günlük Ort.</th>
-                  <th className="text-center py-3 px-2 font-medium text-sm">Aktif Gün</th>
                   <th className="text-center py-3 px-2 font-medium text-sm">İptal</th>
-                  <th className="text-center py-3 px-2 font-medium text-sm">Performans</th>
                 </tr>
               </thead>
               <tbody>
@@ -339,49 +423,150 @@ export default function PilotPerformanceReport() {
                       {index > 2 && <span className="text-muted-foreground">{index + 1}</span>}
                     </td>
                     <td className="py-3 px-2 font-medium">
-                      <Link
-                        href={`/admin/reports/pilots/${pilot.id}`}
-                        className="text-blue-600 hover:underline"
-                      >
-                        {pilot.name}
-                      </Link>
+                      <div className="flex items-center gap-2">
+                        <Link
+                          href={`/admin/reports/pilots/${pilot.id}`}
+                          className="text-blue-600 hover:underline"
+                        >
+                          {pilot.name}
+                        </Link>
+                        {pilot.isTeamLeader && (
+                          <Crown className="h-4 w-4 text-amber-500" />
+                        )}
+                        {pilot.team && (
+                          <Badge variant="outline" style={{ borderColor: pilot.team.color, color: pilot.team.color }}>
+                            {pilot.team.name}
+                          </Badge>
+                        )}
+                      </div>
+                    </td>
+                    <td className="py-3 px-2 text-center bg-blue-50/40">
+                      <span className="font-bold text-blue-700">{pilot.tur}</span>
                     </td>
                     <td className="py-3 px-2 text-center">
-                      <span className="font-bold text-blue-600">{pilot.totalFlights}</span>
+                      <span className="font-bold text-gray-800">{pilot.totalFlights}</span>
                     </td>
-                    <td className="py-3 px-2 text-center">{pilot.avgDuration} dk</td>
-                    <td className="py-3 px-2 text-center">{pilot.avgDailyFlights}</td>
-                    <td className="py-3 px-2 text-center">{pilot.activeDays}</td>
+                    <td className="py-3 px-2 text-center bg-green-50/40">
+                      <div className="flex items-center justify-center gap-1">
+                        <span>₺{pilot.flightFee.toLocaleString('tr-TR')}</span>
+                        {isSuperAdmin && (
+                          <button
+                            onClick={() => {
+                              setEditingPilotFee({ id: pilot.id, name: pilot.name, fee: pilot.flightFee })
+                              setFeeInput(String(pilot.flightFee))
+                            }}
+                            className="text-blue-600 hover:text-blue-800 ml-1"
+                            title="Pilotaj düzenle"
+                          >
+                            <Settings className="h-3 w-3" />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                    <td className="py-3 px-2 text-center bg-green-100/40 font-bold text-green-700">
+                      ₺{pilot.earnings.toLocaleString('tr-TR')}
+                    </td>
+                    <td className="py-3 px-2 text-center">
+                      {pilot.forfeitCount > 0 ? (
+                        <Badge variant="secondary" className="bg-orange-100 text-orange-800">
+                          {pilot.forfeitCount}
+                        </Badge>
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
+                    </td>
+                    <td className="py-3 px-2 text-center text-sm text-muted-foreground">{pilot.avgDuration} dk</td>
                     <td className="py-3 px-2 text-center">
                       {pilot.cancelledFlights > 0 ? (
                         <Badge variant="destructive">{pilot.cancelledFlights}</Badge>
                       ) : (
-                        <Badge variant="secondary" className="bg-green-100 text-green-800">
-                          0
-                        </Badge>
+                        <span className="text-muted-foreground">-</span>
                       )}
-                    </td>
-                    <td className="py-3 px-2 text-center">
-                      <Badge
-                        variant="secondary"
-                        className={
-                          parseFloat(pilot.performanceScore) >= 5
-                            ? 'bg-green-100 text-green-800'
-                            : parseFloat(pilot.performanceScore) >= 3
-                            ? 'bg-yellow-100 text-yellow-800'
-                            : 'bg-red-100 text-red-800'
-                        }
-                      >
-                        {pilot.performanceScore}
-                      </Badge>
                     </td>
                   </tr>
                 ))}
               </tbody>
+              <tfoot>
+                <tr className="border-t-2 bg-gray-50 font-bold">
+                  <td colSpan={3} className="py-3 px-2 text-right">TOPLAM:</td>
+                  <td className="py-3 px-2 text-center text-blue-700">
+                    {data?.pilots.reduce((sum, p) => sum + p.totalFlights, 0)}
+                  </td>
+                  <td colSpan={1}></td>
+                  <td className="py-3 px-2 text-center text-green-700">
+                    ₺{data?.pilots.reduce((sum, p) => sum + p.earnings, 0).toLocaleString('tr-TR')}
+                  </td>
+                  <td className="py-3 px-2 text-center text-orange-700">
+                    {data?.pilots.reduce((sum, p) => sum + p.forfeitCount, 0)}
+                  </td>
+                  <td colSpan={2}></td>
+                </tr>
+              </tfoot>
             </table>
           </div>
         </CardContent>
       </Card>
+
+      {/* Global Pilotaj Modal */}
+      {editingGlobalFee !== null && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+            <h2 className="text-xl font-bold mb-2">Global Pilotaj Ücretini Belirle</h2>
+            <p className="text-sm text-muted-foreground mb-4">
+              Bu ücret, kendi pilotajı belirlenmemiş tüm pilotlar için varsayılan olarak kullanılır.
+            </p>
+            <div className="space-y-2 mb-4">
+              <label className="text-sm font-medium">Tutar (TL)</label>
+              <Input
+                type="number"
+                value={feeInput}
+                onChange={(e) => setFeeInput(e.target.value)}
+                placeholder="1000"
+                autoFocus
+                className="text-lg"
+              />
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" onClick={() => { setEditingGlobalFee(null); setFeeInput('') }}>
+                İptal
+              </Button>
+              <Button onClick={saveGlobalFee}>Kaydet</Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Pilot Bazlı Pilotaj Modal */}
+      {editingPilotFee && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+            <h2 className="text-xl font-bold mb-1">{editingPilotFee.name}</h2>
+            <p className="text-sm text-muted-foreground mb-4">
+              Pilot bazlı pilotaj ücreti. Boş bırakırsanız global ayar kullanılır.
+            </p>
+            <div className="space-y-2 mb-4">
+              <label className="text-sm font-medium">Tutar (TL)</label>
+              <Input
+                type="number"
+                value={feeInput}
+                onChange={(e) => setFeeInput(e.target.value)}
+                placeholder={`Global: ₺${data?.globalFlightFee || 1000}`}
+                autoFocus
+                className="text-lg"
+              />
+              <p className="text-xs text-muted-foreground">
+                Boş bırakıp kaydedersen global ücret ({`₺${data?.globalFlightFee || 1000}`}) kullanılır.
+              </p>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" onClick={() => { setEditingPilotFee(null); setFeeInput('') }}>
+                İptal
+              </Button>
+              <Button onClick={savePilotFee}>Kaydet</Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Legend */}
       <Card>

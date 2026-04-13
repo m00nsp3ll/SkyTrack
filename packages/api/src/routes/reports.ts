@@ -226,11 +226,23 @@ router.get('/pilots', authenticate, asyncHandler(async (req: AuthRequest, res: a
   const toDate = to ? new Date(to as string) : new Date();
   toDate.setHours(23, 59, 59, 999);
 
+  // Global pilotaj ücreti (TL)
+  const feeSetting = await prisma.setting.findUnique({ where: { key: 'flightFee' } });
+  const globalFlightFee = parseFloat(feeSetting?.value || '1000');
+
+  // Global round counter
+  const queueState = await prisma.queueState.findUnique({ where: { id: 'singleton' } });
+  const currentRound = queueState?.currentRound || 0;
+
   const pilots = await prisma.pilot.findMany({
     where: { isActive: true },
     select: {
       id: true,
       name: true,
+      flightFee: true,
+      forfeitCount: true,
+      isTeamLeader: true,
+      team: { select: { id: true, name: true, color: true } },
       flights: {
         where: { createdAt: { gte: fromDate, lte: toDate } },
         select: {
@@ -252,10 +264,20 @@ router.get('/pilots', authenticate, asyncHandler(async (req: AuthRequest, res: a
       pilot.flights.map(f => f.createdAt.toISOString().split('T')[0])
     ).size;
 
+    // Pilotaj ücreti (pilota özel veya global)
+    const flightFee = pilot.flightFee ? Number(pilot.flightFee) : globalFlightFee;
+    const earnings = completedFlights.length * flightFee;
+
     return {
       id: pilot.id,
       name: pilot.name,
+      tur: currentRound, // Mevcut tur sayısı
       totalFlights: completedFlights.length,
+      flightFee,
+      earnings,
+      forfeitCount: pilot.forfeitCount,
+      isTeamLeader: pilot.isTeamLeader,
+      team: pilot.team,
       avgDuration: completedFlights.length > 0 ? Math.round(totalDuration / completedFlights.length) : 0,
       totalCustomers: pilot.flights.length,
       avgDailyFlights: activeDays > 0 ? (completedFlights.length / activeDays).toFixed(1) : '0',
@@ -277,6 +299,8 @@ router.get('/pilots', authenticate, asyncHandler(async (req: AuthRequest, res: a
     success: true,
     data: {
       pilots: pilotStats.sort((a, b) => b.totalFlights - a.totalFlights),
+      currentRound,
+      globalFlightFee,
       fairness: {
         maxMinDiff: maxFlights - minFlights,
         standardDeviation: stdDev.toFixed(2),

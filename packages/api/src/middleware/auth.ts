@@ -79,12 +79,28 @@ export const requireRole = (...allowedRoles: UserRole[]) => {
       return next(new AppError('Oturum açmanız gerekiyor', 401, 'UNAUTHORIZED'));
     }
 
-    if (!allowedRoles.includes(req.user.role)) {
+    // SUPER_ADMIN her yerde ADMIN yetkisine sahiptir
+    const effectiveRoles = allowedRoles.includes('ADMIN')
+      ? [...allowedRoles, 'SUPER_ADMIN' as UserRole]
+      : allowedRoles;
+
+    if (!effectiveRoles.includes(req.user.role)) {
       return next(new AppError('Bu işlem için yetkiniz yok', 403, 'FORBIDDEN'));
     }
 
     next();
   };
+};
+
+// Sadece SUPER_ADMIN erişebilir (Pilotaj ücreti gibi kritik ayarlar için)
+export const requireSuperAdmin = (req: AuthRequest, res: Response, next: NextFunction) => {
+  if (!req.user) {
+    return next(new AppError('Oturum açmanız gerekiyor', 401, 'UNAUTHORIZED'));
+  }
+  if (req.user.role !== 'SUPER_ADMIN') {
+    return next(new AppError('Bu işlem sadece Süper Admin yetkisi gerektirir', 403, 'SUPER_ADMIN_REQUIRED'));
+  }
+  next();
 };
 
 export const generateToken = (user: { id: string; role: UserRole; pilotId?: string | null; passwordHash?: string }) => {

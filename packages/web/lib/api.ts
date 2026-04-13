@@ -330,6 +330,14 @@ export const reportsApi = {
   getSystem: () => api.get('/reports/system'),
 }
 
+// Settings API (Super Admin için)
+export const settingsApi = {
+  get: (key: string) => api.get(`/settings/${key}`),
+  set: (key: string, value: string | number) => api.patch(`/settings/${key}`, { value }),
+  setPilotFee: (pilotId: string, fee: number | null) =>
+    api.patch(`/settings/pilots/${pilotId}/fee`, { fee }),
+}
+
 // OS algılamalı SMB/UNC klasör açma helper
 export function openNetworkFolder(data: { smbPath?: string; uncPath?: string }) {
   const ua = navigator.userAgent
