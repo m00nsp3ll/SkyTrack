@@ -13,6 +13,11 @@ router.post('/', authenticate, asyncHandler(async (req: AuthRequest, res: any) =
 
   try {
     const swap = await swapService.createSwapRequest(req.user.pilotId, targetPilotId);
+    // Socket.IO ile target pilota anlık bildirim → modal hemen açılsın
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`pilot:${targetPilotId}`).emit('pilot:swap-requested', { swapRequestId: swap.id });
+    }
     res.json({ success: true, data: swap, message: 'Talep gönderildi. 60 saniye içinde yanıtlanmalı.' });
   } catch (e: any) {
     throw new AppError(e.message, 400, 'SWAP_CREATE_FAILED');

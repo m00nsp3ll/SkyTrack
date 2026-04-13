@@ -341,6 +341,15 @@ export default function PilotPanel() {
       setSwapModal(null)
     })
 
+    // Pilot Swap talebi geldi → modal'ı hemen aç
+    const unsubSwapRequested = on('pilot:swap-requested' as any, () => {
+      fetchPendingSwap()
+      // Sesli/titreşimli uyarı
+      try {
+        if ('vibrate' in navigator) navigator.vibrate([200, 100, 200])
+      } catch {}
+    })
+
     // Queue'yu her 30sn yenile
     const queueInterval = setInterval(fetchQueueList, 30000)
     fetchQueueList()
@@ -355,6 +364,7 @@ export default function PilotPanel() {
       unsubStatusChanged()
       unsubQueueUpdated()
       unsubSwapCompleted()
+      unsubSwapRequested()
       clearInterval(queueInterval)
     }
   }, [user?.pilotId, on, fetchPanelData, fetchQueueList])
@@ -466,23 +476,24 @@ export default function PilotPanel() {
     } catch {}
   }
 
-  // Bekleyen swap taleplerini polle (FCM ile gelmese bile yakalasın)
+  // Bekleyen swap taleplerini polle (FCM/socket gelmese bile yakalasın)
+  const fetchPendingSwap = useCallback(async () => {
+    try {
+      const res = await swapApi.getPending()
+      if (res.data.data) {
+        setPendingSwap(res.data.data)
+      } else {
+        setPendingSwap((prev) => (prev ? null : prev))
+      }
+    } catch {}
+  }, [])
+
   useEffect(() => {
     if (!user?.pilotId) return
-    const pollSwap = async () => {
-      try {
-        const res = await swapApi.getPending()
-        if (res.data.data) {
-          setPendingSwap(res.data.data)
-        } else if (pendingSwap) {
-          setPendingSwap(null)
-        }
-      } catch {}
-    }
-    pollSwap()
-    const interval = setInterval(pollSwap, 5000)
+    fetchPendingSwap()
+    const interval = setInterval(fetchPendingSwap, 2000) // 2sn polling
     return () => clearInterval(interval)
-  }, [user?.pilotId])
+  }, [user?.pilotId, fetchPendingSwap])
 
   // Countdown timer
   useEffect(() => {
