@@ -97,6 +97,7 @@ model User {
   sales             Sale[]
   pushSubscriptions PushSubscription[]
   fcmTokens         FcmToken[]
+  pilotPayments     PilotPayment[]
   createdAt         DateTime           @default(now()) @map("created_at")
   updatedAt         DateTime           @updatedAt @map("updated_at")
 
@@ -126,6 +127,12 @@ model Pilot {
   isTeamLeader     Boolean            @default(false) @map("is_team_leader")
   // Pilotaj ücreti (null ise global ayar kullanılır)
   flightFee        Decimal?           @db.Decimal(10, 2) @map("flight_fee")
+  // Per-pilot TUR sayacı (uçtukça veya feragat ettikçe artar)
+  roundCount       Int                @default(0) @map("round_count")
+  // Firma bilgisi
+  companyId        String?            @map("company_id")
+  company          Company?           @relation(fields: [companyId], references: [id])
+  payments         PilotPayment[]
   user             User?
   customers        Customer[]
   flights          Flight[]
@@ -418,6 +425,39 @@ model Setting {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("settings")
+}
+
+// Firma modeli — pilotun bağlı olduğu acente
+model Company {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  color     String   @default("#3b82f6")
+  sortOrder Int      @default(0) @map("sort_order")
+  pilots    Pilot[]
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("companies")
+}
+
+// Pilot ödeme kayıtları — hakediş takibi için
+model PilotPayment {
+  id         String    @id @default(uuid())
+  pilotId    String    @map("pilot_id")
+  pilot      Pilot     @relation(fields: [pilotId], references: [id])
+  amount     Decimal   @db.Decimal(10, 2)
+  note       String?
+  paidById   String    @map("paid_by_id")
+  paidBy     User      @relation(fields: [paidById], references: [id])
+  periodFrom DateTime? @map("period_from")
+  periodTo   DateTime? @map("period_to")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+  deletedAt  DateTime? @map("deleted_at")
+
+  @@index([pilotId, createdAt])
+  @@index([paidById])
+  @@map("pilot_payments")
 }
 
 // Pilot Swap Request — müşteri transferi için onay sistemi
