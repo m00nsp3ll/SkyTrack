@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { teamsApi, pilotsApi } from '@/lib/api'
-import { Users, Plus, Edit, Trash2, Crown, RefreshCw, X } from 'lucide-react'
+import { Users, Plus, Edit, Trash2, Crown, RefreshCw, X, ArrowUp, ArrowDown } from 'lucide-react'
 
 interface Pilot {
   id: string
@@ -96,6 +96,28 @@ export default function TeamsPage() {
     }
   }
 
+  // Takım sırasını değiştir (yukarı/aşağı ok butonlarıyla)
+  const moveTeam = async (teamId: string, direction: 'up' | 'down') => {
+    const sorted = [...teams].sort((a, b) => a.sortOrder - b.sortOrder)
+    const idx = sorted.findIndex(t => t.id === teamId)
+    if (idx === -1) return
+    const newIdx = direction === 'up' ? idx - 1 : idx + 1
+    if (newIdx < 0 || newIdx >= sorted.length) return
+
+    // Swap sortOrder between two teams
+    const a = sorted[idx]
+    const b = sorted[newIdx]
+    try {
+      await Promise.all([
+        teamsApi.update(a.id, { sortOrder: b.sortOrder }),
+        teamsApi.update(b.id, { sortOrder: a.sortOrder }),
+      ])
+      fetchData()
+    } catch (e: any) {
+      alert(e.response?.data?.error?.message || 'Sıra değiştirilemedi')
+    }
+  }
+
   if (loading) return <div className="flex justify-center p-12"><RefreshCw className="h-8 w-8 animate-spin" /></div>
 
   const assignedPilotIds = new Set(teams.flatMap(t => t.pilots.map(p => p.id)))
@@ -118,7 +140,7 @@ export default function TeamsPage() {
 
       {/* Takımlar */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {teams.map(team => (
+        {[...teams].sort((a, b) => a.sortOrder - b.sortOrder).map((team, idx, sorted) => (
           <Card key={team.id} className="border-t-4" style={{ borderTopColor: team.color }}>
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
@@ -127,6 +149,26 @@ export default function TeamsPage() {
                   {team.name}
                 </CardTitle>
                 <div className="flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => moveTeam(team.id, 'up')}
+                    disabled={idx === 0}
+                    title="Yukarı taşı"
+                    className="h-8 px-2"
+                  >
+                    <ArrowUp className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => moveTeam(team.id, 'down')}
+                    disabled={idx === sorted.length - 1}
+                    title="Aşağı taşı"
+                    className="h-8 px-2"
+                  >
+                    <ArrowDown className="h-4 w-4" />
+                  </Button>
                   <Button variant="ghost" size="sm" onClick={() => setEditModal({ id: team.id, name: team.name, color: team.color, sortOrder: team.sortOrder })}>
                     <Edit className="h-4 w-4" />
                   </Button>
@@ -135,7 +177,7 @@ export default function TeamsPage() {
                   </Button>
                 </div>
               </div>
-              <p className="text-xs text-muted-foreground">{team.pilots.length} pilot</p>
+              <p className="text-xs text-muted-foreground">{team.pilots.length} pilot · Sıra #{idx + 1}</p>
             </CardHeader>
             <CardContent className="space-y-1">
               {team.pilots.length === 0 ? (
