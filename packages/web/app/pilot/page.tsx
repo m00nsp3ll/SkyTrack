@@ -1426,13 +1426,39 @@ export default function PilotPanel() {
 
       {/* Pilot Swap - Hedef Pilot Onay Modal (gelen istek için) */}
       {pendingSwap && (
-        <div className="fixed inset-0 z-[110] bg-black/70 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-6">
-            <h2 className="text-xl font-bold mb-1 text-purple-700">🔄 Değişim Talebi</h2>
-            <p className="text-sm text-muted-foreground mb-3">
-              <strong>{pendingSwap.requester?.name || 'Bir pilot'}</strong> müşterisini sizinkiyle değiştirmek istiyor.
-            </p>
-            <div className="text-center bg-purple-50 rounded-xl p-3 mb-4">
+        <div className="fixed inset-0 z-[110] bg-black/70 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md my-auto p-6">
+            <h2 className="text-xl font-bold mb-3 text-purple-700">🔄 Değişim Talebi</h2>
+
+            {/* Sizin Yolcunuz */}
+            {pendingSwap.targetCustomer && (
+              <div className="bg-blue-50 rounded-xl p-3 mb-2">
+                <p className="text-xs text-blue-600 font-medium mb-1">SİZİN YOLCUNUZ</p>
+                <p className="font-bold">{pendingSwap.targetCustomer.firstName} {pendingSwap.targetCustomer.lastName}</p>
+                <p className="text-sm text-muted-foreground">
+                  {pendingSwap.targetCustomer.displayId}
+                  {pendingSwap.targetCustomer.weight && ` · ⚖️ ${pendingSwap.targetCustomer.weight} kg`}
+                </p>
+              </div>
+            )}
+
+            <p className="text-center text-purple-600 text-2xl my-1">⇅</p>
+
+            {/* İsteyen pilotun yolcusu */}
+            {pendingSwap.requesterCustomer && (
+              <div className="bg-orange-50 rounded-xl p-3 mb-3">
+                <p className="text-xs text-orange-600 font-medium mb-1">{pendingSwap.requester?.name?.toUpperCase() || 'PİLOT'}'İN YOLCUSU</p>
+                <p className="font-bold">{pendingSwap.requesterCustomer.firstName} {pendingSwap.requesterCustomer.lastName}</p>
+                <p className="text-sm text-muted-foreground">
+                  {pendingSwap.requesterCustomer.displayId}
+                  {pendingSwap.requesterCustomer.weight && ` · ⚖️ ${pendingSwap.requesterCustomer.weight} kg`}
+                </p>
+              </div>
+            )}
+
+            <p className="text-center text-sm text-gray-700 mb-3">değiştirmek istiyor</p>
+
+            <div className="text-center bg-purple-50 rounded-xl p-2 mb-4">
               <p className="text-3xl font-bold text-purple-700">{swapTimeLeft}</p>
               <p className="text-xs text-muted-foreground">saniye sonra otomatik iptal</p>
             </div>

@@ -204,7 +204,7 @@ export async function declineSwap(swapRequestId: string, decliningPilotId: strin
 
 // PENDING talepleri kontrol et — pilot için bekleyen var mı?
 export async function getPendingSwapForPilot(pilotId: string) {
-  return prisma.pilotSwapRequest.findFirst({
+  const swap = await prisma.pilotSwapRequest.findFirst({
     where: {
       targetPilotId: pilotId,
       status: 'PENDING',
@@ -215,6 +215,25 @@ export async function getPendingSwapForPilot(pilotId: string) {
     },
     orderBy: { createdAt: 'desc' },
   });
+  if (!swap) return null;
+
+  // Her iki flight'ı ve müşteri bilgilerini getir
+  const [requesterFlight, targetFlight] = await Promise.all([
+    prisma.flight.findUnique({
+      where: { id: swap.requesterFlightId },
+      include: { customer: { select: { firstName: true, lastName: true, displayId: true, weight: true } } },
+    }),
+    prisma.flight.findUnique({
+      where: { id: swap.targetFlightId },
+      include: { customer: { select: { firstName: true, lastName: true, displayId: true, weight: true } } },
+    }),
+  ]);
+
+  return {
+    ...swap,
+    requesterCustomer: requesterFlight?.customer || null,
+    targetCustomer: targetFlight?.customer || null,
+  };
 }
 
 // PICKED_UP durumundaki diğer pilotları getir (swap için hedef seçimi)

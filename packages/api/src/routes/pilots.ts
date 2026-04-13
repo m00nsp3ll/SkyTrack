@@ -577,6 +577,34 @@ router.patch('/:id/status', authenticate, asyncHandler(async (req: AuthRequest, 
   });
 }));
 
+// POST /api/pilots/me/forfeit - Pilot kendisi feragat eder
+// ÖNEMLİ: Bu /:id/forfeit'ten önce tanımlanmalı ki route eşleşmesinde öncelik alsın
+router.post('/me/forfeit', authenticate, asyncHandler(async (req: AuthRequest, res: any) => {
+  if (!req.user?.pilotId) {
+    throw new AppError('Sadece pilotlar feragat edebilir', 403, 'NOT_PILOT');
+  }
+  const pilotId = req.user.pilotId;
+
+  // Aktif uçuş kontrolü
+  const activeFlight = await prisma.flight.findFirst({
+    where: { pilotId, status: { in: ['ASSIGNED', 'PICKED_UP', 'IN_FLIGHT'] } },
+  });
+  if (activeFlight) {
+    throw new AppError('Aktif uçuşu olan pilot feragat edemez', 400, 'PILOT_HAS_ACTIVE_FLIGHT');
+  }
+
+  const { forfeitPilot } = await import('../services/roundCounter.js');
+  await forfeitPilot(pilotId);
+
+  await cache.pilotQueue.invalidate();
+  await cache.pilot.invalidate(pilotId);
+
+  const io = req.app.get('io');
+  if (io) io.emit('pilot:queue-updated');
+
+  res.json({ success: true, message: 'Feragat ettiniz' });
+}));
+
 // POST /api/pilots/:id/forfeit - Pilot feragat (admin)
 // Pilot kuyruğun en sonuna gönderilir, lockedUntilRound = currentRound + 1
 router.post('/:id/forfeit', authenticate, requireRole('ADMIN'), asyncHandler(async (req: AuthRequest, res: any) => {
@@ -613,33 +641,6 @@ router.post('/:id/forfeit', authenticate, requireRole('ADMIN'), asyncHandler(asy
   } catch {}
 
   res.json({ success: true, message: 'Pilot feragat etti' });
-}));
-
-// POST /api/pilots/me/forfeit - Pilot kendisi feragat eder
-router.post('/me/forfeit', authenticate, asyncHandler(async (req: AuthRequest, res: any) => {
-  if (!req.user?.pilotId) {
-    throw new AppError('Sadece pilotlar feragat edebilir', 403, 'NOT_PILOT');
-  }
-  const pilotId = req.user.pilotId;
-
-  // Aktif uçuş kontrolü
-  const activeFlight = await prisma.flight.findFirst({
-    where: { pilotId, status: { in: ['ASSIGNED', 'PICKED_UP', 'IN_FLIGHT'] } },
-  });
-  if (activeFlight) {
-    throw new AppError('Aktif uçuşu olan pilot feragat edemez', 400, 'PILOT_HAS_ACTIVE_FLIGHT');
-  }
-
-  const { forfeitPilot } = await import('../services/roundCounter.js');
-  await forfeitPilot(pilotId);
-
-  await cache.pilotQueue.invalidate();
-  await cache.pilot.invalidate(pilotId);
-
-  const io = req.app.get('io');
-  if (io) io.emit('pilot:queue-updated');
-
-  res.json({ success: true, message: 'Feragat ettiniz' });
 }));
 
 // DELETE /api/pilots/:id - Delete pilot (admin only)
