@@ -431,20 +431,29 @@ export default function PilotPerformanceReport() {
               <p className="text-3xl font-bold text-green-700">₺{data?.globalFlightFee?.toLocaleString('tr-TR') || '1.000'}</p>
             </div>
           </div>
-          {isSuperAdmin && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setFeeInput(String(data?.globalFlightFee || 1000))
-                setEditingGlobalFee(data?.globalFlightFee || 1000)
-              }}
-              className="gap-2"
-            >
-              <Settings className="h-4 w-4" />
-              Pilotajı Belirle
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            {isSuperAdmin && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setFeeInput(String(data?.globalFlightFee || 1000))
+                  setEditingGlobalFee(data?.globalFlightFee || 1000)
+                }}
+                className="gap-2"
+              >
+                <Settings className="h-4 w-4" />
+                Pilotajı Belirle
+              </Button>
+            )}
+            {isAdmin && (
+              <Link href="/admin/reports/pilots/payments">
+                <Button variant="outline" size="sm" className="gap-2">
+                  📋 Ödeme Geçmişi
+                </Button>
+              </Link>
+            )}
+          </div>
         </CardContent>
       </Card>
 
@@ -595,15 +604,6 @@ export default function PilotPerformanceReport() {
             </table>
           </div>
 
-          {isAdmin && (
-            <div className="mt-4 flex justify-end">
-              <Link href="/admin/reports/pilots/payments">
-                <Button variant="outline" size="sm" className="gap-2">
-                  📋 Ödeme Geçmişi
-                </Button>
-              </Link>
-            </div>
-          )}
         </CardContent>
       </Card>
 
