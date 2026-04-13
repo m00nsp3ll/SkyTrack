@@ -87,6 +87,26 @@ export default function LiveFlightsPage() {
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date())
   const [showBulkCancel, setShowBulkCancel] = useState(false)
   const [cancelling, setCancelling] = useState(false)
+  const [updatingId, setUpdatingId] = useState<string | null>(null)
+
+  // Manuel admin status değiştirme — uygulaması olmayan pilotlar için
+  const adminUpdateStatus = async (flightId: string, newStatus: string) => {
+    const labels: Record<string, string> = {
+      PICKED_UP: 'Müşteri alındı olarak işaretlensin mi?',
+      IN_FLIGHT: 'Uçuş başlatılsın mı?',
+      COMPLETED: 'Uçuş tamamlandı (güvenli iniş) olarak işaretlensin mi?',
+    }
+    if (!confirm(labels[newStatus] || 'Onaylıyor musunuz?')) return
+    setUpdatingId(flightId)
+    try {
+      await flightsApi.updateStatus(flightId, newStatus)
+      await fetchData()
+    } catch (e: any) {
+      alert(e.response?.data?.error?.message || 'İşlem başarısız')
+    } finally {
+      setUpdatingId(null)
+    }
+  }
 
   const { on, socket } = useSocket({ autoConnect: true, rooms: ['admin'] })
   const isConnected = socket?.connected ?? false
@@ -296,10 +316,10 @@ export default function LiveFlightsPage() {
             ) : (
               <div className="space-y-3">
                 {inFlight.map((flight) => (
-                  <Link key={flight.id} href={`/admin/customers/${flight.customer.displayId}`}>
-                    <Card className="cursor-pointer hover:shadow-md transition-shadow bg-blue-50">
-                      <CardContent className="p-3">
-                        <div className="flex items-start justify-between mb-2">
+                  <Card key={flight.id} className="bg-blue-50">
+                    <CardContent className="p-3">
+                      <Link href={`/admin/customers/${flight.customer.displayId}`}>
+                        <div className="flex items-start justify-between mb-2 cursor-pointer hover:opacity-80">
                           <div>
                             <p className="font-bold text-lg">{flight.pilot.name}</p>
                             <p className="text-sm text-muted-foreground">
@@ -318,9 +338,18 @@ export default function LiveFlightsPage() {
                             <p className="text-xs text-muted-foreground">uçuş süresi</p>
                           </div>
                         </div>
-                      </CardContent>
-                    </Card>
-                  </Link>
+                      </Link>
+                      <Button
+                        size="sm"
+                        className="w-full bg-green-600 hover:bg-green-700"
+                        onClick={(e) => { e.stopPropagation(); adminUpdateStatus(flight.id, 'COMPLETED') }}
+                        disabled={updatingId === flight.id}
+                      >
+                        <CheckCircle className="h-4 w-4 mr-1" />
+                        {updatingId === flight.id ? 'İşleniyor...' : 'Güvenli İniş'}
+                      </Button>
+                    </CardContent>
+                  </Card>
                 ))}
               </div>
             )}
@@ -343,10 +372,10 @@ export default function LiveFlightsPage() {
             ) : (
               <div className="space-y-3">
                 {waiting.map((flight) => (
-                  <Link key={flight.id} href={`/admin/customers/${flight.customer.displayId}`}>
-                    <Card className="cursor-pointer hover:shadow-md transition-shadow bg-yellow-50">
-                      <CardContent className="p-3">
-                        <div className="flex items-start justify-between mb-2">
+                  <Card key={flight.id} className="bg-yellow-50">
+                    <CardContent className="p-3">
+                      <Link href={`/admin/customers/${flight.customer.displayId}`}>
+                        <div className="flex items-start justify-between mb-2 cursor-pointer hover:opacity-80">
                           <div>
                             <p className="font-bold text-lg">{flight.pilot.name}</p>
                             <p className="text-sm text-muted-foreground">
@@ -361,16 +390,39 @@ export default function LiveFlightsPage() {
                             <p className="text-xs text-muted-foreground">bekleme</p>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <span className={`px-1.5 py-0.5 rounded text-xs ${
-                            flight.status === 'PICKED_UP' ? 'bg-yellow-200 text-yellow-700' : 'bg-gray-200 text-gray-700'
-                          }`}>
-                            {flight.status === 'PICKED_UP' ? 'Alındı' : 'Atandı'}
-                          </span>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </Link>
+                      </Link>
+                      <div className="flex items-center justify-between gap-2 mb-2">
+                        <span className={`px-1.5 py-0.5 rounded text-xs ${
+                          flight.status === 'PICKED_UP' ? 'bg-yellow-200 text-yellow-700' : 'bg-gray-200 text-gray-700'
+                        }`}>
+                          {flight.status === 'PICKED_UP' ? 'Alındı' : 'Atandı'}
+                        </span>
+                      </div>
+                      {/* Manuel admin status butonları */}
+                      {flight.status === 'ASSIGNED' && (
+                        <Button
+                          size="sm"
+                          className="w-full bg-yellow-500 hover:bg-yellow-600"
+                          onClick={(e) => { e.stopPropagation(); adminUpdateStatus(flight.id, 'PICKED_UP') }}
+                          disabled={updatingId === flight.id}
+                        >
+                          <User className="h-4 w-4 mr-1" />
+                          {updatingId === flight.id ? 'İşleniyor...' : 'Müşteri Alındı'}
+                        </Button>
+                      )}
+                      {flight.status === 'PICKED_UP' && (
+                        <Button
+                          size="sm"
+                          className="w-full bg-blue-500 hover:bg-blue-600"
+                          onClick={(e) => { e.stopPropagation(); adminUpdateStatus(flight.id, 'IN_FLIGHT') }}
+                          disabled={updatingId === flight.id}
+                        >
+                          <Plane className="h-4 w-4 mr-1" />
+                          {updatingId === flight.id ? 'İşleniyor...' : 'Uçuşa Başla'}
+                        </Button>
+                      )}
+                    </CardContent>
+                  </Card>
                 ))}
               </div>
             )}

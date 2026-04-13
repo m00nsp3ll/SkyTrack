@@ -16,6 +16,7 @@ import {
   Moon,
   UserPlus,
   User,
+  Users,
 } from 'lucide-react'
 
 interface Pilot {
@@ -169,16 +170,24 @@ export default function PilotQueuePage() {
             </p>
           </div>
         </div>
-        {hasChanges && (
-          <Button onClick={handleSave} disabled={saving}>
-            {saving ? (
-              <Loader2 className="h-4 w-4 animate-spin mr-1" />
-            ) : (
-              <Save className="h-4 w-4 mr-1" />
-            )}
-            Kaydet
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          <Link href="/admin/teams">
+            <Button variant="outline" size="sm" className="border-purple-300 text-purple-700 hover:bg-purple-50">
+              <Users className="h-4 w-4 mr-1" />
+              Takım Yönetimi
+            </Button>
+          </Link>
+          {hasChanges && (
+            <Button onClick={handleSave} disabled={saving}>
+              {saving ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-1" />
+              ) : (
+                <Save className="h-4 w-4 mr-1" />
+              )}
+              Kaydet
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Info */}
