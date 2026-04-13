@@ -323,14 +323,28 @@ class QnapService {
       const zipRelPath = `${zipDir}/${zipName}`;
       const zipFullPath = `${this.mediaPath}/${zipRelPath}`;
 
-      // Clean previous + recreate dir (eski zip'i her seferinde yenile, mediaFolder güncellenmiş olabilir)
+      // ZIP zaten varsa yeniden oluşturma (cache) — dosya sayısı değişmediyse mevcut ZIP'i kullan
+      try {
+        const existingSize = await this.execSSH(`stat -c '%s' "${zipFullPath}" 2>/dev/null || echo 0`);
+        const size = parseInt(existingSize.trim()) || 0;
+        if (size > 1000) {
+          // ZIP var ve geçerli, kaynak dosya sayısını karşılaştır
+          const srcCount = await this.execSSH(`find "${this.mediaPath}/${relPath}" -type f ! -name '.DS_Store' ! -name 'Thumbs.db' | wc -l`);
+          const zipCount = await this.execSSH(`/usr/local/sbin/zip -sf "${zipFullPath}" 2>/dev/null | grep -c '.' || echo 0`);
+          const srcN = parseInt(srcCount.trim()) || 0;
+          const zipN = Math.max(0, (parseInt(zipCount.trim()) || 0) - 2); // zip -sf header/footer çıkar
+          if (srcN > 0 && Math.abs(srcN - zipN) <= 1) {
+            console.log(`[QNAP] ZIP cache kullanılıyor: ${zipRelPath} (${size} bytes, ${srcN} dosya)`);
+            return { zipRelPath, size };
+          }
+        }
+      } catch { /* cache kontrolü başarısız, yeniden oluştur */ }
+
+      // ZIP yoksa veya güncel değilse oluştur
       await this.execSSH(
         `rm -rf "${this.mediaPath}/${zipDir}" && mkdir -p "${this.mediaPath}/${zipDir}"`
       );
 
-      // -0 = no compression (medya dosyaları zaten compressed, sadece overhead olur)
-      // -x = exclude pattern (mac/windows sistem dosyaları ve QNAP @-klasörleri)
-      // cd ile çalıştır ki ZIP içinde tam path değil relPath olsun
       const cmd = `cd "${this.mediaPath}" && /usr/local/sbin/zip -r -0 -q "${zipRelPath}" "${relPath}" -x "*.DS_Store" "*/Thumbs.db" "*/@*" && stat -c '%s' "${zipFullPath}"`;
       const output = await this.execSSH(cmd);
       const size = parseInt(output.trim()) || 0;
