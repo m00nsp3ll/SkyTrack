@@ -209,10 +209,10 @@ export const pilotQueueService = {
       return flight;
     });
 
-    // Round counter — atama yapıldı, tur ilerlesin
+    // Round counter — atama yapıldı, pilot TUR'u artsın
     try {
       const { recordAssignment } = await import('./roundCounter.js');
-      await recordAssignment();
+      await recordAssignment(pilot.id);
     } catch (e) {
       console.error('Round counter error:', e);
     }

@@ -338,6 +338,18 @@ export const settingsApi = {
   set: (key: string, value: string | number) => api.patch(`/settings/${key}`, { value }),
   setPilotFee: (pilotId: string, fee: number | null) =>
     api.patch(`/settings/pilots/${pilotId}/fee`, { fee }),
+  // Firmalar
+  getCompanies: () => api.get('/settings/companies/list'),
+  setPilotCompany: (pilotId: string, companyId: string | null) =>
+    api.patch(`/settings/pilots/${pilotId}/company`, { companyId }),
+  // Ödemeler
+  getPayments: (params?: { pilotId?: string; from?: string; to?: string }) =>
+    api.get('/settings/payments/all', { params }),
+  createPayment: (data: { pilotId: string; amount: number; note?: string; periodFrom?: string; periodTo?: string }) =>
+    api.post('/settings/payments', data),
+  updatePayment: (id: string, data: { amount?: number; note?: string; periodFrom?: string; periodTo?: string }) =>
+    api.patch(`/settings/payments/${id}`, data),
+  deletePayment: (id: string) => api.delete(`/settings/payments/${id}`),
 }
 
 // OS algılamalı SMB/UNC klasör açma helper

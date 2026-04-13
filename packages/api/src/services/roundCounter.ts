@@ -14,11 +14,20 @@ const prisma = new PrismaClient();
 
 /**
  * Yeni atama yapıldığında çağrılır.
- * Eğer assignmentsInRound aktif pilot sayısına ulaştıysa tur biter, currentRound++.
- * @returns Güncel round bilgisi
+ * - İlgili pilotun roundCount'u 1 artar (o pilot turunu kullandı)
+ * - Global assignmentsInRound 1 artar
+ * - Tur biterse currentRound++ (feragat lock'u için)
  */
-export async function recordAssignment(tx?: any): Promise<{ currentRound: number; assignmentsInRound: number; roundCompleted: boolean }> {
+export async function recordAssignment(pilotId?: string, tx?: any): Promise<{ currentRound: number; assignmentsInRound: number; roundCompleted: boolean }> {
   const db = tx || prisma;
+
+  // İlgili pilotun kendi TUR sayacını artır
+  if (pilotId) {
+    await db.pilot.update({
+      where: { id: pilotId },
+      data: { roundCount: { increment: 1 } },
+    });
+  }
 
   // Aktif sıradaki pilot sayısı (round size)
   const activeQueueSize = await db.pilot.count({
@@ -107,7 +116,7 @@ export async function forfeitPilot(pilotId: string, tx?: any): Promise<void> {
   const originalPosition = pilot.queuePosition;
 
   await db.$transaction([
-    // Pilotu en arkaya yerleştir
+    // Pilotu en arkaya yerleştir + TUR sayacı ve feragat sayacı artsın
     db.pilot.update({
       where: { id: pilotId },
       data: {
@@ -115,7 +124,8 @@ export async function forfeitPilot(pilotId: string, tx?: any): Promise<void> {
         lastForfeitRound: currentRound,
         lockedUntilRound: currentRound + 1,
         forfeitCount: { increment: 1 },
-        status: 'AVAILABLE', // Feragat sonrası müsait kalır ama en arkada
+        roundCount: { increment: 1 }, // Feragat da tur sayılır
+        status: 'AVAILABLE',
       },
     }),
     // Aradaki pilotları 1 yukarı çek (gap fill)

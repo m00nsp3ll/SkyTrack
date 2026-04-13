@@ -230,7 +230,7 @@ router.get('/pilots', authenticate, asyncHandler(async (req: AuthRequest, res: a
   const feeSetting = await prisma.setting.findUnique({ where: { key: 'flightFee' } });
   const globalFlightFee = parseFloat(feeSetting?.value || '1000');
 
-  // Global round counter
+  // Global round counter (feragat lock için)
   const queueState = await prisma.queueState.findUnique({ where: { id: 'singleton' } });
   const currentRound = queueState?.currentRound || 0;
 
@@ -241,8 +241,10 @@ router.get('/pilots', authenticate, asyncHandler(async (req: AuthRequest, res: a
       name: true,
       flightFee: true,
       forfeitCount: true,
+      roundCount: true,
       isTeamLeader: true,
       team: { select: { id: true, name: true, color: true } },
+      company: { select: { id: true, name: true, color: true } },
       flights: {
         where: { createdAt: { gte: fromDate, lte: toDate } },
         select: {
@@ -250,6 +252,10 @@ router.get('/pilots', authenticate, asyncHandler(async (req: AuthRequest, res: a
           durationMinutes: true,
           createdAt: true,
         },
+      },
+      payments: {
+        where: { deletedAt: null },
+        select: { amount: true, createdAt: true },
       },
     },
   });
@@ -259,25 +265,38 @@ router.get('/pilots', authenticate, asyncHandler(async (req: AuthRequest, res: a
     const cancelledFlights = pilot.flights.filter(f => f.status === 'CANCELLED');
     const totalDuration = completedFlights.reduce((sum, f) => sum + (f.durationMinutes || 0), 0);
 
-    // Count active days (days with at least one flight)
+    // Günlük aktif gün sayısı
     const activeDays = new Set(
       pilot.flights.map(f => f.createdAt.toISOString().split('T')[0])
     ).size;
 
+    // Günlük uçuş dağılımı (monthly view için)
+    const dailyFlights: Record<string, number> = {};
+    completedFlights.forEach(f => {
+      const day = f.createdAt.toISOString().split('T')[0];
+      dailyFlights[day] = (dailyFlights[day] || 0) + 1;
+    });
+
     // Pilotaj ücreti (pilota özel veya global)
     const flightFee = pilot.flightFee ? Number(pilot.flightFee) : globalFlightFee;
-    const earnings = completedFlights.length * flightFee;
+    const hakedis = completedFlights.length * flightFee; // Toplam hakediş
+    const totalPaid = pilot.payments.reduce((s, p) => s + Number(p.amount), 0);
+    const kalan = hakedis - totalPaid;
 
     return {
       id: pilot.id,
       name: pilot.name,
-      tur: currentRound, // Mevcut tur sayısı
+      tur: pilot.roundCount, // Her pilotun kendi TUR'u
       totalFlights: completedFlights.length,
       flightFee,
-      earnings,
+      hakedis,
+      totalPaid,
+      kalan,
       forfeitCount: pilot.forfeitCount,
       isTeamLeader: pilot.isTeamLeader,
       team: pilot.team,
+      company: pilot.company,
+      dailyFlights,
       avgDuration: completedFlights.length > 0 ? Math.round(totalDuration / completedFlights.length) : 0,
       totalCustomers: pilot.flights.length,
       avgDailyFlights: activeDays > 0 ? (completedFlights.length / activeDays).toFixed(1) : '0',

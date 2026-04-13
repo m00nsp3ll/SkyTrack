@@ -34,10 +34,14 @@ interface PilotStats {
   tur: number
   totalFlights: number
   flightFee: number
-  earnings: number
+  hakedis: number
+  totalPaid: number
+  kalan: number
   forfeitCount: number
   isTeamLeader: boolean
   team?: { id: string; name: string; color: string } | null
+  company?: { id: string; name: string; color: string } | null
+  dailyFlights: Record<string, number>
   avgDuration: number
   totalCustomers: number
   avgDailyFlights: string
@@ -58,6 +62,12 @@ interface ReportData {
   globalFlightFee: number
   fairness: FairnessData
   dateRange: { from: string; to: string }
+}
+
+interface Company {
+  id: string
+  name: string
+  color: string
 }
 
 type QuickFilter = 'today' | 'week' | 'month' | 'custom'
@@ -91,9 +101,19 @@ export default function PilotPerformanceReport() {
   const [dateFrom, setDateFrom] = useState(() => getQuickDates('month').from)
   const [dateTo, setDateTo] = useState(() => getQuickDates('month').to)
   const [isSuperAdmin, setIsSuperAdmin] = useState(false)
+  const [isAdmin, setIsAdmin] = useState(false)
   const [editingPilotFee, setEditingPilotFee] = useState<{ id: string; name: string; fee: number } | null>(null)
   const [editingGlobalFee, setEditingGlobalFee] = useState<number | null>(null)
   const [feeInput, setFeeInput] = useState('')
+  const [companies, setCompanies] = useState<Company[]>([])
+  // Ödeme modal
+  const [paymentModal, setPaymentModal] = useState<{ pilotId: string; pilotName: string; kalan: number } | null>(null)
+  const [paymentAmount, setPaymentAmount] = useState('')
+  const [paymentNote, setPaymentNote] = useState('')
+  const [paymentConfirm, setPaymentConfirm] = useState(false)
+  const [paymentSaving, setPaymentSaving] = useState(false)
+  // Firma atama
+  const [editingCompany, setEditingCompany] = useState<{ pilotId: string; pilotName: string; currentId: string | null } | null>(null)
 
   useEffect(() => {
     try {
@@ -101,9 +121,48 @@ export default function PilotPerformanceReport() {
       if (userStr) {
         const user = JSON.parse(userStr)
         setIsSuperAdmin(user.role === 'SUPER_ADMIN')
+        setIsAdmin(user.role === 'SUPER_ADMIN' || user.role === 'ADMIN')
       }
     } catch {}
+    settingsApi.getCompanies().then(r => setCompanies(r.data.data || [])).catch(() => {})
   }, [])
+
+  const savePilotCompany = async (companyId: string | null) => {
+    if (!editingCompany) return
+    try {
+      await settingsApi.setPilotCompany(editingCompany.pilotId, companyId)
+      setEditingCompany(null)
+      fetchData(dateFrom, dateTo)
+    } catch (e: any) {
+      alert(e.response?.data?.error?.message || 'Firma atanamadı')
+    }
+  }
+
+  const savePayment = async () => {
+    if (!paymentModal) return
+    const amount = parseFloat(paymentAmount)
+    if (isNaN(amount) || amount <= 0) {
+      alert('Geçerli bir tutar girin')
+      return
+    }
+    setPaymentSaving(true)
+    try {
+      await settingsApi.createPayment({
+        pilotId: paymentModal.pilotId,
+        amount,
+        note: paymentNote || undefined,
+      })
+      setPaymentModal(null)
+      setPaymentAmount('')
+      setPaymentNote('')
+      setPaymentConfirm(false)
+      fetchData(dateFrom, dateTo)
+    } catch (e: any) {
+      alert(e.response?.data?.error?.message || 'Ödeme kaydedilemedi')
+    } finally {
+      setPaymentSaving(false)
+    }
+  }
 
   const savePilotFee = async () => {
     if (!editingPilotFee) return
@@ -399,54 +458,72 @@ export default function PilotPerformanceReport() {
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="w-full text-sm">
               <thead>
                 <tr className="border-b">
-                  <th className="text-left py-3 px-2 font-medium text-sm">#</th>
-                  <th className="text-left py-3 px-2 font-medium text-sm">Pilot</th>
-                  <th className="text-center py-3 px-2 font-medium text-sm bg-blue-50">TUR</th>
-                  <th className="text-center py-3 px-2 font-medium text-sm">Toplam Uçuş</th>
-                  <th className="text-center py-3 px-2 font-medium text-sm bg-green-50">Pilotaj</th>
-                  <th className="text-center py-3 px-2 font-medium text-sm bg-green-100">Kazanç</th>
-                  <th className="text-center py-3 px-2 font-medium text-sm">Feragat</th>
-                  <th className="text-center py-3 px-2 font-medium text-sm">Ort. Süre</th>
-                  <th className="text-center py-3 px-2 font-medium text-sm">İptal</th>
+                  <th className="text-left py-3 px-2 font-medium">#</th>
+                  <th className="text-left py-3 px-2 font-medium">Pilot</th>
+                  <th className="text-left py-3 px-2 font-medium">Firma</th>
+                  <th className="text-center py-3 px-2 font-medium bg-blue-50">TUR</th>
+                  <th className="text-center py-3 px-2 font-medium">Uçuş</th>
+                  <th className="text-center py-3 px-2 font-medium">Feragat</th>
+                  <th className="text-center py-3 px-2 font-medium bg-green-50">Pilotaj/Uçuş</th>
+                  <th className="text-center py-3 px-2 font-medium bg-green-100">Hakediş</th>
+                  <th className="text-center py-3 px-2 font-medium bg-blue-100">Ödeme</th>
+                  <th className="text-center py-3 px-2 font-medium bg-red-100">Kalan</th>
+                  {isAdmin && <th className="text-center py-3 px-2 font-medium">İşlem</th>}
                 </tr>
               </thead>
               <tbody>
                 {data?.pilots.map((pilot, index) => (
                   <tr key={pilot.id} className="border-b hover:bg-gray-50">
-                    <td className="py-3 px-2">
+                    <td className="py-2 px-2">
                       {index === 0 && <span className="text-yellow-500 text-lg">🥇</span>}
                       {index === 1 && <span className="text-gray-400 text-lg">🥈</span>}
                       {index === 2 && <span className="text-amber-600 text-lg">🥉</span>}
                       {index > 2 && <span className="text-muted-foreground">{index + 1}</span>}
                     </td>
-                    <td className="py-3 px-2 font-medium">
-                      <div className="flex items-center gap-2">
+                    <td className="py-2 px-2 font-medium">
+                      <div className="flex items-center gap-1.5">
                         <Link
                           href={`/admin/reports/pilots/${pilot.id}`}
                           className="text-blue-600 hover:underline"
                         >
                           {pilot.name}
                         </Link>
-                        {pilot.isTeamLeader && (
-                          <Crown className="h-4 w-4 text-amber-500" />
-                        )}
-                        {pilot.team && (
-                          <Badge variant="outline" style={{ borderColor: pilot.team.color, color: pilot.team.color }}>
-                            {pilot.team.name}
-                          </Badge>
-                        )}
+                        {pilot.isTeamLeader && <Crown className="h-3.5 w-3.5 text-amber-500" />}
                       </div>
                     </td>
-                    <td className="py-3 px-2 text-center bg-blue-50/40">
+                    <td className="py-2 px-2">
+                      <button
+                        onClick={() => isAdmin && setEditingCompany({ pilotId: pilot.id, pilotName: pilot.name, currentId: pilot.company?.id || null })}
+                        className={isAdmin ? 'hover:underline' : ''}
+                      >
+                        {pilot.company ? (
+                          <Badge variant="outline" style={{ borderColor: pilot.company.color, color: pilot.company.color }}>
+                            {pilot.company.name}
+                          </Badge>
+                        ) : (
+                          <span className="text-xs text-muted-foreground italic">Atanmamış</span>
+                        )}
+                      </button>
+                    </td>
+                    <td className="py-2 px-2 text-center bg-blue-50/40">
                       <span className="font-bold text-blue-700">{pilot.tur}</span>
                     </td>
-                    <td className="py-3 px-2 text-center">
-                      <span className="font-bold text-gray-800">{pilot.totalFlights}</span>
+                    <td className="py-2 px-2 text-center">
+                      <span className="font-semibold">{pilot.totalFlights}</span>
                     </td>
-                    <td className="py-3 px-2 text-center bg-green-50/40">
+                    <td className="py-2 px-2 text-center">
+                      {pilot.forfeitCount > 0 ? (
+                        <span className="inline-flex items-center justify-center w-6 h-6 rounded bg-red-100 text-red-700 font-bold text-xs">
+                          {pilot.forfeitCount}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
+                    </td>
+                    <td className="py-2 px-2 text-center bg-green-50/40">
                       <div className="flex items-center justify-center gap-1">
                         <span>₺{pilot.flightFee.toLocaleString('tr-TR')}</span>
                         {isSuperAdmin && (
@@ -455,7 +532,7 @@ export default function PilotPerformanceReport() {
                               setEditingPilotFee({ id: pilot.id, name: pilot.name, fee: pilot.flightFee })
                               setFeeInput(String(pilot.flightFee))
                             }}
-                            className="text-blue-600 hover:text-blue-800 ml-1"
+                            className="text-blue-600 hover:text-blue-800"
                             title="Pilotaj düzenle"
                           >
                             <Settings className="h-3 w-3" />
@@ -463,47 +540,70 @@ export default function PilotPerformanceReport() {
                         )}
                       </div>
                     </td>
-                    <td className="py-3 px-2 text-center bg-green-100/40 font-bold text-green-700">
-                      ₺{pilot.earnings.toLocaleString('tr-TR')}
+                    <td className="py-2 px-2 text-center bg-green-100/40 font-bold text-green-700">
+                      ₺{pilot.hakedis.toLocaleString('tr-TR')}
                     </td>
-                    <td className="py-3 px-2 text-center">
-                      {pilot.forfeitCount > 0 ? (
-                        <Badge variant="secondary" className="bg-orange-100 text-orange-800">
-                          {pilot.forfeitCount}
-                        </Badge>
-                      ) : (
-                        <span className="text-muted-foreground">-</span>
-                      )}
+                    <td className="py-2 px-2 text-center bg-blue-100/40 font-semibold text-blue-700">
+                      ₺{pilot.totalPaid.toLocaleString('tr-TR')}
                     </td>
-                    <td className="py-3 px-2 text-center text-sm text-muted-foreground">{pilot.avgDuration} dk</td>
-                    <td className="py-3 px-2 text-center">
-                      {pilot.cancelledFlights > 0 ? (
-                        <Badge variant="destructive">{pilot.cancelledFlights}</Badge>
-                      ) : (
-                        <span className="text-muted-foreground">-</span>
-                      )}
+                    <td className="py-2 px-2 text-center bg-red-100/40 font-bold text-red-700">
+                      ₺{pilot.kalan.toLocaleString('tr-TR')}
                     </td>
+                    {isAdmin && (
+                      <td className="py-2 px-2 text-center">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="bg-green-50 border-green-300 text-green-700 hover:bg-green-100 h-7 text-xs"
+                          onClick={() => {
+                            setPaymentModal({ pilotId: pilot.id, pilotName: pilot.name, kalan: pilot.kalan })
+                            setPaymentAmount(String(Math.max(0, pilot.kalan)))
+                          }}
+                        >
+                          Ödeme Yap
+                        </Button>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
               <tfoot>
-                <tr className="border-t-2 bg-gray-50 font-bold">
+                <tr className="border-t-2 bg-gray-100 font-bold">
                   <td colSpan={3} className="py-3 px-2 text-right">TOPLAM:</td>
+                  <td className="py-3 px-2 text-center text-blue-700">
+                    {data?.pilots.reduce((sum, p) => sum + p.tur, 0)}
+                  </td>
                   <td className="py-3 px-2 text-center text-blue-700">
                     {data?.pilots.reduce((sum, p) => sum + p.totalFlights, 0)}
                   </td>
-                  <td colSpan={1}></td>
-                  <td className="py-3 px-2 text-center text-green-700">
-                    ₺{data?.pilots.reduce((sum, p) => sum + p.earnings, 0).toLocaleString('tr-TR')}
-                  </td>
-                  <td className="py-3 px-2 text-center text-orange-700">
+                  <td className="py-3 px-2 text-center text-red-700">
                     {data?.pilots.reduce((sum, p) => sum + p.forfeitCount, 0)}
                   </td>
-                  <td colSpan={2}></td>
+                  <td></td>
+                  <td className="py-3 px-2 text-center text-green-700">
+                    ₺{data?.pilots.reduce((sum, p) => sum + p.hakedis, 0).toLocaleString('tr-TR')}
+                  </td>
+                  <td className="py-3 px-2 text-center text-blue-700">
+                    ₺{data?.pilots.reduce((sum, p) => sum + p.totalPaid, 0).toLocaleString('tr-TR')}
+                  </td>
+                  <td className="py-3 px-2 text-center text-red-700">
+                    ₺{data?.pilots.reduce((sum, p) => sum + p.kalan, 0).toLocaleString('tr-TR')}
+                  </td>
+                  {isAdmin && <td></td>}
                 </tr>
               </tfoot>
             </table>
           </div>
+
+          {isAdmin && (
+            <div className="mt-4 flex justify-end">
+              <Link href="/admin/reports/pilots/payments">
+                <Button variant="outline" size="sm" className="gap-2">
+                  📋 Ödeme Geçmişi
+                </Button>
+              </Link>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -531,6 +631,110 @@ export default function PilotPerformanceReport() {
                 İptal
               </Button>
               <Button onClick={saveGlobalFee}>Kaydet</Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Ödeme Yap Modal */}
+      {paymentModal && !paymentConfirm && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+            <h2 className="text-xl font-bold mb-1 text-green-700">💰 Ödeme Yap</h2>
+            <p className="text-sm text-muted-foreground mb-1">{paymentModal.pilotName}</p>
+            <p className="text-sm text-red-600 mb-4">Kalan borç: <strong>₺{paymentModal.kalan.toLocaleString('tr-TR')}</strong></p>
+            <div className="space-y-3 mb-4">
+              <div>
+                <label className="text-sm font-medium">Tutar (TL)</label>
+                <Input
+                  type="number"
+                  value={paymentAmount}
+                  onChange={(e) => setPaymentAmount(e.target.value)}
+                  autoFocus
+                  className="text-lg"
+                  min="0"
+                  step="0.01"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Not (opsiyonel)</label>
+                <Input
+                  value={paymentNote}
+                  onChange={(e) => setPaymentNote(e.target.value)}
+                  placeholder="Açıklama..."
+                />
+              </div>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" onClick={() => { setPaymentModal(null); setPaymentAmount(''); setPaymentNote('') }}>
+                İptal
+              </Button>
+              <Button
+                className="bg-green-600 hover:bg-green-700"
+                onClick={() => {
+                  const n = parseFloat(paymentAmount)
+                  if (isNaN(n) || n <= 0) { alert('Geçerli bir tutar girin'); return }
+                  setPaymentConfirm(true)
+                }}
+              >
+                Devam Et
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Ödeme Onay Modal */}
+      {paymentModal && paymentConfirm && (
+        <div className="fixed inset-0 z-[60] bg-black/60 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+            <h2 className="text-xl font-bold mb-3 text-red-700">⚠️ Ödeme Onayı</h2>
+            <p className="mb-2">
+              <strong>{paymentModal.pilotName}</strong> pilotuna
+            </p>
+            <p className="text-3xl font-bold text-green-700 mb-3">
+              ₺{parseFloat(paymentAmount || '0').toLocaleString('tr-TR')}
+            </p>
+            {paymentNote && <p className="text-sm text-muted-foreground mb-3">Not: {paymentNote}</p>}
+            <p className="text-sm text-red-600 mb-4">Bu ödemeyi onaylıyor musunuz?</p>
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" onClick={() => setPaymentConfirm(false)} disabled={paymentSaving}>
+                Geri
+              </Button>
+              <Button className="bg-red-600 hover:bg-red-700" onClick={savePayment} disabled={paymentSaving}>
+                {paymentSaving ? 'Kaydediliyor...' : 'Onayla ve Kaydet'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Firma Atama Modal */}
+      {editingCompany && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 max-h-[80vh] overflow-y-auto">
+            <h2 className="text-xl font-bold mb-1">Firma Ata</h2>
+            <p className="text-sm text-muted-foreground mb-4">{editingCompany.pilotName}</p>
+            <div className="space-y-1">
+              <button
+                onClick={() => savePilotCompany(null)}
+                className={`w-full text-left p-2 rounded-lg hover:bg-gray-100 ${!editingCompany.currentId ? 'bg-gray-100 font-bold' : ''}`}
+              >
+                <span className="text-muted-foreground italic">Firma yok</span>
+              </button>
+              {companies.map(c => (
+                <button
+                  key={c.id}
+                  onClick={() => savePilotCompany(c.id)}
+                  className={`w-full text-left p-2 rounded-lg hover:bg-gray-100 flex items-center gap-2 ${editingCompany.currentId === c.id ? 'bg-gray-100 font-bold' : ''}`}
+                >
+                  <span className="w-3 h-3 rounded-full" style={{ backgroundColor: c.color }}></span>
+                  <span>{c.name}</span>
+                </button>
+              ))}
+            </div>
+            <div className="flex justify-end mt-4">
+              <Button variant="outline" onClick={() => setEditingCompany(null)}>Kapat</Button>
             </div>
           </div>
         </div>
