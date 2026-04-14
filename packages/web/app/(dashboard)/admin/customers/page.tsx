@@ -14,6 +14,7 @@ interface Customer {
   firstName: string
   lastName: string
   phone: string
+  emergencyContact: string | null
   status: string
   createdAt: string
   assignedPilot: { id: string; name: string } | null
@@ -270,6 +271,11 @@ export default function CustomersPage() {
                         <p className="text-sm text-muted-foreground">
                           {customer.phone}
                         </p>
+                        {customer.emergencyContact && (
+                          <p className="text-sm text-muted-foreground truncate">
+                            🏨 {customer.emergencyContact}
+                          </p>
+                        )}
                       </div>
 
                       <div className="hidden sm:block text-right">

@@ -1755,7 +1755,7 @@ Bu belgeyi imzalayarak asagidaki hususlari kabul ve beyan ederim:
               {customer.emergencyContact && (
                 <div className="flex items-center gap-3">
                   <Phone className="w-4 h-4 text-red-500" />
-                  <span>Acil: {customer.emergencyContact}</span>
+                  <span>Otel: {customer.emergencyContact}</span>
                 </div>
               )}
             </div>
