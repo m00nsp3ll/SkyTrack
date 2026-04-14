@@ -1,8 +1,7 @@
 Windows Registry Editor Version 5.00
 
-; SkyTrack Klasör Açıcı — tarayıcıdan Dosya Gezgini açar
-; 1. skytrack-open.bat dosyasını C:\SkyTrack\ klasörüne kopyalayın
-; 2. Bu .reg dosyasını çift tıklayın ("Evet" deyin)
+; SkyTrack Klasör Açıcı (sessiz) — tarayıcıdan Dosya Gezgini
+; Kurulum: install.bat dosyasını yönetici olarak çalıştırın.
 
 [HKEY_CLASSES_ROOT\skytrack]
 @="URL:SkyTrack Folder Protocol"
@@ -16,4 +15,4 @@ Windows Registry Editor Version 5.00
 [HKEY_CLASSES_ROOT\skytrack\shell\open]
 
 [HKEY_CLASSES_ROOT\skytrack\shell\open\command]
-@="cmd.exe /c \"\"C:\\SkyTrack\\skytrack-open.bat\" \"%1\"\""
+@="wscript.exe \"C:\\SkyTrack\\skytrack-launcher.vbs\" \"%1\""
