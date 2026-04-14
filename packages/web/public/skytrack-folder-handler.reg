@@ -1,17 +1,19 @@
 Windows Registry Editor Version 5.00
 
 ; SkyTrack Klasör Açıcı — tarayıcıdan Dosya Gezgini açar
-; 1. Bu dosyayı çalıştırın (çift tıklayın, "Evet" deyin)
-; 2. skytrack-open.bat dosyasını C:\SkyTrack\ klasörüne kopyalayın
-; 3. Artık web'den "Klasörü Aç" butonu çalışacak
+; 1. skytrack-open.bat dosyasını C:\SkyTrack\ klasörüne kopyalayın
+; 2. Bu .reg dosyasını çift tıklayın ("Evet" deyin)
 
 [HKEY_CLASSES_ROOT\skytrack]
 @="URL:SkyTrack Folder Protocol"
 "URL Protocol"=""
+
+[HKEY_CLASSES_ROOT\skytrack\DefaultIcon]
+@="C:\\Windows\\explorer.exe,0"
 
 [HKEY_CLASSES_ROOT\skytrack\shell]
 
 [HKEY_CLASSES_ROOT\skytrack\shell\open]
 
 [HKEY_CLASSES_ROOT\skytrack\shell\open\command]
-@="\"C:\\SkyTrack\\skytrack-open.bat\" \"%1\""
+@="cmd.exe /c \"\"C:\\SkyTrack\\skytrack-open.bat\" \"%1\"\""
