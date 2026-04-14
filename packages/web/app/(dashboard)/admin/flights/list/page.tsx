@@ -174,7 +174,7 @@ export default function FlightsListPage() {
     setSearch('')
     setStatusFilter('all')
     setPilotFilter('')
-    setDateFilter(new Date().toISOString().split('T')[0])
+    applyQuickFilter('today')
   }
 
   const formatTime = (date: string) => {
