@@ -77,7 +77,13 @@ export default function FlightsListPage() {
   const [statusFilter, setStatusFilter] = useState<string>(initialStatus)
   const [pilotFilter, setPilotFilter] = useState<string>('')
   // Tarih aralığı (from-to)
-  const today = new Date().toISOString().split('T')[0]
+  const toLocalDateStr = (d: Date) => {
+    const y = d.getFullYear()
+    const m = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    return `${y}-${m}-${day}`
+  }
+  const today = toLocalDateStr(new Date())
   const [fromDate, setFromDate] = useState<string>(today)
   const [toDate, setToDate] = useState<string>(today)
   const [quickFilter, setQuickFilter] = useState<'today' | 'week' | 'month' | 'custom' | 'all'>(
@@ -88,18 +94,18 @@ export default function FlightsListPage() {
   const applyQuickFilter = (f: 'today' | 'week' | 'month' | 'custom' | 'all') => {
     setQuickFilter(f)
     const now = new Date()
-    const todayStr = now.toISOString().split('T')[0]
+    const todayStr = toLocalDateStr(now)
     if (f === 'today') {
       setFromDate(todayStr)
       setToDate(todayStr)
     } else if (f === 'week') {
       const weekAgo = new Date(now)
       weekAgo.setDate(now.getDate() - 6)
-      setFromDate(weekAgo.toISOString().split('T')[0])
+      setFromDate(toLocalDateStr(weekAgo))
       setToDate(todayStr)
     } else if (f === 'month') {
       const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
-      setFromDate(firstOfMonth.toISOString().split('T')[0])
+      setFromDate(toLocalDateStr(firstOfMonth))
       setToDate(todayStr)
     } else if (f === 'all') {
       setFromDate('')
