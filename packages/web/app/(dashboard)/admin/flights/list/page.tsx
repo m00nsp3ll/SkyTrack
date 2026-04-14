@@ -76,10 +76,42 @@ export default function FlightsListPage() {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>(initialStatus)
   const [pilotFilter, setPilotFilter] = useState<string>('')
-  // CANCELLED statü için tarih filtresi başlangıçta boş — tüm tarihler görünsün
-  const [dateFilter, setDateFilter] = useState<string>(
-    initialStatus === 'CANCELLED' ? '' : new Date().toISOString().split('T')[0]
+  // Tarih aralığı (from-to)
+  const today = new Date().toISOString().split('T')[0]
+  const [fromDate, setFromDate] = useState<string>(today)
+  const [toDate, setToDate] = useState<string>(today)
+  const [quickFilter, setQuickFilter] = useState<'today' | 'week' | 'month' | 'custom' | 'all'>(
+    initialStatus === 'CANCELLED' ? 'month' : 'today'
   )
+
+  // Quick filter mantığı
+  const applyQuickFilter = (f: 'today' | 'week' | 'month' | 'custom' | 'all') => {
+    setQuickFilter(f)
+    const now = new Date()
+    const todayStr = now.toISOString().split('T')[0]
+    if (f === 'today') {
+      setFromDate(todayStr)
+      setToDate(todayStr)
+    } else if (f === 'week') {
+      const weekAgo = new Date(now)
+      weekAgo.setDate(now.getDate() - 6)
+      setFromDate(weekAgo.toISOString().split('T')[0])
+      setToDate(todayStr)
+    } else if (f === 'month') {
+      const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+      setFromDate(firstOfMonth.toISOString().split('T')[0])
+      setToDate(todayStr)
+    } else if (f === 'all') {
+      setFromDate('')
+      setToDate('')
+    }
+  }
+
+  // Initial quick filter uygula
+  useEffect(() => {
+    applyQuickFilter(quickFilter)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const fetchFlights = async (cursor?: string) => {
     try {
@@ -88,7 +120,8 @@ export default function FlightsListPage() {
 
       if (statusFilter !== 'all') params.status = statusFilter
       if (pilotFilter) params.pilotId = pilotFilter
-      if (dateFilter) params.date = dateFilter
+      if (fromDate) params.from = fromDate
+      if (toDate) params.to = toDate
       if (search) params.search = search
       if (cursor) params.cursor = cursor
 
@@ -125,7 +158,7 @@ export default function FlightsListPage() {
 
   useEffect(() => {
     fetchFlights()
-  }, [statusFilter, pilotFilter, dateFilter])
+  }, [statusFilter, pilotFilter, fromDate, toDate])
 
   const handleSearch = () => {
     fetchFlights()
@@ -166,10 +199,35 @@ export default function FlightsListPage() {
         </div>
       </div>
 
+      {/* Hızlı Tarih Filtreleri */}
+      <Card>
+        <CardContent className="p-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm font-medium text-muted-foreground mr-2">Hızlı Filtre:</span>
+            {[
+              { key: 'today', label: 'Bugün' },
+              { key: 'week', label: 'Bu Hafta' },
+              { key: 'month', label: 'Bu Ay' },
+              { key: 'all', label: 'Tümü' },
+              { key: 'custom', label: 'Özel Aralık' },
+            ].map(f => (
+              <Button
+                key={f.key}
+                variant={quickFilter === f.key ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => applyQuickFilter(f.key as any)}
+              >
+                {f.label}
+              </Button>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Filters */}
       <Card>
         <CardContent className="p-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
             {/* Search */}
             <div className="relative sm:col-span-2">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -182,14 +240,28 @@ export default function FlightsListPage() {
               />
             </div>
 
-            {/* Date Filter */}
+            {/* Tarih Aralığı - From */}
             <div className="relative">
-              <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
               <Input
                 type="date"
-                value={dateFilter}
-                onChange={(e) => setDateFilter(e.target.value)}
+                lang="tr"
+                value={fromDate}
+                onChange={(e) => { setFromDate(e.target.value); setQuickFilter('custom') }}
                 className="pl-10"
+                placeholder="Başlangıç"
+              />
+            </div>
+            {/* Tarih Aralığı - To */}
+            <div className="relative">
+              <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+              <Input
+                type="date"
+                lang="tr"
+                value={toDate}
+                onChange={(e) => { setToDate(e.target.value); setQuickFilter('custom') }}
+                className="pl-10"
+                placeholder="Bitiş"
               />
             </div>
 

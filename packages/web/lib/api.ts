@@ -134,7 +134,7 @@ export const customersApi = {
 
 // Flights API
 export const flightsApi = {
-  getAll: (params?: { status?: string; pilotId?: string; date?: string; search?: string; cursor?: string; limit?: number }) =>
+  getAll: (params?: { status?: string; pilotId?: string; date?: string; from?: string; to?: string; search?: string; cursor?: string; limit?: number }) =>
     api.get('/flights', { params }),
   getById: (id: string) => api.get(`/flights/${id}`),
   getLive: () => api.get('/flights/live'),

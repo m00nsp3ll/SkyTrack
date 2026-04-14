@@ -65,6 +65,8 @@ router.get('/', authenticate, asyncHandler(async (req: AuthRequest, res: any) =>
     status,
     pilotId,
     date,
+    from,
+    to,
     search,
     cursor,
     limit = '50'
@@ -83,15 +85,29 @@ router.get('/', authenticate, asyncHandler(async (req: AuthRequest, res: any) =>
     where.pilotId = pilotId;
   }
 
-  // Date filter (default to today)
-  if (date !== 'all') {
-    const filterDate = date ? new Date(date as string) : new Date();
+  // Date range filter (from/to) — öncelikli
+  if (from || to) {
+    where.createdAt = {};
+    if (from) {
+      const fromDate = new Date(from as string);
+      fromDate.setHours(0, 0, 0, 0);
+      where.createdAt.gte = fromDate;
+    }
+    if (to) {
+      const toDate = new Date(to as string);
+      toDate.setHours(23, 59, 59, 999);
+      where.createdAt.lte = toDate;
+    }
+  } else if (date && date !== 'all') {
+    // Eski API — tek gün filtresi
+    const filterDate = new Date(date as string);
     const startOfDay = new Date(filterDate);
     startOfDay.setHours(0, 0, 0, 0);
     const endOfDay = new Date(filterDate);
     endOfDay.setHours(23, 59, 59, 999);
     where.createdAt = { gte: startOfDay, lte: endOfDay };
   }
+  // date === 'all' veya hiçbiri yoksa tüm tarihler
 
   // Search by customer name or displayId
   if (search) {
