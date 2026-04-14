@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -25,6 +26,9 @@ interface Flight {
   takeoffAt?: string
   landingAt?: string
   durationMinutes?: number
+  cancellationReason?: 'WEATHER' | 'CUSTOMER_CANCEL' | 'OTHER' | null
+  cancellationNote?: string | null
+  notes?: string | null
   customer: {
     id: string
     displayId: string
@@ -37,6 +41,12 @@ interface Flight {
     id: string
     name: string
   }
+}
+
+const cancelReasonLabels: Record<string, { label: string; emoji: string; color: string }> = {
+  WEATHER: { label: 'Kötü Hava', emoji: '🌧️', color: 'bg-gray-100 text-gray-700' },
+  CUSTOMER_CANCEL: { label: 'Müşteri İptal', emoji: '👤', color: 'bg-purple-100 text-purple-700' },
+  OTHER: { label: 'Diğer', emoji: '⚠️', color: 'bg-orange-100 text-orange-700' },
 }
 
 interface Pilot {
@@ -53,17 +63,23 @@ const statusLabels: Record<string, { label: string; color: string }> = {
 }
 
 export default function FlightsListPage() {
+  const searchParams = useSearchParams()
+  const initialStatus = searchParams?.get('status') || 'all'
+
   const [flights, setFlights] = useState<Flight[]>([])
   const [pilots, setPilots] = useState<Pilot[]>([])
   const [loading, setLoading] = useState(true)
   const [hasMore, setHasMore] = useState(false)
   const [nextCursor, setNextCursor] = useState<string | null>(null)
 
-  // Filters
+  // Filters (URL'den status'u al)
   const [search, setSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [statusFilter, setStatusFilter] = useState<string>(initialStatus)
   const [pilotFilter, setPilotFilter] = useState<string>('')
-  const [dateFilter, setDateFilter] = useState<string>(new Date().toISOString().split('T')[0])
+  // CANCELLED statü için tarih filtresi başlangıçta boş — tüm tarihler görünsün
+  const [dateFilter, setDateFilter] = useState<string>(
+    initialStatus === 'CANCELLED' ? '' : new Date().toISOString().split('T')[0]
+  )
 
   const fetchFlights = async (cursor?: string) => {
     try {
@@ -284,6 +300,21 @@ export default function FlightsListPage() {
                             </span>
                           )}
                         </div>
+                        {/* İptal nedeni + not */}
+                        {flight.status === 'CANCELLED' && flight.cancellationReason && (
+                          <div className="mt-2 pt-2 border-t border-red-100">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className={`px-2 py-0.5 rounded text-xs font-semibold ${cancelReasonLabels[flight.cancellationReason]?.color}`}>
+                                {cancelReasonLabels[flight.cancellationReason]?.emoji} {cancelReasonLabels[flight.cancellationReason]?.label}
+                              </span>
+                              {flight.cancellationNote && (
+                                <span className="text-sm text-gray-700 italic">
+                                  💬 {flight.cancellationNote}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        )}
                       </div>
 
                       <ChevronRight className="h-5 w-5 text-muted-foreground" />

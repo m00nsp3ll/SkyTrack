@@ -221,6 +221,12 @@ export default function LiveFlightsPage() {
               Uçuş Geçmişi
             </Button>
           </Link>
+          <Link href="/admin/flights/list?status=CANCELLED">
+            <Button variant="outline" className="border-red-300 text-red-700 hover:bg-red-50">
+              <XCircle className="h-4 w-4 mr-2" />
+              İptal Geçmişi
+            </Button>
+          </Link>
           <Button onClick={fetchData} variant="outline">
             <RefreshCw className="h-4 w-4 mr-2" />
             Yenile
