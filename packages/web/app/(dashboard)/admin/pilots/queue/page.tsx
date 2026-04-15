@@ -150,7 +150,8 @@ export default function PilotQueuePage() {
     )
   }
 
-  const inQueuePilots = pilots.filter(p => p.inQueue)
+  const inQueuePilots = pilots.filter(p => p.inQueue && p.status !== 'OFF_DUTY' && p.status !== 'ON_BREAK')
+  const offDutyPilots = pilots.filter(p => p.inQueue && (p.status === 'OFF_DUTY' || p.status === 'ON_BREAK'))
   const outOfQueuePilots = pilots.filter(p => !p.inQueue)
 
   return (
@@ -216,11 +217,7 @@ export default function PilotQueuePage() {
           <div className="divide-y">
             {inQueuePilots.map((pilot, index) => {
               const status = statusConfig[pilot.status] || statusConfig.AVAILABLE
-              // Mesai dışı / molada pilotlar sayıya katılmaz
-              const isOutOfRotation = pilot.status === 'OFF_DUTY' || pilot.status === 'ON_BREAK'
-              const displayPos = isOutOfRotation
-                ? null
-                : inQueuePilots.slice(0, index + 1).filter(p => p.status !== 'OFF_DUTY' && p.status !== 'ON_BREAK').length
+              const displayPos = index + 1
               const StatusIcon = status.icon
               const isAtLimit = pilot.dailyFlightCount >= pilot.maxDailyFlights
               const isDragging = draggedId === pilot.id
@@ -240,8 +237,8 @@ export default function PilotQueuePage() {
                   `}
                 >
                   <GripVertical className="h-5 w-5 text-gray-400 flex-shrink-0" />
-                  <div className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-bold flex-shrink-0 ${isOutOfRotation ? 'bg-gray-300 text-gray-600' : 'bg-primary text-white'}`}>
-                    {displayPos ?? '—'}
+                  <div className="flex items-center justify-center w-8 h-8 rounded-full text-sm font-bold flex-shrink-0 bg-primary text-white">
+                    {displayPos}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-medium truncate">{pilot.name}</p>
@@ -264,6 +261,41 @@ export default function PilotQueuePage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Mesai Dışı / Molada Pilotlar */}
+      {offDutyPilots.length > 0 && (
+        <div>
+          <div className="flex items-center gap-3 my-2">
+            <div className="flex-1 h-px bg-gray-300" />
+            <span className="text-sm font-medium text-gray-500 whitespace-nowrap">Mesai Dışı / Molada ({offDutyPilots.length})</span>
+            <div className="flex-1 h-px bg-gray-300" />
+          </div>
+          <Card className="opacity-75">
+            <CardContent className="p-0">
+              <div className="divide-y">
+                {offDutyPilots.map((pilot) => {
+                  const status = statusConfig[pilot.status] || statusConfig.AVAILABLE
+                  const StatusIcon = status.icon
+                  return (
+                    <div key={pilot.id} className="flex items-center gap-3 p-3">
+                      <div className="flex items-center justify-center w-8 h-8 bg-gray-300 text-gray-600 rounded-full text-sm font-bold flex-shrink-0">—</div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate">{pilot.name}</p>
+                        <div className={`text-xs flex items-center gap-1 ${status.color}`}>
+                          <StatusIcon className="h-3 w-3" />
+                          <span>{status.label}</span>
+                          <span className="mx-1">·</span>
+                          <span>{pilot.dailyFlightCount}/{pilot.maxDailyFlights} uçuş</span>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Sıra Dışı Pilotlar */}
       {outOfQueuePilots.length > 0 && (
