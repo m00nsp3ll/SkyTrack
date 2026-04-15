@@ -42,15 +42,24 @@ export const pilotQueueService = {
     }
 
     // Fallback to database
+    // Kitap mantığı: tur sayısı en az olan, eşitse queue_position küçük olan.
+    // locked_until_round ile bu tur bloke olan pilot atlanır.
+    const { getCurrentRound } = await import('./roundCounter.js');
+    const currentRound = await getCurrentRound();
     const pilot = await prisma.pilot.findFirst({
       where: {
         isActive: true,
-        inQueue: true, // Sıradan çıkarılan pilotlar atanmaz
+        inQueue: true,
         status: 'AVAILABLE',
         dailyFlightCount: { lt: prisma.pilot.fields.maxDailyFlights },
+        OR: [
+          { lockedUntilRound: null },
+          { lockedUntilRound: { lte: currentRound } },
+        ],
       },
       orderBy: [
-        { queuePosition: 'asc' }, // ONLY queue position - round-robin order
+        { roundCount: 'asc' },
+        { queuePosition: 'asc' },
       ],
     });
 
@@ -176,33 +185,12 @@ export const pilotQueueService = {
         },
       });
 
-      // Get the max queue position
-      const maxQueuePilot = await tx.pilot.findFirst({
-        where: { isActive: true },
-        orderBy: { queuePosition: 'desc' },
-        select: { queuePosition: true },
-      });
-      const maxQueuePosition = maxQueuePilot?.queuePosition || 0;
-
-      // Update pilot: increment flight count, set status to ASSIGNED, move to end of queue
+      // Sıra konumu DEĞİŞMEZ (kitap gibi fix rotation). Sadece sayaçlar ve status güncellenir.
       await tx.pilot.update({
         where: { id: pilot.id },
         data: {
           dailyFlightCount: { increment: 1 },
           status: 'ASSIGNED',
-          queuePosition: maxQueuePosition + 1,
-        },
-      });
-
-      // Reorder remaining pilots to fill the gap
-      await tx.pilot.updateMany({
-        where: {
-          isActive: true,
-          id: { not: pilot.id },
-          queuePosition: { gt: pilot.queuePosition },
-        },
-        data: {
-          queuePosition: { decrement: 1 },
         },
       });
 
@@ -387,52 +375,20 @@ export const pilotQueueService = {
           });
         }
 
-        // Queue management: old pilot goes to top (position 1), new pilot goes to end
+        // Reassign: eski pilot AVAILABLE olur, yeni pilot ASSIGNED.
+        // Sıra konumları sabit — kitap mantığı. Eski pilotun round_count düşürülür (bu atama sayılmaz).
         if (oldPilotId !== pilot!.id) {
-          const oldPilot = await tx.pilot.findUnique({
+          await tx.pilot.update({
             where: { id: oldPilotId },
-            select: { queuePosition: true },
+            data: {
+              status: 'AVAILABLE',
+              roundCount: { decrement: 1 },
+            },
           });
-          const newPilotData = await tx.pilot.findUnique({
+          await tx.pilot.update({
             where: { id: pilot!.id },
-            select: { queuePosition: true },
+            data: { status: 'ASSIGNED' },
           });
-
-          if (oldPilot && newPilotData) {
-            // Move all pilots with position < old pilot's position down by 1
-            // to make room for old pilot at position 1
-            await tx.pilot.updateMany({
-              where: {
-                isActive: true,
-                id: { notIn: [oldPilotId, pilot!.id] },
-                queuePosition: { lt: oldPilot.queuePosition },
-              },
-              data: { queuePosition: { increment: 1 } },
-            });
-
-            // Old pilot goes to position 1 (top of queue, available)
-            await tx.pilot.update({
-              where: { id: oldPilotId },
-              data: {
-                queuePosition: 1,
-                status: 'AVAILABLE',
-              },
-            });
-
-            // Get max queue position for the new pilot
-            const maxQueuePilot = await tx.pilot.findFirst({
-              where: { isActive: true, id: { not: pilot!.id } },
-              orderBy: { queuePosition: 'desc' },
-              select: { queuePosition: true },
-            });
-            const maxPos = maxQueuePilot?.queuePosition || 0;
-
-            // New pilot goes to end of queue with ASSIGNED status
-            await tx.pilot.update({
-              where: { id: pilot!.id },
-              data: { queuePosition: maxPos + 1, status: 'ASSIGNED' },
-            });
-          }
         }
       });
 
