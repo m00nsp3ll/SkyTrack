@@ -411,7 +411,12 @@ router.get('/:id/panel', authenticate, asyncHandler(async (req: AuthRequest, res
   // Molada / Mesai Dışı / Uçuşta → sıra 0 (frontend "-" gösterir)
   let dynamicQueuePosition = 0;
   if (pilot.status === 'AVAILABLE') {
-    const eligiblePilots = allQueuedPilots.filter(p => p.dailyFlightCount < p.maxDailyFlights);
+    // Mesai dışı / molada pilotlar sıraya dahil değil — pilot gerçek rotasyon pozisyonunu görsün
+    const eligiblePilots = allQueuedPilots.filter(p =>
+      p.dailyFlightCount < p.maxDailyFlights &&
+      p.status !== 'OFF_DUTY' &&
+      p.status !== 'ON_BREAK'
+    );
     const positionIndex = eligiblePilots.findIndex(p => p.id === id);
     if (positionIndex !== -1) {
       dynamicQueuePosition = positionIndex + 1;
