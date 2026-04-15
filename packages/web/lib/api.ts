@@ -47,10 +47,25 @@ api.interceptors.request.use((config) => {
 // Track if we're already redirecting to prevent multiple redirects
 let isRedirectingToLogin = false
 
-// Response interceptor to handle errors
+// Network error + 5xx için otomatik retry (kesintisiz operasyon)
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
+    const cfg = error.config
+    const isNetworkError = !error.response
+    const is5xx = error.response?.status >= 500 && error.response?.status < 600
+    const is429 = error.response?.status === 429
+    const isRetriable = (isNetworkError || is5xx || is429) && cfg && !cfg.__isRetry
+    const method = (cfg?.method || 'get').toLowerCase()
+    // Sadece GET'leri otomatik retry et (POST/PUT/DELETE çift yazmayı önlemek için)
+    if (isRetriable && method === 'get') {
+      cfg.__retryCount = (cfg.__retryCount || 0) + 1
+      if (cfg.__retryCount <= 3) {
+        await new Promise(r => setTimeout(r, 500 * cfg.__retryCount))
+        return api(cfg)
+      }
+    }
+
     // Only redirect to login for actual auth failures, not network errors
     if (error.response?.status === 401 && typeof window !== 'undefined') {
       const currentPath = window.location.pathname
