@@ -58,7 +58,7 @@ export const pilotQueueService = {
         ],
       },
       orderBy: [
-        { roundCount: 'asc' },
+        { dailyFlightCount: 'asc' },
         { queuePosition: 'asc' },
       ],
     });

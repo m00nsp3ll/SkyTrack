@@ -1196,7 +1196,7 @@ export default function PilotPanel() {
                         <p className={`font-semibold truncate ${isMe ? 'text-yellow-700' : ''}`}>
                           {p.name} {isMe && <span className="text-xs font-normal text-yellow-600">(Sen)</span>}
                         </p>
-                        <p className="text-xs text-muted-foreground">{p.dailyFlightCount}/{p.maxDailyFlights} uçuş</p>
+                        {isMe && <p className="text-xs text-muted-foreground">{p.dailyFlightCount}/{p.maxDailyFlights} uçuş</p>}
                       </div>
                       <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${statusColor[p.status] || 'text-gray-500 bg-gray-100'}`}>
                         {statusLabel[p.status] || p.status}
