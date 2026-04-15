@@ -30,6 +30,7 @@ interface Customer {
   firstName: string
   lastName: string
   weight: number
+  emergencyContact?: string | null
   createdAt: string
 }
 
@@ -340,6 +341,9 @@ export default function LiveFlightsPage() {
                             <p className="text-sm text-muted-foreground">
                               {flight.customer.firstName} {flight.customer.lastName} — {flight.customer.weight} kg
                             </p>
+                            {flight.customer.emergencyContact && (
+                              <p className="text-xs text-muted-foreground">🏨 {flight.customer.emergencyContact}</p>
+                            )}
                             <p className="text-xs text-muted-foreground">{flight.customer.displayId}</p>
                           </div>
                           <div className="text-right">
@@ -396,6 +400,9 @@ export default function LiveFlightsPage() {
                             <p className="text-sm text-muted-foreground">
                               {flight.customer.firstName} {flight.customer.lastName} — {flight.customer.weight} kg
                             </p>
+                            {flight.customer.emergencyContact && (
+                              <p className="text-xs text-muted-foreground">🏨 {flight.customer.emergencyContact}</p>
+                            )}
                             <p className="text-xs text-muted-foreground">{flight.customer.displayId}</p>
                           </div>
                           <div className="text-right">
@@ -467,6 +474,9 @@ export default function LiveFlightsPage() {
                         <p className="text-xs text-muted-foreground">
                           {flight.customer.firstName} {flight.customer.lastName} — {flight.customer.weight} kg
                         </p>
+                        {flight.customer.emergencyContact && (
+                          <p className="text-xs text-muted-foreground">🏨 {flight.customer.emergencyContact}</p>
+                        )}
                       </div>
                       {flight.durationMinutes && (
                         <span className="text-xs text-green-600 font-medium">{flight.durationMinutes} dk</span>
