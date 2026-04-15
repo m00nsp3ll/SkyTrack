@@ -36,6 +36,7 @@ interface Flight {
     lastName: string
     phone: string
     weight: number
+    emergencyContact?: string | null
   }
   pilot: {
     id: string
@@ -351,6 +352,9 @@ export default function FlightsListPage() {
                         <p className="text-sm text-muted-foreground truncate">
                           {flight.customer.firstName} {flight.customer.lastName}
                           <span className="ml-2 text-xs">({flight.customer.weight} kg)</span>
+                          {flight.customer.emergencyContact && (
+                            <span className="ml-2 text-xs text-muted-foreground">🏨 {flight.customer.emergencyContact}</span>
+                          )}
                         </p>
                         <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1.5">
                           {flight.takeoffAt && (
