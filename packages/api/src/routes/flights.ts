@@ -141,6 +141,7 @@ router.get('/', authenticate, asyncHandler(async (req: AuthRequest, res: any) =>
           lastName: true,
           phone: true,
           weight: true,
+          emergencyContact: true,
         },
       },
       pilot: {
@@ -278,6 +279,7 @@ router.get('/live', authenticate, asyncHandler(async (req: AuthRequest, res: any
           firstName: true,
           lastName: true,
           weight: true,
+          emergencyContact: true,
           createdAt: true,
         },
       },
