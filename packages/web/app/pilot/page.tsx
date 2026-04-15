@@ -243,10 +243,10 @@ export default function PilotPanel() {
     // Initialize native push notifications (Capacitor/FCM)
     initNativePush(token || undefined).catch(console.error)
 
-    // Fallback polling every 10 seconds (Socket.IO handles real-time updates)
+    // Fallback polling every 20 seconds (Socket.IO handles real-time updates)
     const interval = setInterval(() => {
       fetchPanelData(parsed.pilotId)
-    }, 10000)
+    }, 20000)
 
     return () => clearInterval(interval)
   }, [router, fetchPanelData, fetchQueueList])
@@ -351,7 +351,7 @@ export default function PilotPanel() {
     })
 
     // Queue'yu her 30sn yenile
-    const queueInterval = setInterval(fetchQueueList, 30000)
+    const queueInterval = setInterval(fetchQueueList, 60000)
     fetchQueueList()
 
     return () => {
@@ -491,7 +491,7 @@ export default function PilotPanel() {
   useEffect(() => {
     if (!user?.pilotId) return
     fetchPendingSwap()
-    const interval = setInterval(fetchPendingSwap, 2000) // 2sn polling
+    const interval = setInterval(fetchPendingSwap, 15000) // 15sn polling (socket.io fallback)
     return () => clearInterval(interval)
   }, [user?.pilotId, fetchPendingSwap])
 
