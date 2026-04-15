@@ -404,6 +404,7 @@ router.get('/:id/panel', authenticate, asyncHandler(async (req: AuthRequest, res
       id: true,
       dailyFlightCount: true,
       maxDailyFlights: true,
+      status: true,
     },
   });
 
