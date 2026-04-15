@@ -105,10 +105,11 @@ app.use(cors({
 // Compression (gzip) for better performance
 app.use(compression());
 
-// Rate limiting (1000 requests per minute per IP)
+// Rate limiting (10000 req/min per IP; tabletler ofis NAT arkasından tek IP görünüyor)
 const limiter = rateLimit({
   windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '60000'),
-  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '1000'),
+  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '10000'),
+  skip: (req) => req.path === '/health' || req.path.startsWith('/media/'),
   message: {
     success: false,
     error: {
