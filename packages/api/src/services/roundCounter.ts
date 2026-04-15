@@ -91,51 +91,29 @@ export async function isPilotLocked(pilotId: string): Promise<boolean> {
 
 /**
  * Pilot feragat eder.
- * - Kuyruğun en sonuna gönderilir
- * - lockedUntilRound = currentRound + 1 (1 tam tur sonra kilit kalkar)
- * - forfeitCount artar
+ * - Sıra konumu DEĞİŞMEZ (pilot yerinde kalır, bir sonraki turda sırasında döner)
+ * - lockedUntilRound = currentRound + 1 (bu tur müşteri almaz)
+ * - forfeitCount + roundCount artar
  */
 export async function forfeitPilot(pilotId: string, tx?: any): Promise<void> {
   const db = tx || prisma;
 
   const pilot = await db.pilot.findUnique({
     where: { id: pilotId },
-    select: { id: true, queuePosition: true, forfeitCount: true },
+    select: { id: true },
   });
   if (!pilot) throw new Error('Pilot bulunamadı');
 
   const currentRound = await getCurrentRound();
 
-  // En son sıra pozisyonu
-  const maxPosResult = await db.pilot.aggregate({
-    where: { isActive: true },
-    _max: { queuePosition: true },
+  await db.pilot.update({
+    where: { id: pilotId },
+    data: {
+      lastForfeitRound: currentRound,
+      lockedUntilRound: currentRound + 1,
+      forfeitCount: { increment: 1 },
+      roundCount: { increment: 1 },
+      status: 'AVAILABLE',
+    },
   });
-  const maxPosition = (maxPosResult._max.queuePosition || 0) + 1;
-
-  const originalPosition = pilot.queuePosition;
-
-  await db.$transaction([
-    // Pilotu en arkaya yerleştir + TUR sayacı ve feragat sayacı artsın
-    db.pilot.update({
-      where: { id: pilotId },
-      data: {
-        queuePosition: maxPosition,
-        lastForfeitRound: currentRound,
-        lockedUntilRound: currentRound + 1,
-        forfeitCount: { increment: 1 },
-        roundCount: { increment: 1 }, // Feragat da tur sayılır
-        status: 'AVAILABLE',
-      },
-    }),
-    // Aradaki pilotları 1 yukarı çek (gap fill)
-    db.pilot.updateMany({
-      where: {
-        isActive: true,
-        queuePosition: { gt: originalPosition },
-        id: { not: pilotId },
-      },
-      data: { queuePosition: { decrement: 1 } },
-    }),
-  ]);
 }
