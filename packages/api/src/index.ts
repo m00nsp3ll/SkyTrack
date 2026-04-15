@@ -43,6 +43,8 @@ import { cache } from './services/cache.js';
 import { getLocalIP } from './utils/networkUtils.js';
 
 const app = express();
+// Trust nginx reverse proxy (so rate limiter uses real client IP, not 127.0.0.1)
+app.set('trust proxy', 1);
 
 // SSL certificates for HTTPS
 const certsPath = path.join(process.cwd(), '..', '..', 'certs');
