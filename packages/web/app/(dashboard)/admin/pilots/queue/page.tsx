@@ -216,6 +216,11 @@ export default function PilotQueuePage() {
           <div className="divide-y">
             {inQueuePilots.map((pilot, index) => {
               const status = statusConfig[pilot.status] || statusConfig.AVAILABLE
+              // Mesai dışı / molada pilotlar sayıya katılmaz
+              const isOutOfRotation = pilot.status === 'OFF_DUTY' || pilot.status === 'ON_BREAK'
+              const displayPos = isOutOfRotation
+                ? null
+                : inQueuePilots.slice(0, index + 1).filter(p => p.status !== 'OFF_DUTY' && p.status !== 'ON_BREAK').length
               const StatusIcon = status.icon
               const isAtLimit = pilot.dailyFlightCount >= pilot.maxDailyFlights
               const isDragging = draggedId === pilot.id
@@ -235,8 +240,8 @@ export default function PilotQueuePage() {
                   `}
                 >
                   <GripVertical className="h-5 w-5 text-gray-400 flex-shrink-0" />
-                  <div className="flex items-center justify-center w-8 h-8 bg-primary text-white rounded-full text-sm font-bold flex-shrink-0">
-                    {index + 1}
+                  <div className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-bold flex-shrink-0 ${isOutOfRotation ? 'bg-gray-300 text-gray-600' : 'bg-primary text-white'}`}>
+                    {displayPos ?? '—'}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-medium truncate">{pilot.name}</p>

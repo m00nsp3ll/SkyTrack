@@ -649,7 +649,11 @@ export default function PilotPanel() {
         >
           <CardContent className="p-3 text-center">
             <p className="text-2xl font-bold text-yellow-600">
-              {pilot?.inQueue && pilot.status === 'AVAILABLE' && pilot.queuePosition > 0 ? pilot.queuePosition : '-'}
+              {pilot?.inQueue && pilot.status === 'AVAILABLE' && pilot.queuePosition > 0
+                ? (queueList.length
+                    ? queueList.filter(p => p.inQueue && p.status !== 'OFF_DUTY' && p.status !== 'ON_BREAK' && p.queuePosition <= pilot.queuePosition).length || pilot.queuePosition
+                    : pilot.queuePosition)
+                : '-'}
             </p>
             <p className="text-xs text-muted-foreground">Sıra</p>
           </CardContent>
@@ -984,7 +988,11 @@ export default function PilotPanel() {
                       ) : pilot?.status === 'IN_FLIGHT' ? (
                         <span className="font-semibold text-blue-600">Uçuşta</span>
                       ) : pilot.queuePosition > 0 ? (
-                        <span className="font-semibold text-yellow-600">{pilot.queuePosition}. sırada</span>
+                        <span className="font-semibold text-yellow-600">
+                          {(queueList.length
+                            ? queueList.filter(p => p.inQueue && p.status !== 'OFF_DUTY' && p.status !== 'ON_BREAK' && p.queuePosition <= pilot.queuePosition).length || pilot.queuePosition
+                            : pilot.queuePosition)}. sırada
+                        </span>
                       ) : (
                         <span className="font-semibold text-yellow-600">Sırada</span>
                       )}
