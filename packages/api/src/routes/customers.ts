@@ -211,10 +211,10 @@ router.post('/', authenticate, requireRole('ADMIN', 'OFFICE_STAFF', 'KIOSK'), as
     throw new AppError('Risk formu onaylanmalıdır', 400, 'WAIVER_REQUIRED');
   }
 
-  // Validate phone format (Turkish mobile)
-  const phoneRegex = /^(05\d{9}|\+905\d{9})$/;
-  if (!phoneRegex.test(phone.replace(/\s/g, ''))) {
-    throw new AppError('Geçersiz telefon formatı (05XX XXX XX XX)', 400, 'INVALID_PHONE');
+  // Validate phone format (E.164-ish: optional +, 7-15 digits)
+  const phoneRegex = /^\+?[0-9]{7,15}$/;
+  if (!phoneRegex.test(phone.replace(/[\s-]/g, ''))) {
+    throw new AppError('Geçersiz telefon formatı', 400, 'INVALID_PHONE');
   }
 
   // Validate weight
