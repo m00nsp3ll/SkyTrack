@@ -91,7 +91,7 @@ export async function isPilotLocked(pilotId: string): Promise<boolean> {
 
 /**
  * Pilot feragat eder.
- * - Sıra konumu DEĞİŞMEZ (pilot yerinde kalır, bir sonraki turda sırasında döner)
+ * - Pilot kuyruğun en sonuna gider (max queue_position + 1), diğerleri 1 yukarı kayar
  * - lockedUntilRound = currentRound + 1 (bu tur müşteri almaz)
  * - forfeitCount + roundCount artar
  */
@@ -100,20 +100,37 @@ export async function forfeitPilot(pilotId: string, tx?: any): Promise<void> {
 
   const pilot = await db.pilot.findUnique({
     where: { id: pilotId },
-    select: { id: true },
+    select: { id: true, queuePosition: true },
   });
   if (!pilot) throw new Error('Pilot bulunamadı');
 
   const currentRound = await getCurrentRound();
-
-  await db.pilot.update({
-    where: { id: pilotId },
-    data: {
-      lastForfeitRound: currentRound,
-      lockedUntilRound: currentRound + 1,
-      forfeitCount: { increment: 1 },
-      roundCount: { increment: 1 },
-      status: 'AVAILABLE',
-    },
+  const maxPosResult = await db.pilot.aggregate({
+    where: { isActive: true },
+    _max: { queuePosition: true },
   });
+  const maxPosition = (maxPosResult._max.queuePosition || 0) + 1;
+  const oldPosition = pilot.queuePosition;
+
+  await db.$transaction([
+    db.pilot.update({
+      where: { id: pilotId },
+      data: {
+        queuePosition: maxPosition,
+        lastForfeitRound: currentRound,
+        lockedUntilRound: currentRound + 1,
+        forfeitCount: { increment: 1 },
+        roundCount: { increment: 1 },
+        status: 'AVAILABLE',
+      },
+    }),
+    db.pilot.updateMany({
+      where: {
+        isActive: true,
+        id: { not: pilotId },
+        queuePosition: { gt: oldPosition },
+      },
+      data: { queuePosition: { decrement: 1 } },
+    }),
+  ]);
 }

@@ -560,12 +560,23 @@ router.patch('/:id/status', authenticate, asyncHandler(async (req: AuthRequest, 
     throw new AppError('Bu durum uçuş sırasında otomatik ayarlanır', 400, 'INVALID_STATUS_CHANGE');
   }
 
-  // UNAVAILABLE → AVAILABLE geçişinde queue position korunur (preserveQueuePosition flight'lar için)
-  // Bu zaten queuePosition'ı değiştirmediğimiz için doğal olarak korunuyor
-  const pilot = await prisma.pilot.update({
-    where: { id },
-    data: { status },
-  });
+  // OFF_DUTY/ON_BREAK → AVAILABLE: pilot sırasının geçmişse otomatik feragat (sıra sonuna git)
+  const existing = await prisma.pilot.findUnique({ where: { id }, select: { status: true, queuePosition: true } });
+  const wasOutOfRotation = existing && (existing.status === 'OFF_DUTY' || existing.status === 'ON_BREAK');
+  const becomingAvailable = status === 'AVAILABLE';
+
+  let pilot;
+  if (wasOutOfRotation && becomingAvailable) {
+    // Otomatik feragat: kuyruğun sonuna at, diğerleri 1 yukarı kay
+    const { forfeitPilot } = await import('../services/roundCounter.js');
+    await forfeitPilot(id);
+    pilot = await prisma.pilot.findUnique({ where: { id } });
+  } else {
+    pilot = await prisma.pilot.update({
+      where: { id },
+      data: { status },
+    });
+  }
 
   // Invalidate caches
   await cache.pilotQueue.invalidate();
