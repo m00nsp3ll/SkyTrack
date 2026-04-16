@@ -4,6 +4,7 @@ import { asyncHandler, AppError } from '../middleware/errorHandler.js';
 import { authenticate, requireRole, AuthRequest } from '../middleware/auth.js';
 import { cache } from '../services/cache.js';
 import { sendNativeToPilot, getNotificationConfig } from '../services/firebaseNotification.js';
+import { pilotQueueService } from '../services/pilotQueue.js';
 import fs from 'fs/promises';
 import path from 'path';
 
@@ -534,6 +535,71 @@ router.post('/:id/cancel', authenticate, asyncHandler(async (req: AuthRequest, r
     success: true,
     data: updatedFlight,
     message: 'Uçuş iptal edildi',
+  });
+}));
+
+// POST /api/flights/:id/forfeit-reassign - Pilot feragat eder, müşteri sıradaki pilota geçer
+router.post('/:id/forfeit-reassign', authenticate, requireRole('ADMIN'), asyncHandler(async (req: AuthRequest, res: any) => {
+  const { id } = req.params;
+
+  const flight = await prisma.flight.findUnique({
+    where: { id },
+    include: { customer: true, pilot: true },
+  });
+  if (!flight) throw new AppError('Uçuş bulunamadı', 404, 'FLIGHT_NOT_FOUND');
+  if (flight.status === 'COMPLETED' || flight.status === 'CANCELLED') {
+    throw new AppError('Bu uçuş zaten tamamlanmış veya iptal edilmiş', 400, 'INVALID_STATUS');
+  }
+
+  // 1. Mevcut uçuşu iptal et + pilot feragat et
+  await prisma.$transaction(async (tx) => {
+    await tx.flight.update({
+      where: { id },
+      data: {
+        status: 'CANCELLED',
+        cancellationReason: 'OTHER',
+        cancellationNote: 'Admin feragat — müşteri sıradaki pilota geçti',
+      },
+    });
+    await tx.pilot.update({
+      where: { id: flight.pilotId },
+      data: { status: 'AVAILABLE', dailyFlightCount: { decrement: 1 } },
+    });
+    await tx.customer.update({
+      where: { id: flight.customerId },
+      data: { status: 'REGISTERED', assignedPilotId: null },
+    });
+  });
+
+  const { forfeitPilot } = await import('../services/roundCounter.js');
+  await forfeitPilot(flight.pilotId);
+
+  await cache.pilotQueue.invalidate();
+  await cache.pilot.invalidate(flight.pilotId);
+  await cache.customer.invalidate(flight.customerId);
+  await cache.activeFlights.invalidate();
+
+  // 2. Müşteriyi sıradaki pilota ata
+  const io = req.app.get('io');
+  const result = await pilotQueueService.assignPilotToCustomer(
+    flight.customerId,
+    flight.customer.displayId,
+    io,
+  );
+
+  if (!result) {
+    return res.json({
+      success: true,
+      message: 'Pilot feragat etti — şu an müsait pilot yok, müşteri kuyrukta',
+      reassigned: false,
+    });
+  }
+
+  res.json({
+    success: true,
+    message: `Pilot feragat etti — müşteri ${result.pilot.name} pilotuna atandı`,
+    reassigned: true,
+    newPilot: { id: result.pilot.id, name: result.pilot.name },
   });
 }));
 

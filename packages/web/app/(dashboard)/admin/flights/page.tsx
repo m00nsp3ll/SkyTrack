@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { flightsApi } from '@/lib/api'
+import { flightsApi, api } from '@/lib/api'
 import { useSocket } from '@/hooks/useSocket'
 import { SOCKET_EVENTS } from '@/lib/socket'
 import {
@@ -22,6 +22,7 @@ import {
   List,
   Wifi,
   WifiOff,
+  SkipForward,
 } from 'lucide-react'
 
 interface Customer {
@@ -422,15 +423,37 @@ export default function LiveFlightsPage() {
                       </div>
                       {/* Manuel admin status butonları */}
                       {flight.status === 'ASSIGNED' && (
-                        <Button
-                          size="sm"
-                          className="w-full bg-yellow-500 hover:bg-yellow-600"
-                          onClick={(e) => { e.stopPropagation(); adminUpdateStatus(flight.id, 'PICKED_UP') }}
-                          disabled={updatingId === flight.id}
-                        >
-                          <User className="h-4 w-4 mr-1" />
-                          {updatingId === flight.id ? 'İşleniyor...' : 'Müşteri Alındı'}
-                        </Button>
+                        <div className="grid grid-cols-2 gap-2">
+                          <Button
+                            size="sm"
+                            className="bg-green-600 hover:bg-green-700"
+                            onClick={(e) => { e.stopPropagation(); adminUpdateStatus(flight.id, 'PICKED_UP') }}
+                            disabled={updatingId === flight.id}
+                          >
+                            <User className="h-4 w-4 mr-1" />
+                            Onayla
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="border-orange-300 text-orange-700 hover:bg-orange-50"
+                            onClick={async (e) => {
+                              e.stopPropagation()
+                              if (!confirm(`${flight.pilot.name} pilotuna feragat yazılıp müşteri sıradaki pilota geçsin mi?`)) return
+                              setUpdatingId(flight.id)
+                              try {
+                                await api.post(`/flights/${flight.id}/forfeit-reassign`)
+                                await fetchData()
+                              } catch (err: any) {
+                                alert(err.response?.data?.error?.message || 'Feragat başarısız')
+                              } finally { setUpdatingId(null) }
+                            }}
+                            disabled={updatingId === flight.id}
+                          >
+                            <SkipForward className="h-4 w-4 mr-1" />
+                            Feragat
+                          </Button>
+                        </div>
                       )}
                       {flight.status === 'PICKED_UP' && (
                         <Button
