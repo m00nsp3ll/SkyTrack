@@ -27,6 +27,7 @@ interface Pilot {
   maxDailyFlights: number
   queuePosition: number
   inQueue: boolean
+  isInExcel?: boolean
 }
 
 const statusConfig = {
@@ -150,17 +151,18 @@ export default function PilotQueuePage() {
     )
   }
 
-  // Excel'de olan pilotlar (in_queue=true) ana listede, sıralama roundCount asc → forma asc
+  // Excel'de olan tüm pilotlar (is_in_excel=true) ana listede, sıralama roundCount asc → forma asc
+  // in_queue=false olanlar bile listede kalır ("Sırada Değil" rozeti + auto-forfeit)
   const inQueuePilots = pilots
-    .filter(p => p.inQueue)
+    .filter((p: any) => p.isInExcel !== false)
     .sort((a, b) => {
       const ar = (a as any).roundCount ?? 0
       const br = (b as any).roundCount ?? 0
       if (ar !== br) return ar - br
       return a.queuePosition - b.queuePosition
     })
-  // Excel'de olmayan / sisteme dahil değil pilotlar — alt bölüm
-  const outOfQueuePilots = pilots.filter(p => !p.inQueue)
+  // Excel'de olmayan pilotlar — "Sisteme Dahil Değil" alt bölümü
+  const outOfQueuePilots = pilots.filter((p: any) => p.isInExcel === false)
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -273,7 +275,12 @@ export default function PilotQueuePage() {
                     {displayPos}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate">{pilot.name}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium truncate">{pilot.name}</p>
+                      {isNotInQueue && (
+                        <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-orange-200 text-orange-800">Sırada Değil</span>
+                      )}
+                    </div>
                     <div className="flex items-center gap-2 text-sm">
                       <StatusIcon className={`h-3 w-3 ${status.color}`} />
                       <span className={status.color}>{status.label}</span>

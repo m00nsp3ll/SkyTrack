@@ -194,20 +194,24 @@ export const pilotQueueService = {
         },
       });
 
-      // OTOMATİK FERAGAT: sırası gelmiş ama mesai dışı/molada olan EXCEL pilotları
-      // (in_queue=false pilotlar Excel'de değil — rotasyona katılmaz, feragat almaz)
+      // OTOMATİK FERAGAT: Excel'deki ama uçamayan pilotlar (mesai dışı/molada/sırada değil)
       const skipped = await tx.pilot.findMany({
         where: {
           isActive: true,
-          inQueue: true,
-          status: { in: ['OFF_DUTY', 'ON_BREAK'] },
+          isInExcel: true,
           OR: [
-            { roundCount: { lt: pilot.roundCount } },
-            {
-              roundCount: pilot.roundCount,
-              queuePosition: { lt: pilot.queuePosition },
-            },
+            { inQueue: false }, // Excel'de ama sıraya katılmıyor
+            { status: { in: ['OFF_DUTY', 'ON_BREAK'] } },
           ],
+          AND: [{
+            OR: [
+              { roundCount: { lt: pilot.roundCount } },
+              {
+                roundCount: pilot.roundCount,
+                queuePosition: { lt: pilot.queuePosition },
+              },
+            ],
+          }],
         },
         select: { id: true, roundCount: true, queuePosition: true },
       });
