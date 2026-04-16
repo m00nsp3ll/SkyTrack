@@ -154,7 +154,7 @@ export default function PilotQueuePage() {
   // Excel'de olan tüm pilotlar (is_in_excel=true) ana listede, sıralama roundCount asc → forma asc
   // in_queue=false olanlar bile listede kalır ("Sırada Değil" rozeti + auto-forfeit)
   const inQueuePilots = pilots
-    .filter((p: any) => p.isInExcel !== false)
+    .filter((p: any) => p.isInExcel === true)
     .sort((a, b) => {
       const ar = (a as any).roundCount ?? 0
       const br = (b as any).roundCount ?? 0
@@ -162,7 +162,7 @@ export default function PilotQueuePage() {
       return a.queuePosition - b.queuePosition
     })
   // Excel'de olmayan pilotlar — "Sisteme Dahil Değil" alt bölümü
-  const outOfQueuePilots = pilots.filter((p: any) => p.isInExcel === false)
+  const outOfQueuePilots = pilots.filter((p: any) => p.isInExcel === false || p.isInExcel === undefined && !p.inQueue)
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">

@@ -45,6 +45,7 @@ router.get('/queue', authenticate, asyncHandler(async (req: AuthRequest, res: an
       queuePosition: true,
       roundCount: true,
       inQueue: true,
+      isInExcel: true,
       phone: true,
     },
   });
