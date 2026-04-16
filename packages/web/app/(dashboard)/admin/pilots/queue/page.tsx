@@ -150,7 +150,16 @@ export default function PilotQueuePage() {
     )
   }
 
-  const inQueuePilots = pilots.filter(p => p.inQueue && p.status !== 'OFF_DUTY' && p.status !== 'ON_BREAK')
+  const tookCustomer = (s: string) => s === 'ASSIGNED' || s === 'PICKED_UP' || s === 'IN_FLIGHT'
+  const inQueuePilots = pilots
+    .filter(p => p.inQueue && p.status !== 'OFF_DUTY' && p.status !== 'ON_BREAK')
+    .sort((a, b) => {
+      const at = tookCustomer(a.status) ? 1 : 0
+      const bt = tookCustomer(b.status) ? 1 : 0
+      if (at !== bt) return at - bt
+      if (at === 1) return b.queuePosition - a.queuePosition
+      return a.queuePosition - b.queuePosition
+    })
   const offDutyPilots = pilots.filter(p => p.inQueue && (p.status === 'OFF_DUTY' || p.status === 'ON_BREAK'))
   const outOfQueuePilots = pilots.filter(p => !p.inQueue)
 
