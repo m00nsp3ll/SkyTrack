@@ -102,23 +102,18 @@ export default function PilotsPage() {
     return matchesSearch && matchesFilter
   })
 
-  // Aktif sıradaki pilotlar — Müsait + müşteri almış hepsi tek listede.
-  // Müsait olanlar başta queuePosition asc, müşteri almışlar sonda queuePosition DESC
-  // (en erken müşteri alan en sonda — qp en küçük olan = ilk push edilen)
-  const tookCustomer = (s: string) => s === 'ASSIGNED' || s === 'PICKED_UP' || s === 'IN_FLIGHT'
+  // Excel mantığı: tüm sıradakiler (Müsait + Müşteri Almış + Mesai Dışı + Molada) tek listede
+  // Sıralama: roundCount ASC → queuePosition (forma) ASC. Herkes eşit tur dönsün.
   const queuePilots = filteredPilots
-    .filter((p) => p.isActive && p.inQueue && p.dailyFlightCount < p.maxDailyFlights && p.status !== 'OFF_DUTY' && p.status !== 'ON_BREAK')
+    .filter((p) => p.isActive && p.inQueue && p.dailyFlightCount < p.maxDailyFlights)
     .sort((a, b) => {
-      const at = tookCustomer(a.status) ? 1 : 0
-      const bt = tookCustomer(b.status) ? 1 : 0
-      if (at !== bt) return at - bt
-      if (at === 1) return b.queuePosition - a.queuePosition // took customer: DESC
-      return a.queuePosition - b.queuePosition // available: ASC
+      const ar = (a as any).roundCount ?? 0
+      const br = (b as any).roundCount ?? 0
+      if (ar !== br) return ar - br
+      return a.queuePosition - b.queuePosition
     })
   const limitReachedPilots = filteredPilots.filter((p) => p.dailyFlightCount >= p.maxDailyFlights && p.isActive)
   const notInQueuePilots = filteredPilots.filter((p) => p.isActive && !p.inQueue && p.dailyFlightCount < p.maxDailyFlights)
-  const onBreakPilots = filteredPilots.filter((p) => p.isActive && p.inQueue && p.status === 'ON_BREAK' && p.dailyFlightCount < p.maxDailyFlights)
-  const offDutyPilots = filteredPilots.filter((p) => p.isActive && p.inQueue && p.status === 'OFF_DUTY' && p.dailyFlightCount < p.maxDailyFlights)
   const inactivePilots = filteredPilots.filter((p) => !p.isActive)
 
   // First AVAILABLE pilot in queue is the next one to receive a customer
@@ -365,68 +360,6 @@ export default function PilotsPage() {
           </div>
         )}
 
-
-        {/* Molada Pilotlar */}
-        {onBreakPilots.length > 0 && (
-          <div className="space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="flex-1 h-px bg-yellow-300" />
-              <span className="text-sm font-medium text-yellow-600 whitespace-nowrap">Molada ({onBreakPilots.length})</span>
-              <div className="flex-1 h-px bg-yellow-300" />
-            </div>
-            <div className="grid gap-3">
-              {onBreakPilots.map((pilot) => (
-                <Card key={pilot.id} className="opacity-75 bg-yellow-50 border-yellow-200">
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-4">
-                      <div className="hidden sm:flex items-center justify-center px-3 py-1 bg-yellow-500 text-white rounded-full text-xs font-bold">MOLA</div>
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold truncate">{pilot.name}</h3>
-                        <span className="flex items-center gap-1 text-sm text-muted-foreground"><Phone className="h-3 w-3" />{pilot.phone}</span>
-                      </div>
-                      <div className="text-center">
-                        <p className="text-2xl font-bold text-primary">{pilot.dailyFlightCount}/{pilot.maxDailyFlights}</p>
-                        <p className="text-xs text-muted-foreground">Bugün</p>
-                      </div>
-                      <Link href={`/admin/pilots/${pilot.id}`}><Button variant="outline" size="sm"><Edit className="h-4 w-4 mr-1" />Detay</Button></Link>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Mesai Dışı Pilotlar */}
-        {offDutyPilots.length > 0 && (
-          <div className="space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="flex-1 h-px bg-gray-300" />
-              <span className="text-sm font-medium text-gray-500 whitespace-nowrap">Mesai Dışı ({offDutyPilots.length})</span>
-              <div className="flex-1 h-px bg-gray-300" />
-            </div>
-            <div className="grid gap-3">
-              {offDutyPilots.map((pilot) => (
-                <Card key={pilot.id} className="opacity-60 bg-gray-50 border-gray-200">
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-4">
-                      <div className="hidden sm:flex items-center justify-center px-3 py-1 bg-gray-500 text-white rounded-full text-xs font-bold">MESAİ DIŞI</div>
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold truncate">{pilot.name}</h3>
-                        <span className="flex items-center gap-1 text-sm text-muted-foreground"><Phone className="h-3 w-3" />{pilot.phone}</span>
-                      </div>
-                      <div className="text-center">
-                        <p className="text-2xl font-bold text-primary">{pilot.dailyFlightCount}/{pilot.maxDailyFlights}</p>
-                        <p className="text-xs text-muted-foreground">Bugün</p>
-                      </div>
-                      <Link href={`/admin/pilots/${pilot.id}`}><Button variant="outline" size="sm"><Edit className="h-4 w-4 mr-1" />Detay</Button></Link>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </div>
-        )}
 
         {/* Sırada Değil */}
         {notInQueuePilots.length > 0 && (
