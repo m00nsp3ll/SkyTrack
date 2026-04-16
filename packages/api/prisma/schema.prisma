@@ -114,6 +114,7 @@ model Pilot {
   maxDailyFlights  Int                @default(7) @map("max_daily_flights")
   isActive         Boolean            @default(true) @map("is_active")
   inQueue          Boolean            @default(true) @map("in_queue")
+  isInExcel        Boolean            @default(true) @map("is_in_excel")
   queuePosition    Int                @map("queue_position")
   status           PilotStatus        @default(AVAILABLE)
   appInstalled     Boolean            @default(false) @map("app_installed")
