@@ -294,44 +294,6 @@ export default function PilotQueuePage() {
         </CardContent>
       </Card>
 
-      {/* Sıra Dışı Pilotlar */}
-      {outOfQueuePilots.length > 0 && (
-        <div>
-          <div className="flex items-center gap-3 my-2">
-            <div className="flex-1 h-px bg-orange-300" />
-            <span className="text-sm font-medium text-orange-500 whitespace-nowrap">Sırada Değil</span>
-            <div className="flex-1 h-px bg-orange-300" />
-          </div>
-          <Card className="border-orange-200">
-            <CardContent className="p-0">
-              <div className="divide-y">
-                {outOfQueuePilots.map((pilot) => {
-                  const status = statusConfig[pilot.status] || statusConfig.AVAILABLE
-                  const StatusIcon = status.icon
-                  const isAtLimit = pilot.dailyFlightCount >= pilot.maxDailyFlights
-                  return (
-                    <div key={pilot.id} className="flex items-center gap-4 p-4 opacity-60 bg-orange-50/40">
-                      <div className="w-5" />
-                      <div className="flex items-center justify-center w-8 h-8 bg-orange-300 text-white rounded-full text-sm font-bold">—</div>
-                      <div className="flex-1">
-                        <p className="font-medium">{pilot.name}</p>
-                        <div className="flex items-center gap-2 text-sm">
-                          <StatusIcon className={`h-3 w-3 ${status.color}`} />
-                          <span className={status.color}>{status.label}</span>
-                          <span className="text-muted-foreground">·</span>
-                          <span className={isAtLimit ? 'text-red-600' : 'text-muted-foreground'}>
-                            {pilot.dailyFlightCount}/{pilot.maxDailyFlights} uçuş
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
     </div>
   )
 }
