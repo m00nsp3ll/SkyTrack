@@ -1156,46 +1156,70 @@ export default function PilotPanel() {
             </div>
             <div className="flex-1 overflow-y-auto divide-y">
               {(() => {
-                // Pilotlara sadece sıradaki AVAILABLE pilotlar gösterilir (mesai dışı, sırası dolanlar gizli)
-                const sorted = queueList
-                  .filter(p => p.inQueue && p.status === 'AVAILABLE' && p.dailyFlightCount < p.maxDailyFlights)
-                  .sort((a, b) => a.queuePosition - b.queuePosition)
-                if (sorted.length === 0) return (
+                const inQueue = queueList.filter(p => p.inQueue)
+                const isAvailableSlot = (p: any) => p.status === 'AVAILABLE' && p.dailyFlightCount < p.maxDailyFlights
+                const active = inQueue.filter(isAvailableSlot).sort((a, b) => a.queuePosition - b.queuePosition)
+                const inactive = inQueue.filter(p => !isAvailableSlot(p)).sort((a, b) => a.queuePosition - b.queuePosition)
+
+                if (active.length === 0 && inactive.length === 0) return (
                   <div className="flex flex-col items-center justify-center h-full text-muted-foreground py-16">
                     <Users className="h-12 w-12 opacity-20 mb-3" />
                     <p className="font-medium">Sıra yükleniyor...</p>
                   </div>
                 )
-                return sorted.map((p, index) => {
-                  const isMe = p.id === pilot?.id
-                  const isInFlight = p.status === 'IN_FLIGHT'
-                  const isAtLimit = p.dailyFlightCount >= p.maxDailyFlights
-                  const statusLabel: Record<string, string> = {
-                    AVAILABLE: 'Müsait', IN_FLIGHT: 'Uçuşta', ON_BREAK: 'Molada',
-                    OFF_DUTY: 'Mesai Dışı', ASSIGNED: 'Atandı',
-                  }
-                  const statusColor: Record<string, string> = {
-                    AVAILABLE: 'text-green-600 bg-green-50', IN_FLIGHT: 'text-blue-600 bg-blue-50',
-                    ON_BREAK: 'text-yellow-600 bg-yellow-50', OFF_DUTY: 'text-gray-500 bg-gray-100',
-                    ASSIGNED: 'text-purple-600 bg-purple-50',
-                  }
-                  return (
-                    <div key={p.id} className={`flex items-center gap-3 px-4 py-3 ${isMe ? 'bg-yellow-50 border-l-4 border-yellow-400' : isInFlight ? 'bg-blue-50/40' : ''} ${isAtLimit ? 'opacity-50' : ''}`}>
-                      <span className={`w-8 text-center font-bold text-lg ${isMe ? 'text-yellow-600' : isInFlight ? 'text-blue-400' : 'text-muted-foreground'}`}>
-                        {isInFlight ? <Plane className="h-4 w-4 mx-auto" /> : index + 1}
-                      </span>
-                      <div className="flex-1 min-w-0">
-                        <p className={`font-semibold truncate ${isMe ? 'text-yellow-700' : ''}`}>
-                          {p.name} {isMe && <span className="text-xs font-normal text-yellow-600">(Sen)</span>}
-                        </p>
-                        {isMe && <p className="text-xs text-muted-foreground">{p.dailyFlightCount}/{p.maxDailyFlights} uçuş</p>}
+
+                const statusLabel: Record<string, string> = {
+                  AVAILABLE: 'Müsait', IN_FLIGHT: 'Uçuşta', ON_BREAK: 'Molada',
+                  OFF_DUTY: 'Mesai Dışı', ASSIGNED: 'Müşteri Atandı', PICKED_UP: 'Müşteri Alındı',
+                }
+                const statusColor: Record<string, string> = {
+                  AVAILABLE: 'text-green-600 bg-green-50', IN_FLIGHT: 'text-blue-600 bg-blue-50',
+                  ON_BREAK: 'text-yellow-600 bg-yellow-50', OFF_DUTY: 'text-gray-500 bg-gray-100',
+                  ASSIGNED: 'text-purple-600 bg-purple-50', PICKED_UP: 'text-blue-500 bg-blue-50',
+                }
+
+                return (
+                  <>
+                    {active.map((p, index) => {
+                      const isMe = p.id === pilot?.id
+                      return (
+                        <div key={p.id} className={`flex items-center gap-3 px-4 py-3 ${isMe ? 'bg-yellow-50 border-l-4 border-yellow-400' : ''}`}>
+                          <span className={`w-8 text-center font-bold text-lg ${isMe ? 'text-yellow-600' : 'text-muted-foreground'}`}>{index + 1}</span>
+                          <div className="flex-1 min-w-0">
+                            <p className={`font-semibold truncate ${isMe ? 'text-yellow-700' : ''}`}>
+                              {p.name} {isMe && <span className="text-xs font-normal text-yellow-600">(Sen)</span>}
+                            </p>
+                            {isMe && <p className="text-xs text-muted-foreground">{p.dailyFlightCount}/{p.maxDailyFlights} uçuş</p>}
+                          </div>
+                          <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${statusColor.AVAILABLE}`}>Müsait</span>
+                        </div>
+                      )
+                    })}
+                    {inactive.length > 0 && (
+                      <div className="px-4 py-2 bg-gray-50 text-xs font-semibold text-gray-500 uppercase tracking-wide border-t-2 border-gray-200">
+                        Müsait Olmayanlar ({inactive.length})
                       </div>
-                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${statusColor[p.status] || 'text-gray-500 bg-gray-100'}`}>
-                        {statusLabel[p.status] || p.status}
-                      </span>
-                    </div>
-                  )
-                })
+                    )}
+                    {inactive.map((p) => {
+                      const isMe = p.id === pilot?.id
+                      const isInFlight = p.status === 'IN_FLIGHT'
+                      return (
+                        <div key={p.id} className={`flex items-center gap-3 px-4 py-3 opacity-70 ${isMe ? 'bg-yellow-50 border-l-4 border-yellow-400' : isInFlight ? 'bg-blue-50/40' : ''}`}>
+                          <span className="w-8 text-center text-gray-400">—</span>
+                          <div className="flex-1 min-w-0">
+                            <p className={`font-semibold truncate ${isMe ? 'text-yellow-700' : ''}`}>
+                              {p.name} {isMe && <span className="text-xs font-normal text-yellow-600">(Sen)</span>}
+                            </p>
+                            {isMe && <p className="text-xs text-muted-foreground">{p.dailyFlightCount}/{p.maxDailyFlights} uçuş</p>}
+                          </div>
+                          <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${statusColor[p.status] || 'text-gray-500 bg-gray-100'}`}>
+                            {statusLabel[p.status] || p.status}
+                          </span>
+                        </div>
+                      )
+                    })}
+                  </>
+                )
               })()}
             </div>
             <div style={{ paddingBottom: 'env(safe-area-inset-bottom)' }} />
