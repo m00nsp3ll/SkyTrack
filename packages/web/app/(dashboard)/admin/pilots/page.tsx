@@ -102,9 +102,13 @@ export default function PilotsPage() {
     return matchesSearch && matchesFilter
   })
 
-  // Aktif sıradaki pilotlar (inQueue=true, limit dolmamış)
+  // Aktif sıradaki pilotlar — sadece müsait (mesai dışı/molada/uçuşta/atanmış aşağıdaki bölümlerde)
   const queuePilots = filteredPilots
-    .filter((p) => p.isActive && p.inQueue && p.dailyFlightCount < p.maxDailyFlights)
+    .filter((p) => p.isActive && p.inQueue && p.status === 'AVAILABLE' && p.dailyFlightCount < p.maxDailyFlights)
+    .sort((a, b) => a.queuePosition - b.queuePosition)
+  // Müşteri almış pilotlar (uçuş zinciri içinde)
+  const busyPilots = filteredPilots
+    .filter((p) => p.isActive && p.inQueue && p.dailyFlightCount < p.maxDailyFlights && (p.status === 'ASSIGNED' || p.status === 'PICKED_UP' || p.status === 'IN_FLIGHT'))
     .sort((a, b) => a.queuePosition - b.queuePosition)
   const limitReachedPilots = filteredPilots.filter((p) => p.dailyFlightCount >= p.maxDailyFlights && p.isActive)
   const notInQueuePilots = filteredPilots.filter((p) => p.isActive && !p.inQueue && p.dailyFlightCount < p.maxDailyFlights)
@@ -344,6 +348,42 @@ export default function PilotsPage() {
                         </div>
                         <div className="text-center">
                           <p className="text-2xl font-bold text-red-600">{pilot.dailyFlightCount}/{pilot.maxDailyFlights}</p>
+                          <p className="text-xs text-muted-foreground">Bugün</p>
+                        </div>
+                        <Link href={`/admin/pilots/${pilot.id}`}><Button variant="outline" size="sm"><Edit className="h-4 w-4 mr-1" />Detay</Button></Link>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Müşteri Almış Pilotlar */}
+        {busyPilots.length > 0 && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="flex-1 h-px bg-blue-300" />
+              <span className="text-sm font-medium text-blue-600 whitespace-nowrap">Müşterisi Var ({busyPilots.length})</span>
+              <div className="flex-1 h-px bg-blue-300" />
+            </div>
+            <div className="grid gap-3">
+              {busyPilots.map((pilot) => {
+                const status = statusConfig[pilot.status] || statusConfig.AVAILABLE
+                return (
+                  <Card key={pilot.id} className="opacity-75 bg-blue-50 border-blue-200">
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-4">
+                        <div className={`hidden sm:flex items-center justify-center px-3 py-1 ${status.color} text-white rounded-full text-xs font-bold`}>
+                          {status.label.toUpperCase()}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-semibold truncate">{pilot.name}</h3>
+                          <span className="flex items-center gap-1 text-sm text-muted-foreground"><Phone className="h-3 w-3" />{pilot.phone}</span>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-2xl font-bold text-primary">{pilot.dailyFlightCount}/{pilot.maxDailyFlights}</p>
                           <p className="text-xs text-muted-foreground">Bugün</p>
                         </div>
                         <Link href={`/admin/pilots/${pilot.id}`}><Button variant="outline" size="sm"><Edit className="h-4 w-4 mr-1" />Detay</Button></Link>
