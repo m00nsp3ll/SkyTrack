@@ -1156,12 +1156,22 @@ export default function PilotPanel() {
             </div>
             <div className="flex-1 overflow-y-auto divide-y">
               {(() => {
-                const inQueue = queueList.filter(p => p.inQueue)
-                const isAvailableSlot = (p: any) => p.status === 'AVAILABLE' && p.dailyFlightCount < p.maxDailyFlights
-                const active = inQueue.filter(isAvailableSlot).sort((a, b) => a.queuePosition - b.queuePosition)
-                const inactive = inQueue.filter(p => !isAvailableSlot(p)).sort((a, b) => a.queuePosition - b.queuePosition)
+                const tookCustomer = (s: string) => s === 'ASSIGNED' || s === 'PICKED_UP' || s === 'IN_FLIGHT'
+                // Aktif sıra: Müsait + müşteri almışlar (Mesai Dışı / Molada ayrı bölümde)
+                const inQueueActive = queueList
+                  .filter(p => p.inQueue && p.dailyFlightCount < p.maxDailyFlights && p.status !== 'OFF_DUTY' && p.status !== 'ON_BREAK')
+                  .sort((a, b) => {
+                    const at = tookCustomer(a.status) ? 1 : 0
+                    const bt = tookCustomer(b.status) ? 1 : 0
+                    if (at !== bt) return at - bt
+                    if (at === 1) return b.queuePosition - a.queuePosition
+                    return a.queuePosition - b.queuePosition
+                  })
+                const inactive = queueList
+                  .filter(p => p.inQueue && (p.status === 'OFF_DUTY' || p.status === 'ON_BREAK'))
+                  .sort((a, b) => a.queuePosition - b.queuePosition)
 
-                if (active.length === 0 && inactive.length === 0) return (
+                if (inQueueActive.length === 0 && inactive.length === 0) return (
                   <div className="flex flex-col items-center justify-center h-full text-muted-foreground py-16">
                     <Users className="h-12 w-12 opacity-20 mb-3" />
                     <p className="font-medium">Sıra yükleniyor...</p>
@@ -1180,18 +1190,21 @@ export default function PilotPanel() {
 
                 return (
                   <>
-                    {active.map((p, index) => {
+                    {inQueueActive.map((p, index) => {
                       const isMe = p.id === pilot?.id
+                      const inFlight = tookCustomer(p.status)
                       return (
-                        <div key={p.id} className={`flex items-center gap-3 px-4 py-3 ${isMe ? 'bg-yellow-50 border-l-4 border-yellow-400' : ''}`}>
-                          <span className={`w-8 text-center font-bold text-lg ${isMe ? 'text-yellow-600' : 'text-muted-foreground'}`}>{index + 1}</span>
+                        <div key={p.id} className={`flex items-center gap-3 px-4 py-3 ${isMe ? 'bg-yellow-50 border-l-4 border-yellow-400' : inFlight ? 'bg-blue-50/40' : ''}`}>
+                          <span className={`w-8 text-center font-bold text-lg ${isMe ? 'text-yellow-600' : inFlight ? 'text-blue-500' : 'text-muted-foreground'}`}>{index + 1}</span>
                           <div className="flex-1 min-w-0">
                             <p className={`font-semibold truncate ${isMe ? 'text-yellow-700' : ''}`}>
                               {p.name} {isMe && <span className="text-xs font-normal text-yellow-600">(Sen)</span>}
                             </p>
                             {isMe && <p className="text-xs text-muted-foreground">{p.dailyFlightCount}/{p.maxDailyFlights} uçuş</p>}
                           </div>
-                          <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${statusColor.AVAILABLE}`}>Müsait</span>
+                          <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${statusColor[p.status] || 'text-gray-500 bg-gray-100'}`}>
+                            {statusLabel[p.status] || p.status}
+                          </span>
                         </div>
                       )
                     })}
@@ -1202,9 +1215,8 @@ export default function PilotPanel() {
                     )}
                     {inactive.map((p) => {
                       const isMe = p.id === pilot?.id
-                      const isInFlight = p.status === 'IN_FLIGHT'
                       return (
-                        <div key={p.id} className={`flex items-center gap-3 px-4 py-3 opacity-70 ${isMe ? 'bg-yellow-50 border-l-4 border-yellow-400' : isInFlight ? 'bg-blue-50/40' : ''}`}>
+                        <div key={p.id} className={`flex items-center gap-3 px-4 py-3 opacity-70 ${isMe ? 'bg-yellow-50 border-l-4 border-yellow-400' : ''}`}>
                           <span className="w-8 text-center text-gray-400">—</span>
                           <div className="flex-1 min-w-0">
                             <p className={`font-semibold truncate ${isMe ? 'text-yellow-700' : ''}`}>
