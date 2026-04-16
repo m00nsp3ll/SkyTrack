@@ -194,6 +194,35 @@ export const pilotQueueService = {
         },
       });
 
+      // OTOMATİK FERAGAT: sırası gelmiş ama mesai dışı/molada olan pilotları da işaretle
+      // (atanan pilotun roundCount+forma'sından önce gelen tüm OFF_DUTY/ON_BREAK)
+      const skipped = await tx.pilot.findMany({
+        where: {
+          isActive: true,
+          inQueue: true,
+          status: { in: ['OFF_DUTY', 'ON_BREAK'] },
+          OR: [
+            { roundCount: { lt: pilot.roundCount } },
+            {
+              roundCount: pilot.roundCount,
+              queuePosition: { lt: pilot.queuePosition },
+            },
+          ],
+        },
+        select: { id: true, roundCount: true, queuePosition: true },
+      });
+      for (const sp of skipped) {
+        // Sıra konumu değişmez, sadece round + forfeit sayaçları artar
+        await tx.pilot.update({
+          where: { id: sp.id },
+          data: {
+            roundCount: { increment: 1 },
+            forfeitCount: { increment: 1 },
+            lastForfeitRound: pilot.roundCount,
+          },
+        });
+      }
+
       return flight;
     });
 

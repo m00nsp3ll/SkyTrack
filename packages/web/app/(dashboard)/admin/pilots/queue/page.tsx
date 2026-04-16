@@ -228,8 +228,26 @@ export default function PilotQueuePage() {
               const displayPos = index + 1
               const StatusIcon = status.icon
               const isAtLimit = pilot.dailyFlightCount >= pilot.maxDailyFlights
+              const isOffDuty = pilot.status === 'OFF_DUTY'
+              const isOnBreak = pilot.status === 'ON_BREAK'
               const isDragging = draggedId === pilot.id
               const isDragOver = dragOverId === pilot.id
+
+              // Renklendirme: mesai dışı (gri), molada (sarı), limit dolan (kırmızı)
+              const rowBg = isAtLimit
+                ? 'bg-red-50 border-l-4 border-red-400'
+                : isOffDuty
+                  ? 'bg-gray-100 border-l-4 border-gray-400'
+                  : isOnBreak
+                    ? 'bg-yellow-50 border-l-4 border-yellow-400'
+                    : ''
+              const numberBg = isAtLimit
+                ? 'bg-red-500 text-white'
+                : isOffDuty
+                  ? 'bg-gray-400 text-white'
+                  : isOnBreak
+                    ? 'bg-yellow-500 text-white'
+                    : 'bg-primary text-white'
 
               return (
                 <div
@@ -240,12 +258,13 @@ export default function PilotQueuePage() {
                   onDrop={(e) => handleDrop(e, pilot.id)}
                   onDragEnd={handleDragEnd}
                   className={`flex items-center gap-4 p-4 cursor-grab active:cursor-grabbing transition-colors select-none
+                    ${rowBg}
                     ${isDragging ? 'opacity-40 bg-blue-50' : ''}
                     ${isDragOver && !isDragging ? 'bg-blue-100 border-t-2 border-blue-500' : 'hover:bg-gray-50'}
                   `}
                 >
                   <GripVertical className="h-5 w-5 text-gray-400 flex-shrink-0" />
-                  <div className="flex items-center justify-center w-8 h-8 rounded-full text-sm font-bold flex-shrink-0 bg-primary text-white">
+                  <div className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-bold flex-shrink-0 ${numberBg}`}>
                     {displayPos}
                   </div>
                   <div className="flex-1 min-w-0">
