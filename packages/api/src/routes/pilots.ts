@@ -585,7 +585,7 @@ router.patch('/:id/status', authenticate, asyncHandler(async (req: AuthRequest, 
   // Emit socket event
   const io = req.app.get('io');
   if (io) {
-    io.to('admin').emit('pilot:status-changed', { pilotId: id, pilotName: pilot.name, status });
+    io.to('admin').emit('pilot:status-changed', { pilotId: id, pilotName: pilot?.name, status });
     io.emit('pilot:queue-updated'); // tüm pilotlara — queue modal anlık güncellenir
   }
 
