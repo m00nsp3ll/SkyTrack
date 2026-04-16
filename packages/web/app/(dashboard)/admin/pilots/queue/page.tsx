@@ -150,17 +150,17 @@ export default function PilotQueuePage() {
     )
   }
 
-  // Excel mantığı: tüm aktif pilotlar (in_queue=false dahil) tek listede.
-  // in_queue=false olanlar otomatik feragat alır — ama görünür kalır.
-  // Sıralama: roundCount asc → queuePosition asc (forma)
+  // Excel'de olan pilotlar (in_queue=true) ana listede, sıralama roundCount asc → forma asc
   const inQueuePilots = pilots
+    .filter(p => p.inQueue)
     .sort((a, b) => {
       const ar = (a as any).roundCount ?? 0
       const br = (b as any).roundCount ?? 0
       if (ar !== br) return ar - br
       return a.queuePosition - b.queuePosition
     })
-  const outOfQueuePilots: any[] = []
+  // Excel'de olmayan / sisteme dahil değil pilotlar — alt bölüm
+  const outOfQueuePilots = pilots.filter(p => !p.inQueue)
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -294,6 +294,41 @@ export default function PilotQueuePage() {
         </CardContent>
       </Card>
 
+      {/* Sisteme Dahil Değil — Excel'de olmayan, henüz sisteme girmemiş pilotlar */}
+      {outOfQueuePilots.length > 0 && (
+        <Card className="mt-6 border-orange-200">
+          <CardHeader className="bg-orange-50 border-b border-orange-200">
+            <CardTitle className="text-orange-700 text-base">
+              Sisteme Dahil Değil ({outOfQueuePilots.length})
+            </CardTitle>
+            <p className="text-xs text-orange-600 mt-1">Excel'de yok — sıraya katılmıyor, otomatik feragat almıyor</p>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="divide-y">
+              {outOfQueuePilots
+                .slice()
+                .sort((a, b) => a.name.localeCompare(b.name, 'tr'))
+                .map((pilot: any) => {
+                  const status = statusConfig[pilot.status as keyof typeof statusConfig] || statusConfig.AVAILABLE
+                  const StatusIcon = status.icon
+                  return (
+                    <div key={pilot.id} className="flex items-center gap-4 p-4 opacity-70">
+                      <div className="w-5" />
+                      <div className="flex items-center justify-center w-8 h-8 bg-orange-300 text-white rounded-full text-sm font-bold flex-shrink-0">—</div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate">{pilot.name}</p>
+                        <div className="flex items-center gap-2 text-sm">
+                          <StatusIcon className={`h-3 w-3 ${status.color}`} />
+                          <span className={status.color}>{status.label}</span>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }
