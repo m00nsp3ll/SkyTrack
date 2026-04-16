@@ -375,8 +375,8 @@ export const pilotQueueService = {
           });
         }
 
-        // Reassign: eski pilot AVAILABLE olur, yeni pilot ASSIGNED.
-        // Sıra konumları sabit — kitap mantığı. Eski pilotun round_count düşürülür (bu atama sayılmaz).
+        // Reassign: eski pilot AVAILABLE+roundCount-1, yeni pilot ASSIGNED+roundCount+1
+        // Forma sabit, sıra bozulmaz (Excel mantığı)
         if (oldPilotId !== pilot!.id) {
           await tx.pilot.update({
             where: { id: oldPilotId },
@@ -387,7 +387,10 @@ export const pilotQueueService = {
           });
           await tx.pilot.update({
             where: { id: pilot!.id },
-            data: { status: 'ASSIGNED' },
+            data: {
+              status: 'ASSIGNED',
+              roundCount: { increment: 1 },
+            },
           });
         }
       });

@@ -150,17 +150,16 @@ export default function PilotQueuePage() {
     )
   }
 
-  const tookCustomer = (s: string) => s === 'ASSIGNED' || s === 'PICKED_UP' || s === 'IN_FLIGHT'
+  // Excel mantığı: tüm sıradakiler (Mesai Dışı/Molada/Müşteri Almış dahil) tek listede.
+  // Sıralama roundCount asc → queuePosition asc (forma)
   const inQueuePilots = pilots
-    .filter(p => p.inQueue && p.status !== 'OFF_DUTY' && p.status !== 'ON_BREAK')
+    .filter(p => p.inQueue)
     .sort((a, b) => {
-      const at = tookCustomer(a.status) ? 1 : 0
-      const bt = tookCustomer(b.status) ? 1 : 0
-      if (at !== bt) return at - bt
-      if (at === 1) return b.queuePosition - a.queuePosition
+      const ar = (a as any).roundCount ?? 0
+      const br = (b as any).roundCount ?? 0
+      if (ar !== br) return ar - br
       return a.queuePosition - b.queuePosition
     })
-  const offDutyPilots = pilots.filter(p => p.inQueue && (p.status === 'OFF_DUTY' || p.status === 'ON_BREAK'))
   const outOfQueuePilots = pilots.filter(p => !p.inQueue)
 
   return (
@@ -270,41 +269,6 @@ export default function PilotQueuePage() {
           </div>
         </CardContent>
       </Card>
-
-      {/* Mesai Dışı / Molada Pilotlar */}
-      {offDutyPilots.length > 0 && (
-        <div>
-          <div className="flex items-center gap-3 my-2">
-            <div className="flex-1 h-px bg-gray-300" />
-            <span className="text-sm font-medium text-gray-500 whitespace-nowrap">Mesai Dışı / Molada ({offDutyPilots.length})</span>
-            <div className="flex-1 h-px bg-gray-300" />
-          </div>
-          <Card className="opacity-75">
-            <CardContent className="p-0">
-              <div className="divide-y">
-                {offDutyPilots.map((pilot) => {
-                  const status = statusConfig[pilot.status] || statusConfig.AVAILABLE
-                  const StatusIcon = status.icon
-                  return (
-                    <div key={pilot.id} className="flex items-center gap-3 p-3">
-                      <div className="flex items-center justify-center w-8 h-8 bg-gray-300 text-gray-600 rounded-full text-sm font-bold flex-shrink-0">—</div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium truncate">{pilot.name}</p>
-                        <div className={`text-xs flex items-center gap-1 ${status.color}`}>
-                          <StatusIcon className="h-3 w-3" />
-                          <span>{status.label}</span>
-                          <span className="mx-1">·</span>
-                          <span>{pilot.dailyFlightCount}/{pilot.maxDailyFlights} uçuş</span>
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
 
       {/* Sıra Dışı Pilotlar */}
       {outOfQueuePilots.length > 0 && (
