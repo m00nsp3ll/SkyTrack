@@ -1156,14 +1156,10 @@ export default function PilotPanel() {
             </div>
             <div className="flex-1 overflow-y-auto divide-y">
               {(() => {
-                const active = queueList.filter(p => p.inQueue && p.status === 'AVAILABLE')
-                const onBreak = queueList.filter(p => p.inQueue && (p.status === 'ON_BREAK' || p.status === 'OFF_DUTY'))
-                const inFlight = queueList.filter(p => p.inQueue && p.status === 'IN_FLIGHT')
-                const sorted = [
-                  ...active.sort((a, b) => a.queuePosition - b.queuePosition),
-                  ...onBreak.sort((a, b) => a.queuePosition - b.queuePosition),
-                  ...inFlight,
-                ]
+                // Pilotlara sadece sıradaki AVAILABLE pilotlar gösterilir (mesai dışı, sırası dolanlar gizli)
+                const sorted = queueList
+                  .filter(p => p.inQueue && p.status === 'AVAILABLE' && p.dailyFlightCount < p.maxDailyFlights)
+                  .sort((a, b) => a.queuePosition - b.queuePosition)
                 if (sorted.length === 0) return (
                   <div className="flex flex-col items-center justify-center h-full text-muted-foreground py-16">
                     <Users className="h-12 w-12 opacity-20 mb-3" />

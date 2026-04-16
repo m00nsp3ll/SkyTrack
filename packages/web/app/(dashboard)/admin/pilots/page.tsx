@@ -105,20 +105,7 @@ export default function PilotsPage() {
   // Aktif sıradaki pilotlar (inQueue=true, limit dolmamış)
   const queuePilots = filteredPilots
     .filter((p) => p.isActive && p.inQueue && p.dailyFlightCount < p.maxDailyFlights)
-    .sort((a, b) => {
-      // Henüz müşteri almamışlar (düşük roundCount) üstte, queuePosition küçük olan önce.
-      // Müşteri alanlar (yüksek roundCount) en altta — içlerinde ilk uçan EN SONDA (queuePosition büyük olan grubun başında).
-      const ar = a.roundCount ?? 0
-      const br = b.roundCount ?? 0
-      if (ar !== br) return ar - br
-      // Aynı roundCount içinde:
-      // Eğer bu pilotlar müşteri almışsa (status ASSIGNED/PICKED_UP/IN_FLIGHT), tersine sırala
-      const tookCustomer = (s: string) => s === 'ASSIGNED' || s === 'PICKED_UP' || s === 'IN_FLIGHT'
-      if (tookCustomer(a.status) && tookCustomer(b.status)) {
-        return b.queuePosition - a.queuePosition
-      }
-      return a.queuePosition - b.queuePosition
-    })
+    .sort((a, b) => a.queuePosition - b.queuePosition)
   const limitReachedPilots = filteredPilots.filter((p) => p.dailyFlightCount >= p.maxDailyFlights && p.isActive)
   const notInQueuePilots = filteredPilots.filter((p) => p.isActive && !p.inQueue && p.dailyFlightCount < p.maxDailyFlights)
   const onBreakPilots = filteredPilots.filter((p) => p.isActive && p.inQueue && p.status === 'ON_BREAK' && p.dailyFlightCount < p.maxDailyFlights)
