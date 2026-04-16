@@ -399,24 +399,29 @@ router.get('/:id/panel', authenticate, asyncHandler(async (req: AuthRequest, res
       isActive: true,
       inQueue: true,
     },
-    orderBy: { queuePosition: 'asc' },
+    orderBy: [
+      { roundCount: 'asc' },
+      { queuePosition: 'asc' },
+    ],
     select: {
       id: true,
       dailyFlightCount: true,
       maxDailyFlights: true,
       status: true,
+      lockedUntilRound: true,
     },
   });
 
-  // Position = rank among all inQueue pilots who haven't hit daily limit
-  // Molada / Mesai Dışı / Uçuşta → sıra 0 (frontend "-" gösterir)
+  // Atama mantığıyla aynı: AVAILABLE + günlük limit altı + kilit yok = sırada
+  const { getCurrentRound } = await import('../services/roundCounter.js');
+  const currentRound = await getCurrentRound();
+
   let dynamicQueuePosition = 0;
   if (pilot.status === 'AVAILABLE') {
-    // Mesai dışı / molada pilotlar sıraya dahil değil — pilot gerçek rotasyon pozisyonunu görsün
     const eligiblePilots = allQueuedPilots.filter(p =>
+      p.status === 'AVAILABLE' &&
       p.dailyFlightCount < p.maxDailyFlights &&
-      p.status !== 'OFF_DUTY' &&
-      p.status !== 'ON_BREAK'
+      (p.lockedUntilRound === null || currentRound >= p.lockedUntilRound)
     );
     const positionIndex = eligiblePilots.findIndex(p => p.id === id);
     if (positionIndex !== -1) {
