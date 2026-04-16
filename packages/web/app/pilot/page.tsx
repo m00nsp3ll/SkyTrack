@@ -1189,10 +1189,9 @@ export default function PilotPanel() {
                   <>
                     {inQueueActive.map((p, index) => {
                       const isMe = p.id === pilot?.id
-                      const inFlight = tookCustomer(p.status)
                       return (
-                        <div key={p.id} className={`flex items-center gap-3 px-4 py-3 ${isMe ? 'bg-yellow-50 border-l-4 border-yellow-400' : inFlight ? 'bg-blue-50/40' : ''}`}>
-                          <span className={`w-8 text-center font-bold text-lg ${isMe ? 'text-yellow-600' : inFlight ? 'text-blue-500' : 'text-muted-foreground'}`}>{index + 1}</span>
+                        <div key={p.id} className={`flex items-center gap-3 px-4 py-3 ${isMe ? 'bg-yellow-50 border-l-4 border-yellow-400' : ''}`}>
+                          <span className={`w-8 text-center font-bold text-lg ${isMe ? 'text-yellow-600' : 'text-muted-foreground'}`}>{index + 1}</span>
                           <div className="flex-1 min-w-0">
                             <p className={`font-semibold truncate ${isMe ? 'text-yellow-700' : ''}`}>
                               {p.name} {isMe && <span className="text-xs font-normal text-yellow-600">(Sen)</span>}
