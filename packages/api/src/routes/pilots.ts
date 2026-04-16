@@ -36,6 +36,7 @@ router.get('/queue', authenticate, asyncHandler(async (req: AuthRequest, res: an
   const pilots = await prisma.pilot.findMany({
     where: { isActive: true },
     orderBy: [
+      { roundCount: 'asc' },
       { queuePosition: 'asc' },
     ],
     select: {
@@ -45,6 +46,7 @@ router.get('/queue', authenticate, asyncHandler(async (req: AuthRequest, res: an
       maxDailyFlights: true,
       status: true,
       queuePosition: true,
+      roundCount: true,
       inQueue: true,
       phone: true,
     },

@@ -35,6 +35,7 @@ interface Pilot {
   inQueue: boolean
   forfeitCount?: number
   lockedUntilRound?: number | null
+  roundCount?: number
   _count?: { flights: number }
 }
 
@@ -105,9 +106,11 @@ export default function PilotsPage() {
   const queuePilots = filteredPilots
     .filter((p) => p.isActive && p.inQueue && p.dailyFlightCount < p.maxDailyFlights)
     .sort((a, b) => {
-      const aAvailable = a.status === 'AVAILABLE' ? 0 : 1
-      const bAvailable = b.status === 'AVAILABLE' ? 0 : 1
-      if (aAvailable !== bAvailable) return aAvailable - bAvailable
+      // Tur sayacı atama mantığıyla aynı: roundCount düşük olan üstte, eşitlikte queuePosition küçük üstte.
+      // Müşteri almış pilotlar (roundCount artmış) doğal olarak alta düşer.
+      const ar = a.roundCount ?? 0
+      const br = b.roundCount ?? 0
+      if (ar !== br) return ar - br
       return a.queuePosition - b.queuePosition
     })
   const limitReachedPilots = filteredPilots.filter((p) => p.dailyFlightCount >= p.maxDailyFlights && p.isActive)
