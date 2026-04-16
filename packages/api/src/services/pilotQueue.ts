@@ -194,20 +194,26 @@ export const pilotQueueService = {
         },
       });
 
-      // OTOMATİK FERAGAT: sırası gelmiş ama mesai dışı/molada olan pilotları da işaretle
-      // (atanan pilotun roundCount+forma'sından önce gelen tüm OFF_DUTY/ON_BREAK)
+      // OTOMATİK FERAGAT: sırası gelmiş ama mesai dışı/molada/sırada değil olan pilotlar
+      // (atanan pilotun roundCount+forma'sından önce gelen tüm uygunsuz pilotlar)
       const skipped = await tx.pilot.findMany({
         where: {
           isActive: true,
-          inQueue: true,
-          status: { in: ['OFF_DUTY', 'ON_BREAK'] },
           OR: [
-            { roundCount: { lt: pilot.roundCount } },
-            {
-              roundCount: pilot.roundCount,
-              queuePosition: { lt: pilot.queuePosition },
-            },
+            // Sırada ama OFF_DUTY/ON_BREAK
+            { inQueue: true, status: { in: ['OFF_DUTY', 'ON_BREAK'] } },
+            // Veya sırada bile değil (excelde olup kuyruğa katılmamış)
+            { inQueue: false },
           ],
+          AND: [{
+            OR: [
+              { roundCount: { lt: pilot.roundCount } },
+              {
+                roundCount: pilot.roundCount,
+                queuePosition: { lt: pilot.queuePosition },
+              },
+            ],
+          }],
         },
         select: { id: true, roundCount: true, queuePosition: true },
       });

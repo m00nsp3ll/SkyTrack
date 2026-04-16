@@ -150,17 +150,17 @@ export default function PilotQueuePage() {
     )
   }
 
-  // Excel mantığı: tüm sıradakiler (Mesai Dışı/Molada/Müşteri Almış dahil) tek listede.
-  // Sıralama roundCount asc → queuePosition asc (forma)
+  // Excel mantığı: tüm aktif pilotlar (in_queue=false dahil) tek listede.
+  // in_queue=false olanlar otomatik feragat alır — ama görünür kalır.
+  // Sıralama: roundCount asc → queuePosition asc (forma)
   const inQueuePilots = pilots
-    .filter(p => p.inQueue)
     .sort((a, b) => {
       const ar = (a as any).roundCount ?? 0
       const br = (b as any).roundCount ?? 0
       if (ar !== br) return ar - br
       return a.queuePosition - b.queuePosition
     })
-  const outOfQueuePilots = pilots.filter(p => !p.inQueue)
+  const outOfQueuePilots: any[] = []
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -230,24 +230,29 @@ export default function PilotQueuePage() {
               const isAtLimit = pilot.dailyFlightCount >= pilot.maxDailyFlights
               const isOffDuty = pilot.status === 'OFF_DUTY'
               const isOnBreak = pilot.status === 'ON_BREAK'
+              const isNotInQueue = !pilot.inQueue
               const isDragging = draggedId === pilot.id
               const isDragOver = dragOverId === pilot.id
 
-              // Renklendirme: mesai dışı (gri), molada (sarı), limit dolan (kırmızı)
-              const rowBg = isAtLimit
-                ? 'bg-red-50 border-l-4 border-red-400'
-                : isOffDuty
-                  ? 'bg-gray-100 border-l-4 border-gray-400'
-                  : isOnBreak
-                    ? 'bg-yellow-50 border-l-4 border-yellow-400'
-                    : ''
-              const numberBg = isAtLimit
-                ? 'bg-red-500 text-white'
-                : isOffDuty
-                  ? 'bg-gray-400 text-white'
-                  : isOnBreak
-                    ? 'bg-yellow-500 text-white'
-                    : 'bg-primary text-white'
+              // Renklendirme: sırada değil (turuncu), limit dolan (kırmızı), mesai dışı (gri), molada (sarı)
+              const rowBg = isNotInQueue
+                ? 'bg-orange-50 border-l-4 border-orange-400'
+                : isAtLimit
+                  ? 'bg-red-50 border-l-4 border-red-400'
+                  : isOffDuty
+                    ? 'bg-gray-100 border-l-4 border-gray-400'
+                    : isOnBreak
+                      ? 'bg-yellow-50 border-l-4 border-yellow-400'
+                      : ''
+              const numberBg = isNotInQueue
+                ? 'bg-orange-500 text-white'
+                : isAtLimit
+                  ? 'bg-red-500 text-white'
+                  : isOffDuty
+                    ? 'bg-gray-400 text-white'
+                    : isOnBreak
+                      ? 'bg-yellow-500 text-white'
+                      : 'bg-primary text-white'
 
               return (
                 <div
