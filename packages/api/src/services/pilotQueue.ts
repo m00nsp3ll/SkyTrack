@@ -58,6 +58,7 @@ export const pilotQueueService = {
         ],
       },
       orderBy: [
+        { roundCount: 'asc' },
         { queuePosition: 'asc' },
       ],
     });
@@ -184,32 +185,13 @@ export const pilotQueueService = {
         },
       });
 
-      // KLASIK ROTASYON: pilot müşteri alınca queue_position max+1 olur (sona gider)
-      // Diğer pilotlar (qp > pilotun eski qp) decrement → 1 yukarı kayar
-      const maxQueuePilot = await tx.pilot.findFirst({
-        where: { isActive: true },
-        orderBy: { queuePosition: 'desc' },
-        select: { queuePosition: true },
-      });
-      const maxQueuePosition = maxQueuePilot?.queuePosition || 0;
-      const oldPosition = pilot.queuePosition;
-
+      // FORMA SİSTEMİ: queue_position SABİT (forma numarası). Sıralama roundCount ile dönüyor.
       await tx.pilot.update({
         where: { id: pilot.id },
         data: {
           dailyFlightCount: { increment: 1 },
           status: 'ASSIGNED',
-          queuePosition: maxQueuePosition + 1,
         },
-      });
-
-      await tx.pilot.updateMany({
-        where: {
-          isActive: true,
-          id: { not: pilot.id },
-          queuePosition: { gt: oldPosition },
-        },
-        data: { queuePosition: { decrement: 1 } },
       });
 
       return flight;
