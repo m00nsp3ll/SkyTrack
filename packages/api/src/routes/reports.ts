@@ -281,7 +281,8 @@ router.get('/pilots', authenticate, asyncHandler(async (req: AuthRequest, res: a
     const flightFee = pilot.flightFee ? Number(pilot.flightFee) : globalFlightFee;
     const hakedis = completedFlights.length * flightFee; // Toplam hakediş
     const totalPaid = pilot.payments.reduce((s, p) => s + Number(p.amount), 0);
-    const kalan = hakedis - totalPaid;
+    // Eksi bakiye yok: pilot uçtuğunun parasını alır, fazla ödeme = 0 (geri alınmaz)
+    const kalan = Math.max(0, hakedis - totalPaid);
 
     return {
       id: pilot.id,
