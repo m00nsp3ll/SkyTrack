@@ -1156,18 +1156,17 @@ export default function PilotPanel() {
             </div>
             <div className="flex-1 overflow-y-auto divide-y">
               {(() => {
-                const tookCustomer = (s: string) => s === 'ASSIGNED' || s === 'PICKED_UP' || s === 'IN_FLIGHT'
-                // Pilotlar SADECE aktif sırayı görür (mesai dışı/molada gizli, Excel mantığı)
-                // Sıralama: roundCount asc → queuePosition asc (forma)
+                // Pilotlar SADECE Müsait pilotları görür (mesai dışı/molada/atanmış/uçuşta gizli)
+                // Sıralama: roundCount asc → queuePosition asc (Excel TOP+forma mantığı)
                 const inQueueActive = queueList
-                  .filter(p => p.inQueue && p.dailyFlightCount < p.maxDailyFlights && p.status !== 'OFF_DUTY' && p.status !== 'ON_BREAK')
+                  .filter(p => p.inQueue && p.status === 'AVAILABLE' && p.dailyFlightCount < p.maxDailyFlights)
                   .sort((a, b) => {
                     const ar = (a as any).roundCount ?? 0
                     const br = (b as any).roundCount ?? 0
                     if (ar !== br) return ar - br
                     return a.queuePosition - b.queuePosition
                   })
-                const inactive: any[] = [] // pilotlara gösterilmiyor
+                const inactive: any[] = []
 
                 if (inQueueActive.length === 0 && inactive.length === 0) return (
                   <div className="flex flex-col items-center justify-center h-full text-muted-foreground py-16">
