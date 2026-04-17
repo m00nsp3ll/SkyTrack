@@ -486,11 +486,8 @@ export default function PilotPerformanceReport() {
               <tbody>
                 {data?.pilots.map((pilot, index) => (
                   <tr key={pilot.id} className="border-b hover:bg-gray-50">
-                    <td className="py-2 px-2">
-                      {index === 0 && <span className="text-yellow-500 text-lg">🥇</span>}
-                      {index === 1 && <span className="text-gray-400 text-lg">🥈</span>}
-                      {index === 2 && <span className="text-amber-600 text-lg">🥉</span>}
-                      {index > 2 && <span className="text-muted-foreground">{index + 1}</span>}
+                    <td className="py-2 px-2 text-center">
+                      <span className="text-muted-foreground font-medium">{index + 1}</span>
                     </td>
                     <td className="py-2 px-2 font-medium">
                       <div className="flex items-center gap-1.5">

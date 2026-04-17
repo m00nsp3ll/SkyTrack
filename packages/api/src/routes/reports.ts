@@ -321,7 +321,7 @@ router.get('/pilots', authenticate, asyncHandler(async (req: AuthRequest, res: a
   res.json({
     success: true,
     data: {
-      pilots: pilotStats.sort((a, b) => b.totalFlights - a.totalFlights),
+      pilots: pilotStats,
       currentRound,
       globalFlightFee,
       fairness: {
