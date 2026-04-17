@@ -221,7 +221,8 @@ router.get('/dashboard/recent', authenticate, asyncHandler(async (req: AuthReque
 router.get('/pilots', authenticate, asyncHandler(async (req: AuthRequest, res: any) => {
   const { from, to } = req.query;
 
-  const fromDate = from ? new Date(from as string) : new Date(new Date().setDate(new Date().getDate() - 30));
+  // Varsayılan: Sezon başlangıcı (1 Mart) — tüm uçuşlar dahil
+  const fromDate = from ? new Date(from as string) : new Date('2026-03-01');
   fromDate.setHours(0, 0, 0, 0);
   const toDate = to ? new Date(to as string) : new Date();
   toDate.setHours(23, 59, 59, 999);
