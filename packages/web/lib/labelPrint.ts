@@ -48,42 +48,42 @@ function buildLabelHtml(data: LabelData): string {
     flex-shrink: 0;
   }
   .qr-top img {
-    width: 30mm;
-    height: 30mm;
+    width: 24mm;
+    height: 24mm;
   }
   .display-id {
-    font-size: 16pt;
+    font-size: 14pt;
     font-weight: bold;
     letter-spacing: 1px;
-    margin-top: 1mm;
-    line-height: 1.1;
+    margin-top: 0.5mm;
+    line-height: 1;
   }
   .customer-name {
-    font-size: 8pt;
+    font-size: 7pt;
     color: #444;
-    margin-top: 1mm;
-    line-height: 1.2;
+    margin-top: 0.5mm;
+    line-height: 1.1;
     max-width: 36mm;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
   .pilot-name {
-    font-size: 8pt;
+    font-size: 7pt;
     font-weight: bold;
     color: #000;
-    margin-top: 0.5mm;
-    line-height: 1.2;
+    margin-top: 0.3mm;
+    line-height: 1.1;
     max-width: 36mm;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
   .datetime {
-    font-size: 6pt;
+    font-size: 5.5pt;
     color: #888;
-    margin-top: 1mm;
-    line-height: 1.1;
+    margin-top: 0.5mm;
+    line-height: 1;
   }
   @media print {
     html, body { margin: 0; padding: 0; }
