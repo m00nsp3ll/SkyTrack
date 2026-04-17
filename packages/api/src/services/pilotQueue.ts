@@ -16,6 +16,7 @@ export interface QueuedPilot {
   maxDailyFlights: number;
   status: PilotStatus;
   queuePosition: number;
+  roundCount: number;
 }
 
 export const pilotQueueService = {
@@ -86,7 +87,8 @@ export const pilotQueueService = {
       const pilots = await prisma.pilot.findMany({
         where: { isActive: true },
         orderBy: [
-          { queuePosition: 'asc' }, // ONLY queue position - round-robin
+          { roundCount: 'asc' },
+          { queuePosition: 'asc' },
         ],
         select: {
           id: true,
@@ -95,6 +97,7 @@ export const pilotQueueService = {
           maxDailyFlights: true,
           status: true,
           queuePosition: true,
+          roundCount: true,
         },
       });
 
@@ -252,7 +255,7 @@ export const pilotQueueService = {
           dailyFlightCount: { lt: prisma.pilot.fields.maxDailyFlights },
           id: { not: pilot.id },
         },
-        orderBy: { queuePosition: 'asc' },
+        orderBy: [{ roundCount: 'asc' }, { queuePosition: 'asc' }],
       });
       if (nextFirst) {
         getNotificationConfig('pilot_first_in_queue').then(config => {
@@ -483,7 +486,8 @@ export const pilotQueueService = {
     const pilots = await prisma.pilot.findMany({
       where: { isActive: true },
       orderBy: [
-        { queuePosition: 'asc' }, // ONLY queue position - pure round-robin
+        { roundCount: 'asc' },
+        { queuePosition: 'asc' },
       ],
       select: {
         id: true,
@@ -492,6 +496,7 @@ export const pilotQueueService = {
         maxDailyFlights: true,
         status: true,
         queuePosition: true,
+        roundCount: true,
       },
     });
 

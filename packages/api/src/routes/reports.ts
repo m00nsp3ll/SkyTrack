@@ -235,13 +235,15 @@ router.get('/pilots', authenticate, asyncHandler(async (req: AuthRequest, res: a
   const currentRound = queueState?.currentRound || 0;
 
   const pilots = await prisma.pilot.findMany({
-    where: { isActive: true },
+    where: { isActive: true, isInExcel: true },
+    orderBy: [{ roundCount: 'asc' }, { queuePosition: 'asc' }],
     select: {
       id: true,
       name: true,
       flightFee: true,
       forfeitCount: true,
       roundCount: true,
+      queuePosition: true,
       isTeamLeader: true,
       team: { select: { id: true, name: true, color: true } },
       company: { select: { id: true, name: true, color: true } },
