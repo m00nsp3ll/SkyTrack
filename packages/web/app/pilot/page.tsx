@@ -537,6 +537,15 @@ export default function PilotPanel() {
   const currentStatus = pilot ? statusConfig[pilot.status] : null
   const CurrentStatusIcon = currentStatus?.icon || CheckCircle
 
+  // Gerçek sıra: müsait pilotlar arasındaki konum (API zaten roundCount+queuePosition sıralı döner)
+  const actualQueueRank = (() => {
+    if (!pilot?.id || !pilot.inQueue || pilot.status !== 'AVAILABLE') return null
+    const available = queueList
+      .filter(p => p.inQueue && p.status === 'AVAILABLE' && p.dailyFlightCount < p.maxDailyFlights)
+    const idx = available.findIndex(p => p.id === pilot.id)
+    return idx >= 0 ? idx + 1 : null
+  })()
+
   return (
     <div className="min-h-screen bg-gray-50 pb-32">
       {/* Header */}
@@ -649,9 +658,7 @@ export default function PilotPanel() {
         >
           <CardContent className="p-3 text-center">
             <p className="text-2xl font-bold text-yellow-600">
-              {pilot?.inQueue && pilot.status === 'AVAILABLE' && pilot.queuePosition > 0
-                ? pilot.queuePosition
-                : '-'}
+              {actualQueueRank ?? '-'}
             </p>
             <p className="text-xs text-muted-foreground">Sıra</p>
           </CardContent>
@@ -985,9 +992,9 @@ export default function PilotPanel() {
                         <span className="font-semibold text-gray-500">Mesai Dışı</span>
                       ) : pilot?.status === 'IN_FLIGHT' ? (
                         <span className="font-semibold text-blue-600">Uçuşta</span>
-                      ) : pilot.queuePosition > 0 ? (
+                      ) : actualQueueRank ? (
                         <span className="font-semibold text-yellow-600">
-                          {pilot.queuePosition}. sırada
+                          {actualQueueRank}. sırada
                         </span>
                       ) : (
                         <span className="font-semibold text-yellow-600">Sırada</span>

@@ -35,7 +35,7 @@ router.get('/queue', authenticate, asyncHandler(async (req: AuthRequest, res: an
   // Always fetch fresh data — cache causes stale queue on real-time updates
   const pilots = await prisma.pilot.findMany({
     where: { isActive: true },
-    orderBy: { queuePosition: 'asc' },
+    orderBy: [{ roundCount: 'asc' }, { queuePosition: 'asc' }],
     select: {
       id: true,
       name: true,
