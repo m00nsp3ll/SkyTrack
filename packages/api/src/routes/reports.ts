@@ -237,7 +237,7 @@ router.get('/pilots', authenticate, asyncHandler(async (req: AuthRequest, res: a
 
   const pilots = await prisma.pilot.findMany({
     where: { isActive: true, isInExcel: true },
-    orderBy: [{ roundCount: 'asc' }, { queuePosition: 'asc' }],
+    orderBy: [{ queuePosition: 'asc' }],
     select: {
       id: true,
       name: true,
