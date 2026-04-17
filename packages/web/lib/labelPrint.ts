@@ -1,7 +1,7 @@
 /**
  * Thermal label printing utility for Xprinter XP-490B
- * Label size: 40mm x 60mm (portrait)
- * 203 DPI: 40mm = 320px, 60mm = 480px
+ * Paper size: 2x4 in (50.8mm x 101.6mm) — closest available in driver
+ * Physical label: ~40mm x 60mm
  */
 
 export interface LabelData {
@@ -26,13 +26,13 @@ function buildLabelHtml(data: LabelData): string {
 <title>Etiket</title>
 <style>
   @page {
-    size: 40mm 60mm;
+    size: 2in 4in;
     margin: 0 !important;
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body {
-    width: 40mm;
-    height: 60mm;
+    width: 2in;
+    height: 4in;
     margin: 0 !important;
     padding: 0;
     overflow: hidden;
@@ -40,13 +40,13 @@ function buildLabelHtml(data: LabelData): string {
     print-color-adjust: exact;
   }
   .label {
-    width: 40mm;
-    height: 60mm;
+    width: 2in;
+    height: 4in;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 1.5mm;
+    padding: 2mm;
     font-family: Arial, Helvetica, sans-serif;
     text-align: center;
     page-break-after: avoid;
@@ -54,49 +54,49 @@ function buildLabelHtml(data: LabelData): string {
     break-inside: avoid;
   }
   .qr-top img {
-    width: 22mm;
-    height: 22mm;
+    width: 30mm;
+    height: 30mm;
     display: block;
   }
   .display-id {
-    font-size: 13pt;
+    font-size: 18pt;
     font-weight: bold;
     letter-spacing: 1px;
-    margin-top: 0.5mm;
+    margin-top: 2mm;
     line-height: 1;
   }
   .customer-name {
-    font-size: 6.5pt;
+    font-size: 9pt;
     color: #333;
-    margin-top: 0.5mm;
-    line-height: 1;
-    max-width: 36mm;
+    margin-top: 1.5mm;
+    line-height: 1.1;
+    max-width: 46mm;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
   .pilot-name {
-    font-size: 6.5pt;
+    font-size: 9pt;
     font-weight: bold;
-    margin-top: 0.3mm;
-    line-height: 1;
-    max-width: 36mm;
+    margin-top: 1mm;
+    line-height: 1.1;
+    max-width: 46mm;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
   .datetime {
-    font-size: 5pt;
+    font-size: 7pt;
     color: #666;
-    margin-top: 0.5mm;
+    margin-top: 1.5mm;
     line-height: 1;
   }
   @media print {
     html, body {
       margin: 0 !important;
       padding: 0 !important;
-      width: 40mm;
-      height: 60mm;
+      width: 2in;
+      height: 4in;
     }
   }
 </style>
