@@ -17,6 +17,7 @@ import {
   ArrowDownRight,
 } from 'lucide-react'
 import { reportsApi } from '@/lib/api'
+import { printLabel, printLabelRotated, type LabelData } from '@/lib/labelPrint'
 import { useSocket } from '@/hooks/useSocket'
 import Link from 'next/link'
 import {
@@ -102,13 +103,68 @@ const statusLabels: Record<string, string> = {
   CANCELLED: 'İptal',
 }
 
+function generateDemoQR(text: string, size = 200): string {
+  const canvas = document.createElement('canvas')
+  canvas.width = size
+  canvas.height = size
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return ''
+
+  // Simple QR-like pattern for demo (real QR would need a library)
+  ctx.fillStyle = '#ffffff'
+  ctx.fillRect(0, 0, size, size)
+  ctx.fillStyle = '#000000'
+
+  // Generate a deterministic pattern from text
+  const cellCount = 25
+  const cellSize = size / cellCount
+  const hash = text.split('').reduce((acc, c) => ((acc << 5) - acc + c.charCodeAt(0)) | 0, 0)
+
+  // Position detection patterns (3 corners)
+  const drawFinder = (x: number, y: number) => {
+    for (let r = 0; r < 7; r++) {
+      for (let c = 0; c < 7; c++) {
+        const isOuter = r === 0 || r === 6 || c === 0 || c === 6
+        const isInner = r >= 2 && r <= 4 && c >= 2 && c <= 4
+        if (isOuter || isInner) {
+          ctx.fillRect((x + c) * cellSize, (y + r) * cellSize, cellSize, cellSize)
+        }
+      }
+    }
+  }
+  drawFinder(0, 0)
+  drawFinder(cellCount - 7, 0)
+  drawFinder(0, cellCount - 7)
+
+  // Fill data area with pseudo-random pattern
+  let seed = Math.abs(hash)
+  for (let r = 0; r < cellCount; r++) {
+    for (let c = 0; c < cellCount; c++) {
+      const inFinder =
+        (r < 8 && c < 8) || (r < 8 && c > cellCount - 9) || (r > cellCount - 9 && c < 8)
+      if (inFinder) continue
+      seed = (seed * 1103515245 + 12345) & 0x7fffffff
+      if (seed % 3 !== 0) {
+        ctx.fillRect(c * cellSize, r * cellSize, cellSize, cellSize)
+      }
+    }
+  }
+
+  return canvas.toDataURL('image/png')
+}
+
 export default function AdminDashboard() {
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null)
   const [chartData, setChartData] = useState<ChartData | null>(null)
   const [recentData, setRecentData] = useState<RecentData | null>(null)
   const [loading, setLoading] = useState(true)
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date())
+  const [demoQR, setDemoQR] = useState<string>('')
   const { socket } = useSocket()
+
+  useEffect(() => {
+    setDemoQR(generateDemoQR('http://192.168.1.100/c/T0060'))
+  }, [])
 
   const fetchData = useCallback(async () => {
     try {
@@ -723,6 +779,78 @@ export default function AdminDashboard() {
                 <span className="text-xs">Kasa Raporu</span>
               </Button>
             </Link>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Etiket Yazıcı Test */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Etiket Yazici Test (60mm x 40mm)</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <button
+              onClick={() => {
+                if (!demoQR) return
+                printLabel({
+                  qrCode: demoQR,
+                  displayId: 'T0060',
+                  customerName: 'Elas Aidukas',
+                  pilotName: 'Mehmet Ermetin',
+                })
+              }}
+              className="border-2 border-dashed border-blue-300 rounded-lg p-4 hover:bg-blue-50 transition-colors"
+            >
+              <div className="text-sm font-bold mb-2">Tasarim A — Yatay</div>
+              <div className="border rounded bg-white p-2 mx-auto" style={{ width: '180px', height: '120px' }}>
+                <div className="flex h-full items-center">
+                  <div className="w-1/2 flex items-center justify-center border-r pr-1">
+                    {demoQR ? (
+                      <img src={demoQR} alt="QR" className="w-16 h-16" />
+                    ) : (
+                      <div className="w-16 h-16 bg-gray-800 rounded" />
+                    )}
+                  </div>
+                  <div className="w-1/2 flex flex-col items-center justify-center text-center pl-1">
+                    <div className="text-xs font-bold">T0060</div>
+                    <div className="text-[8px] text-gray-500">Elas Aidukas</div>
+                    <div className="text-[8px] font-bold">Pilot: Mehmet</div>
+                    <div className="text-[7px] text-gray-400">17.04.2026</div>
+                  </div>
+                </div>
+              </div>
+              <div className="text-xs text-gray-500 mt-2">QR solda, yazi yatay</div>
+            </button>
+
+            <button
+              onClick={() => {
+                if (!demoQR) return
+                printLabelRotated({
+                  qrCode: demoQR,
+                  displayId: 'T0060',
+                  customerName: 'Elas Aidukas',
+                  pilotName: 'Mehmet Ermetin',
+                })
+              }}
+              className="border-2 border-dashed border-green-300 rounded-lg p-4 hover:bg-green-50 transition-colors"
+            >
+              <div className="text-sm font-bold mb-2">Tasarim B — Dikey Yazi</div>
+              <div className="border rounded bg-white p-2 mx-auto" style={{ width: '120px', height: '160px' }}>
+                <div className="flex flex-col h-full items-center justify-center">
+                  {demoQR ? (
+                    <img src={demoQR} alt="QR" className="w-12 h-12" />
+                  ) : (
+                    <div className="w-12 h-12 bg-gray-800 rounded" />
+                  )}
+                  <div className="text-xs font-bold mt-1">T0060</div>
+                  <div className="text-[7px] text-gray-500">Elas Aidukas</div>
+                  <div className="text-[7px] font-bold">Pilot: Mehmet</div>
+                  <div className="text-[6px] text-gray-400">17.04.2026</div>
+                </div>
+              </div>
+              <div className="text-xs text-gray-500 mt-2">QR ustte, yazi dikey (90° donmus)</div>
+            </button>
           </div>
         </CardContent>
       </Card>
