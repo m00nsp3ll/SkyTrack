@@ -9,7 +9,6 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { api } from '@/lib/api'
 import { AirPrint } from '@/lib/airprint'
-// labelPrint inline
 import { Check, X, PenLine, Eraser, Printer, UserPlus } from 'lucide-react'
 import { type Language, LANGUAGES, t, isRtl } from '@/lib/translations'
 
@@ -341,12 +340,30 @@ export default function KioskPage() {
     }
   }
 
+  // Tek sayfa, 2 QR alt alta (siyah beyaz)
   const buildPrintHtml = (res: RegistrationResult) => {
     const now = new Date()
     const dateStr = now.toLocaleDateString('tr-TR')
     const timeStr = now.toLocaleTimeString('tr-TR')
-    const pilotHtml = res.pilot?.name ? `<div class="pilot-name">Pilot: ${res.pilot.name}</div>` : ''
-    return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Etiket</title><style>@page{size:50mm 70mm;margin:0}html,body{width:50mm;height:70mm;max-height:70mm;margin:0;padding:0;overflow:hidden;font-family:Arial,sans-serif;text-align:center}.qr-container{width:50mm;margin:0 auto;padding:2mm}.qr-code{width:3.2cm;height:3.2cm}.display-id{font-size:14px;font-weight:bold;margin-top:0}.pilot-name{font-size:12px;font-weight:bold;color:#000;margin-top:0}.datetime{font-size:10px;font-weight:bold;color:#000;margin-top:0}body{overflow:hidden}</style></head><body><div class="qr-container"><div class="datetime">${dateStr} - ${timeStr}</div><img src="${res.qrCode}" class="qr-code"/><div class="display-id">${res.customer.displayId} - ${res.customer.firstName} ${res.customer.lastName}</div>${pilotHtml}</div></body></html>`
+    const pilotName = res.pilot?.name || ''
+
+    const ticket = (label: string) => `
+      <div style="text-align:center;padding:6px 0;font-family:-apple-system,Arial,sans-serif;">
+        <div style="font-size:10px;font-weight:bold;margin-bottom:2px;">${label}</div>
+        <img src="${res.qrCode}" alt="QR" style="width:4cm;height:4cm;" />
+        <div style="font-size:16px;font-weight:bold;letter-spacing:2px;">${res.customer.displayId}</div>
+        <div style="font-size:11px;">${res.customer.firstName} ${res.customer.lastName}</div>
+        ${pilotName ? `<div style="font-size:11px;font-weight:bold;">Pilot: ${pilotName}</div>` : ''}
+        <div style="font-size:9px;color:#666;">${dateStr} ${timeStr}</div>
+      </div>`
+
+    return `<!DOCTYPE html>
+<html><head><meta charset="utf-8"></head>
+<body style="margin:0;padding:5px;">
+${ticket('MUSTERI')}
+<div style="border-top:1px dashed #000;margin:2px 10px;"></div>
+${ticket('PILOT')}
+</body></html>`
   }
 
   // Native AirPrint
@@ -365,22 +382,50 @@ export default function KioskPage() {
     }
   }
 
-  // Browser/Capacitor fallback — iframe ile print
+  // Browser fallback — iframe ile print
   const browserPrint = (res: RegistrationResult) => {
     const html = buildPrintHtml(res)
-    const old = document.getElementById('lbl-frame')
-    if (old) old.remove()
-    const f = document.createElement('iframe')
-    f.id = 'lbl-frame'
-    f.style.cssText = 'position:fixed;left:0;top:0;width:100%;height:100%;border:0;z-index:9999;background:white'
-    document.body.appendChild(f)
-    const d = f.contentDocument || f.contentWindow?.document
-    if (!d) return
-    d.open(); d.write(html); d.close()
-    setTimeout(() => {
-      try { f.contentWindow?.print() } catch {}
-      setTimeout(() => { try { f.remove() } catch {} }, 5000)
-    }, 500)
+
+    const existing = document.getElementById('print-frame')
+    if (existing) existing.remove()
+
+    const iframe = document.createElement('iframe')
+    iframe.id = 'print-frame'
+    iframe.setAttribute('aria-hidden', 'true')
+    iframe.style.position = 'fixed'
+    iframe.style.right = '0'
+    iframe.style.bottom = '0'
+    iframe.style.width = '0'
+    iframe.style.height = '0'
+    iframe.style.border = '0'
+    iframe.style.visibility = 'hidden'
+    document.body.appendChild(iframe)
+
+    const doc = iframe.contentDocument || iframe.contentWindow?.document
+    if (!doc) return
+    doc.open()
+    doc.write(html)
+    doc.close()
+
+    const triggerPrint = () => {
+      try {
+        iframe.contentWindow?.focus()
+        iframe.contentWindow?.print()
+      } catch (err) {
+        console.error('[Kiosk] Browser print hatası:', err)
+      }
+      setTimeout(() => {
+        try { iframe.remove() } catch {}
+      }, 3000)
+    }
+
+    const img = doc.querySelector('img')
+    if (img && !img.complete) {
+      img.addEventListener('load', () => setTimeout(triggerPrint, 150))
+      img.addEventListener('error', () => setTimeout(triggerPrint, 150))
+    } else {
+      setTimeout(triggerPrint, 300)
+    }
   }
 
   const printBothCopies = (res: RegistrationResult) => {
@@ -478,29 +523,6 @@ export default function KioskPage() {
             </button>
           ))}
         </div>
-
-        <button
-          onClick={() => {
-            const now = new Date()
-            const ds = now.toLocaleDateString('tr-TR')
-            const ts = now.toLocaleTimeString('tr-TR')
-            const printContent = '<div style="text-align:center;font-family:Arial,sans-serif;padding:2mm"><div style="font-size:10px;font-weight:bold">' + ds + ' - ' + ts + '</div><div style="width:3.2cm;height:3.2cm;background:#000;margin:4px auto"></div><div style="font-size:14px;font-weight:bold">TEST YAZICI</div></div>'
-            const backup = document.body.innerHTML
-            const backupStyle = document.body.getAttribute('style') || ''
-            document.body.innerHTML = printContent
-            document.body.setAttribute('style', 'margin:0;padding:0')
-            setTimeout(() => {
-              window.print()
-              setTimeout(() => {
-                document.body.innerHTML = backup
-                document.body.setAttribute('style', backupStyle)
-              }, 1000)
-            }, 100)
-          }}
-          className="mt-4 px-6 py-3 bg-orange-100 border-2 border-orange-300 rounded-xl text-orange-700 font-bold text-sm"
-        >
-          Test QR Yazdir
-        </button>
       </div>
     )
   }
