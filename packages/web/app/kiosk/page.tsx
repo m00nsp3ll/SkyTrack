@@ -484,20 +484,18 @@ export default function KioskPage() {
             const now = new Date()
             const ds = now.toLocaleDateString('tr-TR')
             const ts = now.toLocaleTimeString('tr-TR')
-            const html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Test</title><style>@page{size:50mm 70mm;margin:0}html,body{width:50mm;height:70mm;margin:0;padding:0;overflow:hidden;font-family:Arial,sans-serif;text-align:center}.c{width:50mm;margin:0 auto;padding:2mm}.q{width:3.2cm;height:3.2cm;background:#000;margin:0 auto}.t{font-size:14px;font-weight:bold}.d{font-size:10px;font-weight:bold}</style></head><body><div class="c"><div class="d">' + ds + ' - ' + ts + '</div><div class="q"></div><div class="t">TEST YAZICI</div></div></body></html>'
-            const old = document.getElementById('test-frame')
-            if (old) old.remove()
-            const f = document.createElement('iframe')
-            f.id = 'test-frame'
-            f.style.cssText = 'position:fixed;left:0;top:0;width:100%;height:100%;border:0;z-index:9999;background:white'
-            document.body.appendChild(f)
-            const d = f.contentDocument || f.contentWindow?.document
-            if (!d) return
-            d.open(); d.write(html); d.close()
+            const printContent = '<div style="text-align:center;font-family:Arial,sans-serif;padding:2mm"><div style="font-size:10px;font-weight:bold">' + ds + ' - ' + ts + '</div><div style="width:3.2cm;height:3.2cm;background:#000;margin:4px auto"></div><div style="font-size:14px;font-weight:bold">TEST YAZICI</div></div>'
+            const backup = document.body.innerHTML
+            const backupStyle = document.body.getAttribute('style') || ''
+            document.body.innerHTML = printContent
+            document.body.setAttribute('style', 'margin:0;padding:0')
             setTimeout(() => {
-              try { f.contentWindow?.print() } catch (e) { alert('Yazici hatasi: ' + e) }
-              setTimeout(() => { try { f.remove() } catch {} }, 5000)
-            }, 500)
+              window.print()
+              setTimeout(() => {
+                document.body.innerHTML = backup
+                document.body.setAttribute('style', backupStyle)
+              }, 1000)
+            }, 100)
           }}
           className="mt-4 px-6 py-3 bg-orange-100 border-2 border-orange-300 rounded-xl text-orange-700 font-bold text-sm"
         >
