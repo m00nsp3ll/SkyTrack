@@ -16,9 +16,8 @@ function buildLabelHtml(data: LabelData): string {
   const dateStr = now.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' })
   const timeStr = now.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
 
-  // Single self-contained page — image-based label
-  // No @page size: let the printer use its own configured label size
-  // Content is absolutely sized to fit 40x60mm at any DPI
+  // Paper: 2x4 in portrait — content rotated 90° to appear landscape
+  // QR left, text rotated on right
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -39,56 +38,71 @@ function buildLabelHtml(data: LabelData): string {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
-  .label {
+  .page {
     width: 2in;
     height: 4in;
+    position: relative;
+  }
+  .rotated-content {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 4in;
+    height: 2in;
+    transform: translate(-50%, -50%) rotate(-90deg);
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
+    align-items: center;
+    padding: 3mm;
+    font-family: Arial, Helvetica, sans-serif;
+  }
+  .qr-side {
+    flex-shrink: 0;
+    display: flex;
     align-items: center;
     justify-content: center;
-    padding: 2mm;
-    font-family: Arial, Helvetica, sans-serif;
-    text-align: center;
-    page-break-after: avoid;
-    page-break-inside: avoid;
-    break-inside: avoid;
+    padding-right: 4mm;
   }
-  .qr-top img {
-    width: 30mm;
-    height: 30mm;
+  .qr-side img {
+    width: 42mm;
+    height: 42mm;
     display: block;
   }
+  .info-side {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    overflow: hidden;
+  }
   .display-id {
-    font-size: 18pt;
+    font-size: 24pt;
     font-weight: bold;
     letter-spacing: 1px;
-    margin-top: 2mm;
     line-height: 1;
   }
   .customer-name {
-    font-size: 9pt;
+    font-size: 11pt;
     color: #333;
-    margin-top: 1.5mm;
+    margin-top: 2mm;
     line-height: 1.1;
-    max-width: 46mm;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
   .pilot-name {
-    font-size: 9pt;
+    font-size: 11pt;
     font-weight: bold;
-    margin-top: 1mm;
+    margin-top: 1.5mm;
     line-height: 1.1;
-    max-width: 46mm;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
   .datetime {
-    font-size: 7pt;
+    font-size: 8pt;
     color: #666;
-    margin-top: 1.5mm;
+    margin-top: 2mm;
     line-height: 1;
   }
   @media print {
@@ -102,14 +116,18 @@ function buildLabelHtml(data: LabelData): string {
 </style>
 </head>
 <body>
-<div class="label">
-  <div class="qr-top">
-    <img src="${data.qrCode}" alt="QR" />
+<div class="page">
+  <div class="rotated-content">
+    <div class="qr-side">
+      <img src="${data.qrCode}" alt="QR" />
+    </div>
+    <div class="info-side">
+      <div class="display-id">${data.displayId}</div>
+      <div class="customer-name">${data.customerName}</div>
+      ${data.pilotName ? `<div class="pilot-name">Pilot: ${data.pilotName}</div>` : ''}
+      <div class="datetime">${dateStr} ${timeStr}</div>
+    </div>
   </div>
-  <div class="display-id">${data.displayId}</div>
-  <div class="customer-name">${data.customerName}</div>
-  ${data.pilotName ? `<div class="pilot-name">Pilot: ${data.pilotName}</div>` : ''}
-  <div class="datetime">${dateStr} ${timeStr}</div>
 </div>
 </body>
 </html>`
