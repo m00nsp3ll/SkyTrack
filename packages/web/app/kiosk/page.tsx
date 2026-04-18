@@ -365,20 +365,22 @@ export default function KioskPage() {
     }
   }
 
-  // Browser fallback — popup window ile print (iPad Safari uyumlu)
+  // Browser/Capacitor fallback — iframe ile print
   const browserPrint = (res: RegistrationResult) => {
     const html = buildPrintHtml(res)
-    const w = window.open('', '_blank')
-    if (!w) return
-    w.document.write(html)
-    w.document.close()
-    const img = w.document.querySelector('img')
-    const go = () => { w.focus(); w.print() }
-    if (img && !img.complete) {
-      img.onload = () => setTimeout(go, 200)
-    } else {
-      w.onload = () => setTimeout(go, 200)
-    }
+    const old = document.getElementById('lbl-frame')
+    if (old) old.remove()
+    const f = document.createElement('iframe')
+    f.id = 'lbl-frame'
+    f.style.cssText = 'position:fixed;left:0;top:0;width:100%;height:100%;border:0;z-index:9999;background:white'
+    document.body.appendChild(f)
+    const d = f.contentDocument || f.contentWindow?.document
+    if (!d) return
+    d.open(); d.write(html); d.close()
+    setTimeout(() => {
+      try { f.contentWindow?.print() } catch {}
+      setTimeout(() => { try { f.remove() } catch {} }, 5000)
+    }, 500)
   }
 
   const printBothCopies = (res: RegistrationResult) => {
@@ -483,11 +485,19 @@ export default function KioskPage() {
             const ds = now.toLocaleDateString('tr-TR')
             const ts = now.toLocaleTimeString('tr-TR')
             const html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Test</title><style>@page{size:50mm 70mm;margin:0}html,body{width:50mm;height:70mm;margin:0;padding:0;overflow:hidden;font-family:Arial,sans-serif;text-align:center}.c{width:50mm;margin:0 auto;padding:2mm}.q{width:3.2cm;height:3.2cm;background:#000;margin:0 auto}.t{font-size:14px;font-weight:bold}.d{font-size:10px;font-weight:bold}</style></head><body><div class="c"><div class="d">' + ds + ' - ' + ts + '</div><div class="q"></div><div class="t">TEST YAZICI</div></div></body></html>'
-            const w = window.open('', '_blank')
-            if (!w) { alert('Popup engellendi!'); return }
-            w.document.write(html)
-            w.document.close()
-            setTimeout(() => { w.focus(); w.print() }, 300)
+            const old = document.getElementById('test-frame')
+            if (old) old.remove()
+            const f = document.createElement('iframe')
+            f.id = 'test-frame'
+            f.style.cssText = 'position:fixed;left:0;top:0;width:100%;height:100%;border:0;z-index:9999;background:white'
+            document.body.appendChild(f)
+            const d = f.contentDocument || f.contentWindow?.document
+            if (!d) return
+            d.open(); d.write(html); d.close()
+            setTimeout(() => {
+              try { f.contentWindow?.print() } catch (e) { alert('Yazici hatasi: ' + e) }
+              setTimeout(() => { try { f.remove() } catch {} }, 5000)
+            }, 500)
           }}
           className="mt-4 px-6 py-3 bg-orange-100 border-2 border-orange-300 rounded-xl text-orange-700 font-bold text-sm"
         >
