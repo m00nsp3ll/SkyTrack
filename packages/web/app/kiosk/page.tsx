@@ -476,6 +476,23 @@ export default function KioskPage() {
             </button>
           ))}
         </div>
+
+        <button
+          onClick={() => {
+            const now = new Date()
+            const ds = now.toLocaleDateString('tr-TR')
+            const ts = now.toLocaleTimeString('tr-TR')
+            const html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Test</title><style>@page{size:50mm 70mm;margin:0}html,body{width:50mm;height:70mm;margin:0;padding:0;overflow:hidden;font-family:Arial,sans-serif;text-align:center}.c{width:50mm;margin:0 auto;padding:2mm}.q{width:3.2cm;height:3.2cm;background:#000;margin:0 auto}.t{font-size:14px;font-weight:bold}.d{font-size:10px;font-weight:bold}</style></head><body><div class="c"><div class="d">' + ds + ' - ' + ts + '</div><div class="q"></div><div class="t">TEST YAZICI</div></div></body></html>'
+            const w = window.open('', '_blank')
+            if (!w) { alert('Popup engellendi!'); return }
+            w.document.write(html)
+            w.document.close()
+            setTimeout(() => { w.focus(); w.print() }, 300)
+          }}
+          className="mt-4 px-6 py-3 bg-orange-100 border-2 border-orange-300 rounded-xl text-orange-700 font-bold text-sm"
+        >
+          Test QR Yazdir
+        </button>
       </div>
     )
   }
