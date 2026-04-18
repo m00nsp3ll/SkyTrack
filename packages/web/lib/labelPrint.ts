@@ -17,7 +17,7 @@ function buildLabelHtml(data: LabelData): string {
   const timeStr = now.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
 
   // Paper: 2x4 in portrait — content rotated 90° to appear landscape
-  // QR left, text rotated on right
+  // Uses transform on a fixed-size container to avoid 2-page issue
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -34,24 +34,19 @@ function buildLabelHtml(data: LabelData): string {
     height: 4in;
     margin: 0 !important;
     padding: 0;
-    overflow: hidden;
+    overflow: hidden !important;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
-  .page {
-    width: 2in;
-    height: 4in;
-    position: relative;
-    overflow: hidden;
+  body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
-  .rotated-content {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 3.8in;
-    height: 1.9in;
-    transform: translate(-50%, -50%) rotate(-90deg);
-    transform-origin: center center;
+  .label {
+    width: 3.6in;
+    height: 1.8in;
+    transform: rotate(-90deg);
     display: flex;
     flex-direction: row;
     align-items: center;
@@ -60,14 +55,11 @@ function buildLabelHtml(data: LabelData): string {
   }
   .qr-side {
     flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
     padding-right: 3mm;
   }
   .qr-side img {
-    width: 36mm;
-    height: 36mm;
+    width: 35mm;
+    height: 35mm;
     display: block;
   }
   .info-side {
@@ -78,7 +70,7 @@ function buildLabelHtml(data: LabelData): string {
     overflow: hidden;
   }
   .display-id {
-    font-size: 20pt;
+    font-size: 18pt;
     font-weight: bold;
     letter-spacing: 1px;
     line-height: 1;
@@ -113,22 +105,21 @@ function buildLabelHtml(data: LabelData): string {
       padding: 0 !important;
       width: 2in;
       height: 4in;
+      overflow: hidden !important;
     }
   }
 </style>
 </head>
 <body>
-<div class="page">
-  <div class="rotated-content">
-    <div class="qr-side">
-      <img src="${data.qrCode}" alt="QR" />
-    </div>
-    <div class="info-side">
-      <div class="display-id">${data.displayId}</div>
-      <div class="customer-name">${data.customerName}</div>
-      ${data.pilotName ? `<div class="pilot-name">Pilot: ${data.pilotName}</div>` : ''}
-      <div class="datetime">${dateStr} ${timeStr}</div>
-    </div>
+<div class="label">
+  <div class="qr-side">
+    <img src="${data.qrCode}" alt="QR" />
+  </div>
+  <div class="info-side">
+    <div class="display-id">${data.displayId}</div>
+    <div class="customer-name">${data.customerName}</div>
+    ${data.pilotName ? `<div class="pilot-name">Pilot: ${data.pilotName}</div>` : ''}
+    <div class="datetime">${dateStr} ${timeStr}</div>
   </div>
 </div>
 </body>
