@@ -365,26 +365,20 @@ export default function KioskPage() {
     }
   }
 
-  // Browser fallback — iframe ile print
+  // Browser fallback — popup window ile print (iPad Safari uyumlu)
   const browserPrint = (res: RegistrationResult) => {
     const html = buildPrintHtml(res)
-    const old = document.getElementById('lbl-frame')
-    if (old) old.remove()
-    const f = document.createElement('iframe')
-    f.id = 'lbl-frame'
-    f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden'
-    document.body.appendChild(f)
-    const d = f.contentDocument || f.contentWindow?.document
-    if (!d) return
-    d.open(); d.write(html); d.close()
-    const go = () => {
-      try { f.contentWindow?.focus(); f.contentWindow?.print() } catch {}
-      setTimeout(() => { try { f.remove() } catch {} }, 3000)
-    }
-    const img = d.querySelector('img')
+    const w = window.open('', '_blank')
+    if (!w) return
+    w.document.write(html)
+    w.document.close()
+    const img = w.document.querySelector('img')
+    const go = () => { w.focus(); w.print() }
     if (img && !img.complete) {
-      img.onload = () => setTimeout(go, 150)
-    } else { setTimeout(go, 300) }
+      img.onload = () => setTimeout(go, 200)
+    } else {
+      w.onload = () => setTimeout(go, 200)
+    }
   }
 
   const printBothCopies = (res: RegistrationResult) => {
