@@ -448,13 +448,13 @@ export default function CustomerDetailPage() {
                 padding: 0;
               }
             }
-            body { font-family: Arial, sans-serif; text-align: center; padding: 6px; margin: 0; }
-            .qr-container { width: 3cm; margin: 0 auto; padding: 6px; }
-            .qr-code { width: 2.4cm; height: 2.4cm; }
-            .display-id { font-size: 8px; font-weight: bold; margin-top: 3px; }
+            body { font-family: Arial, sans-serif; text-align: center; padding: 2px; margin: 0; }
+            .qr-container { width: 3cm; margin: 0 auto; padding: 2px; }
+            .qr-code { width: 2.2cm; height: 2.2cm; }
+            .display-id { font-size: 8px; font-weight: bold; margin-top: 1px; }
             .customer-name { font-size: 7px; color: #666; }
-            .pilot-name { font-size: 7px; font-weight: bold; color: #333; margin-top: 2px; }
-            .datetime { font-size: 6px; color: #888; margin-top: 3px; }
+            .pilot-name { font-size: 7px; font-weight: bold; color: #333; margin-top: 1px; }
+            .datetime { font-size: 6px; color: #888; margin-top: 1px; }
           </style>
         </head>
         <body>
