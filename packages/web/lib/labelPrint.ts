@@ -29,7 +29,7 @@ function buildLabelHtml(data: LabelData): string {
     overflow: hidden;
   }
   body {
-    padding: 4px;
+    padding: 2px;
     font-family: Arial, sans-serif;
   }
   .label {
@@ -38,26 +38,26 @@ function buildLabelHtml(data: LabelData): string {
     align-items: center;
   }
   .qr img {
-    width: 100px;
-    height: 100px;
+    width: 55px;
+    height: 55px;
     display: block;
   }
   .info {
     display: flex;
     align-items: center;
     justify-content: center;
-    margin-left: 8px;
-    height: 100px;
+    margin-left: 4px;
+    height: 55px;
   }
   .info-inner {
     transform: rotate(90deg);
     white-space: nowrap;
     text-align: center;
   }
-  .id { font-size: 16px; font-weight: bold; }
-  .name { font-size: 9px; color: #333; margin-top: 2px; }
-  .pilot { font-size: 9px; font-weight: bold; margin-top: 1px; }
-  .dt { font-size: 7px; color: #888; margin-top: 3px; }
+  .id { font-size: 9px; font-weight: bold; }
+  .name { font-size: 6px; color: #333; margin-top: 1px; }
+  .pilot { font-size: 6px; font-weight: bold; margin-top: 1px; }
+  .dt { font-size: 5px; color: #888; margin-top: 2px; }
 </style>
 </head>
 <body>
