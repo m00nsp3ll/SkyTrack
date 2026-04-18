@@ -231,9 +231,9 @@ router.get('/pilots', authenticate, asyncHandler(async (req: AuthRequest, res: a
   const feeSetting = await prisma.setting.findUnique({ where: { key: 'flightFee' } });
   const globalFlightFee = parseFloat(feeSetting?.value || '1000');
 
-  // Global round counter (feragat lock için)
-  const queueState = await prisma.queueState.findUnique({ where: { id: 'singleton' } });
-  const currentRound = queueState?.currentRound || 0;
+  // Mevcut tur: en yüksek roundCount
+  const maxRoundPilot = await prisma.pilot.findFirst({ where: { isActive: true, isInExcel: true }, orderBy: { roundCount: 'desc' } });
+  const currentRound = maxRoundPilot?.roundCount || 0;
 
   const pilots = await prisma.pilot.findMany({
     where: { isActive: true, isInExcel: true },
