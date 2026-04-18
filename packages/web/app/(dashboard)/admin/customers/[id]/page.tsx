@@ -439,7 +439,7 @@ export default function CustomerDetailPage() {
           <title>QR Kod - ${customer.displayId}</title>
           <style>
             @page {
-              size: 70mm 50mm;
+              size: 50mm 70mm;
               margin: 0;
             }
             @media print {
