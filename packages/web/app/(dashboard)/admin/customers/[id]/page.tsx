@@ -448,25 +448,24 @@ export default function CustomerDetailPage() {
                 padding: 0;
               }
             }
-            body { font-family: Arial, sans-serif; text-align: center; padding: 2px; margin: 0; }
-            .qr-container { width: 3cm; margin: 0 auto; padding: 2px; }
-            .qr-code { width: 2.2cm; height: 2.2cm; }
-            .display-id { font-size: 8px; font-weight: bold; margin-top: 1px; }
-            .customer-name { font-size: 7px; color: #666; }
-            .pilot-name { font-size: 7px; font-weight: bold; color: #333; margin-top: 1px; }
-            .datetime { font-size: 6px; color: #888; margin-top: 1px; }
-            body { overflow: hidden; }
+            body { font-family: Arial, sans-serif; text-align: center; padding: 10px; margin: 0; }
+            .qr-container { width: 5cm; margin: 0 auto; padding: 10px; border: 1px dashed #ccc; }
+            .qr-code { width: 4cm; height: 4cm; }
+            .display-id { font-size: 14px; font-weight: bold; margin-top: 5px; }
+            .customer-name { font-size: 12px; color: #666; }
+            .pilot-name { font-size: 12px; font-weight: bold; color: #333; margin-top: 3px; }
+            .datetime { font-size: 10px; color: #888; margin-top: 3px; }
           </style>
-          <script>window.onload = () => { setTimeout(() => window.print(), 200); };</script>
         </head>
         <body>
           <div class="qr-container">
             <div class="display-id">${customer.displayId}</div>
             <div class="customer-name">${customer.firstName} ${customer.lastName}</div>
             ${customer.assignedPilot ? `<div class="pilot-name">Pilot: ${customer.assignedPilot.name}</div>` : ''}
+            <div class="datetime">${dateStr} - ${timeStr}</div>
             <img src="${qrCodeData}" alt="QR Code" class="qr-code" />
-            <div class="datetime">${dateStr} ${timeStr}</div>
           </div>
+          <script>window.onload = () => { setTimeout(() => window.print(), 200); };</script>
         </body>
         </html>
       `)
