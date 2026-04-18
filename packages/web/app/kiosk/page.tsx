@@ -523,6 +523,40 @@ ${ticket('PILOT')}
             </button>
           ))}
         </div>
+
+        {/* AirPrint Test Butonu */}
+        <button
+          onClick={async () => {
+            try {
+              const testHtml = `<html><body style="font-family:sans-serif;text-align:center;padding:40px;">
+                <h1 style="font-size:28px;">SkyTrack Test</h1>
+                <p style="font-size:18px;margin-top:20px;">Yazici testi</p>
+                <p style="font-size:14px;color:#666;margin-top:10px;">${new Date().toLocaleString('tr-TR')}</p>
+              </body></html>`
+              if (typeof window._nativeAirPrint === 'function' || (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios')) {
+                await AirPrint.print({ html: testHtml, jobName: 'SkyTrack-Test' })
+              } else {
+                const existing = document.getElementById('print-frame')
+                if (existing) existing.remove()
+                const iframe = document.createElement('iframe')
+                iframe.id = 'print-frame'
+                iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden'
+                document.body.appendChild(iframe)
+                const doc = iframe.contentDocument || iframe.contentWindow?.document
+                if (doc) { doc.open(); doc.write(testHtml); doc.close() }
+                setTimeout(() => {
+                  try { iframe.contentWindow?.focus(); iframe.contentWindow?.print() } catch {}
+                  setTimeout(() => { try { iframe.remove() } catch {} }, 3000)
+                }, 300)
+              }
+            } catch (err) {
+              alert('Yazici hatasi: ' + (err instanceof Error ? err.message : String(err)))
+            }
+          }}
+          className="mt-4 px-6 py-3 bg-orange-100 border-2 border-orange-300 rounded-xl text-orange-700 font-bold text-sm"
+        >
+          Test Yazdir
+        </button>
       </div>
     )
   }
