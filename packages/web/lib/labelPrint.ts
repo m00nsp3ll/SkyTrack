@@ -1,7 +1,7 @@
 /**
  * Thermal label printing utility for Xprinter XP-490B
  * Physical label: 60mm wide x 40mm tall (landscape)
- * Content: QR left, text rotated 90° on right
+ * No @page size — content compact enough to fit on label at any driver paper size
  */
 
 export interface LabelData {
@@ -22,33 +22,46 @@ function buildLabelHtml(data: LabelData): string {
 <meta charset="utf-8">
 <title>Etiket</title>
 <style>
-  @page { size: 60mm 40mm; margin: 0; }
+  @page { margin: 0; }
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body {
-    width: 60mm; height: 40mm;
+  html, body {
     margin: 0; padding: 0;
     overflow: hidden;
-    display: flex; align-items: center;
+  }
+  body {
+    padding: 4px;
     font-family: Arial, sans-serif;
   }
-  .qr { padding: 1.5mm; }
-  .qr img { width: 34mm; height: 34mm; display: block; }
+  .label {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+  }
+  .qr img {
+    width: 100px;
+    height: 100px;
+    display: block;
+  }
   .info {
-    flex: 1; height: 37mm;
-    display: flex; align-items: center; justify-content: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: 8px;
+    height: 100px;
   }
   .info-inner {
     transform: rotate(90deg);
     white-space: nowrap;
     text-align: center;
   }
-  .id { font-size: 14pt; font-weight: bold; }
-  .name { font-size: 7pt; color: #333; margin-top: 1mm; }
-  .pilot { font-size: 7pt; font-weight: bold; margin-top: 0.5mm; }
-  .dt { font-size: 5pt; color: #888; margin-top: 1mm; }
+  .id { font-size: 16px; font-weight: bold; }
+  .name { font-size: 9px; color: #333; margin-top: 2px; }
+  .pilot { font-size: 9px; font-weight: bold; margin-top: 1px; }
+  .dt { font-size: 7px; color: #888; margin-top: 3px; }
 </style>
 </head>
 <body>
+<div class="label">
   <div class="qr"><img src="${data.qrCode}" /></div>
   <div class="info"><div class="info-inner">
     <div class="id">${data.displayId}</div>
@@ -56,13 +69,14 @@ function buildLabelHtml(data: LabelData): string {
     ${data.pilotName ? `<div class="pilot">Pilot: ${data.pilotName}</div>` : ''}
     <div class="dt">${dateStr} ${timeStr}</div>
   </div></div>
+</div>
 </body>
 </html>`
 }
 
 export function printLabel(data: LabelData): void {
   const html = buildLabelHtml(data)
-  const w = window.open('', '_blank', 'width=340,height=230')
+  const w = window.open('', '_blank', 'width=300,height=200')
   if (!w) return
   w.document.write(html)
   w.document.close()
