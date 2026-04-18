@@ -25,37 +25,40 @@ function buildLabelHtml(data: LabelData): string {
   @page { margin: 0; }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body {
+    width: 100%; height: 100%;
     margin: 0; padding: 0;
     overflow: hidden;
   }
   body {
-    padding: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     font-family: Arial, sans-serif;
   }
   .label {
     display: flex;
     flex-direction: row;
     align-items: center;
+    gap: 5px;
   }
   .qr img {
-    width: 55px;
-    height: 55px;
+    width: 65px;
+    height: 65px;
     display: block;
   }
   .info {
     display: flex;
     align-items: center;
     justify-content: center;
-    margin-left: 4px;
-    height: 55px;
+    height: 65px;
   }
   .info-inner {
     transform: rotate(90deg);
     white-space: nowrap;
     text-align: center;
   }
-  .id { font-size: 9px; font-weight: bold; }
-  .name { font-size: 6px; color: #333; margin-top: 1px; }
+  .id { font-size: 10px; font-weight: bold; }
+  .name { font-size: 6px; color: #333; margin-top: 2px; }
   .pilot { font-size: 6px; font-weight: bold; margin-top: 1px; }
   .dt { font-size: 5px; color: #888; margin-top: 2px; }
 </style>
