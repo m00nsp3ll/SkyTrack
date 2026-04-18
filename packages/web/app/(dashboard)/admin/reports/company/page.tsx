@@ -104,17 +104,11 @@ export default function CompanyReportPage() {
       </div>
 
       {/* Özet Kartları */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="pt-4 text-center">
             <p className="text-sm text-muted-foreground">Toplam Ucus</p>
             <p className="text-2xl font-bold">{grandTotalFlights}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-4 text-center">
-            <p className="text-sm text-muted-foreground">Gercek Ucus</p>
-            <p className="text-2xl font-bold text-blue-600">{grandTotalReal}</p>
           </CardContent>
         </Card>
         <Card>
@@ -165,10 +159,6 @@ export default function CompanyReportPage() {
                         <p className="text-[10px] text-muted-foreground">Ucus</p>
                       </div>
                       <div className="text-center">
-                        <p className="font-bold text-blue-600">{company.totalRealFlights}</p>
-                        <p className="text-[10px] text-muted-foreground">Gercek</p>
-                      </div>
-                      <div className="text-center">
                         <p className="font-bold text-green-600">{formatCurrency(company.totalHakedis)}</p>
                         <p className="text-[10px] text-muted-foreground">Hakedis</p>
                       </div>
@@ -189,7 +179,6 @@ export default function CompanyReportPage() {
                         <th className="py-2 text-left">F#</th>
                         <th className="py-2 text-left">Pilot</th>
                         <th className="py-2 text-center">Ucus</th>
-                        <th className="py-2 text-center">Gercek</th>
                         <th className="py-2 text-center">Feragat</th>
                         <th className="py-2 text-right">Hakedis</th>
                         <th className="py-2 text-right">Odenen</th>
@@ -206,7 +195,6 @@ export default function CompanyReportPage() {
                               <td className="py-2 font-mono text-xs">{pilot.queuePosition}</td>
                               <td className="py-2 font-medium">{pilot.name}</td>
                               <td className="py-2 text-center">{pilot.totalFlights}</td>
-                              <td className="py-2 text-center font-bold text-blue-600">{pilot.realFlights}</td>
                               <td className="py-2 text-center text-gray-500">{pilot.forfeitCount}</td>
                               <td className="py-2 text-right">{formatCurrency(pilot.hakedis)}</td>
                               <td className="py-2 text-right">{formatCurrency(pilot.totalPaid)}</td>
@@ -242,7 +230,6 @@ export default function CompanyReportPage() {
                       <tr className="border-t-2 font-bold text-sm">
                         <td colSpan={2} className="py-2">TOPLAM</td>
                         <td className="py-2 text-center">{company.totalFlights}</td>
-                        <td className="py-2 text-center text-blue-600">{company.totalRealFlights}</td>
                         <td className="py-2 text-center">{company.pilots.reduce((s, p) => s + p.forfeitCount, 0)}</td>
                         <td className="py-2 text-right">{formatCurrency(company.totalHakedis)}</td>
                         <td className="py-2 text-right">{formatCurrency(company.totalPaid)}</td>
