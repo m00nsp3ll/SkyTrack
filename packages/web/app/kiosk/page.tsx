@@ -347,21 +347,15 @@ export default function KioskPage() {
     const pilotHtml = res.pilot?.name ? `<div class="pilot-name">Pilot: ${res.pilot.name}</div>` : ''
 
     return `<!DOCTYPE html>
-<html><head><meta charset="utf-8"><style>
-@page { size: 50mm 70mm; margin: 0; }
-html, body { width: 50mm; height: 70mm; max-height: 70mm; margin: 0; padding: 0; overflow: hidden; font-family: Arial, sans-serif; text-align: center; }
-.qr-container { width: 50mm; margin: 0 auto; padding: 2mm; }
-.qr-code { width: 3.2cm; height: 3.2cm; }
-.display-id { font-size: 14px; font-weight: bold; }
-.pilot-name { font-size: 12px; font-weight: bold; color: #000; }
-.datetime { font-size: 10px; font-weight: bold; color: #000; }
-</style></head>
-<body><div class="qr-container">
-<div class="datetime">${dateStr} - ${timeStr}</div>
-<img src="${res.qrCode}" alt="QR" class="qr-code" />
-<div class="display-id">${res.customer.displayId} - ${res.customer.firstName} ${res.customer.lastName}</div>
+<html><head><meta charset="utf-8"></head>
+<body style="margin:0;padding:5px;font-family:Arial,sans-serif;text-align:center;">
+<div style="width:5cm;margin:0 auto;padding:10px;">
+<div style="font-size:10px;font-weight:bold;">${dateStr} - ${timeStr}</div>
+<img src="${res.qrCode}" alt="QR" style="width:4cm;height:4cm;" />
+<div style="font-size:14px;font-weight:bold;">${res.customer.displayId} - ${res.customer.firstName} ${res.customer.lastName}</div>
 ${pilotHtml}
-</div></body></html>`
+</div>
+</body></html>`
   }
 
   // Native AirPrint
