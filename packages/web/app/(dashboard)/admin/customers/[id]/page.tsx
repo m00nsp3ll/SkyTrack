@@ -465,7 +465,6 @@ export default function CustomerDetailPage() {
             <div class="customer-name">${customer.firstName} ${customer.lastName}</div>
             ${customer.assignedPilot ? `<div class="pilot-name">Pilot: ${customer.assignedPilot.name}</div>` : ''}
             <img src="${qrCodeData}" alt="QR Code" class="qr-code" />
-            <div class="datetime">${dateStr} ${timeStr}</div>
           </div>
         </body>
         </html>
