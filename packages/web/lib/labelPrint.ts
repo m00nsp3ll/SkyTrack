@@ -42,18 +42,20 @@ function buildLabelHtml(data: LabelData): string {
     width: 2in;
     height: 4in;
     position: relative;
+    overflow: hidden;
   }
   .rotated-content {
     position: absolute;
     top: 50%;
     left: 50%;
-    width: 4in;
-    height: 2in;
+    width: 3.8in;
+    height: 1.9in;
     transform: translate(-50%, -50%) rotate(-90deg);
+    transform-origin: center center;
     display: flex;
     flex-direction: row;
     align-items: center;
-    padding: 3mm;
+    padding: 2mm;
     font-family: Arial, Helvetica, sans-serif;
   }
   .qr-side {
@@ -61,11 +63,11 @@ function buildLabelHtml(data: LabelData): string {
     display: flex;
     align-items: center;
     justify-content: center;
-    padding-right: 4mm;
+    padding-right: 3mm;
   }
   .qr-side img {
-    width: 42mm;
-    height: 42mm;
+    width: 36mm;
+    height: 36mm;
     display: block;
   }
   .info-side {
@@ -76,33 +78,33 @@ function buildLabelHtml(data: LabelData): string {
     overflow: hidden;
   }
   .display-id {
-    font-size: 24pt;
+    font-size: 20pt;
     font-weight: bold;
     letter-spacing: 1px;
     line-height: 1;
   }
   .customer-name {
-    font-size: 11pt;
+    font-size: 9pt;
     color: #333;
-    margin-top: 2mm;
-    line-height: 1.1;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .pilot-name {
-    font-size: 11pt;
-    font-weight: bold;
     margin-top: 1.5mm;
     line-height: 1.1;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+  .pilot-name {
+    font-size: 9pt;
+    font-weight: bold;
+    margin-top: 1mm;
+    line-height: 1.1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
   .datetime {
-    font-size: 8pt;
+    font-size: 7pt;
     color: #666;
-    margin-top: 2mm;
+    margin-top: 1.5mm;
     line-height: 1;
   }
   @media print {
