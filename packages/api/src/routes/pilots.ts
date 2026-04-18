@@ -463,12 +463,14 @@ router.post('/', authenticate, requireRole('ADMIN'), asyncHandler(async (req: Au
     throw new AppError('İsim ve telefon gerekli', 400, 'MISSING_FIELDS');
   }
 
-  // Get next queue position
-  const lastPilot = await prisma.pilot.findFirst({
-    orderBy: { queuePosition: 'desc' },
-  });
+  // Get next queue position and max round count for fair start
+  const [lastPositionPilot, maxRoundPilot] = await Promise.all([
+    prisma.pilot.findFirst({ orderBy: { queuePosition: 'desc' } }),
+    prisma.pilot.findFirst({ orderBy: { roundCount: 'desc' } }),
+  ]);
 
-  const queuePosition = (lastPilot?.queuePosition || 0) + 1;
+  const queuePosition = (lastPositionPilot?.queuePosition || 0) + 1;
+  const maxRoundCount = maxRoundPilot?.roundCount || 0;
 
   const pilot = await prisma.pilot.create({
     data: {
@@ -477,6 +479,8 @@ router.post('/', authenticate, requireRole('ADMIN'), asyncHandler(async (req: Au
       email,
       maxDailyFlights: maxDailyFlights || 7,
       queuePosition,
+      roundCount: maxRoundCount,
+      forfeitCount: maxRoundCount,
       isActive: true,
       status: 'AVAILABLE',
     },
