@@ -17,7 +17,7 @@ import {
   ArrowDownRight,
 } from 'lucide-react'
 import { reportsApi } from '@/lib/api'
-import { printLabel, type LabelData } from '@/lib/labelPrint'
+import { printLabel, printLabelLandscape, type LabelData } from '@/lib/labelPrint'
 import { useSocket } from '@/hooks/useSocket'
 import Link from 'next/link'
 import {
@@ -786,37 +786,74 @@ export default function AdminDashboard() {
       {/* Etiket Yazıcı Test */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Etiket Yazici Test (40mm x 60mm)</CardTitle>
+          <CardTitle className="text-lg">Etiket Yazici Test</CardTitle>
         </CardHeader>
         <CardContent>
-          <button
-            onClick={() => {
-              if (!demoQR) return
-              printLabel({
-                qrCode: demoQR,
-                displayId: 'T0060',
-                customerName: 'Elas Aidukas',
-                pilotName: 'Mehmet Ermetin',
-              })
-            }}
-            className="border-2 border-dashed border-blue-300 rounded-lg p-4 hover:bg-blue-50 transition-colors w-full max-w-xs mx-auto block"
-          >
-            <div className="text-sm font-bold mb-2 text-center">Test Etiketi Yazdir</div>
-            <div className="border rounded bg-white p-2 mx-auto" style={{ width: '120px', height: '170px' }}>
-              <div className="flex flex-col h-full items-center justify-center">
-                {demoQR ? (
-                  <img src={demoQR} alt="QR" className="w-16 h-16" />
-                ) : (
-                  <div className="w-16 h-16 bg-gray-800 rounded" />
-                )}
-                <div className="text-xs font-bold mt-1">T0060</div>
-                <div className="text-[7px] text-gray-500">Elas Aidukas</div>
-                <div className="text-[7px] font-bold">Pilot: Mehmet</div>
-                <div className="text-[6px] text-gray-400">17.04.2026 14:30</div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Dikey (Portrait) — 2x4 in */}
+            <button
+              onClick={() => {
+                if (!demoQR) return
+                printLabel({
+                  qrCode: demoQR,
+                  displayId: 'T0060',
+                  customerName: 'Elas Aidukas',
+                  pilotName: 'Mehmet Ermetin',
+                })
+              }}
+              className="border-2 border-dashed border-blue-300 rounded-lg p-4 hover:bg-blue-50 transition-colors"
+            >
+              <div className="text-sm font-bold mb-2 text-center">Dikey (2x4 in)</div>
+              <div className="border rounded bg-white p-2 mx-auto" style={{ width: '100px', height: '150px' }}>
+                <div className="flex flex-col h-full items-center justify-center">
+                  {demoQR ? (
+                    <img src={demoQR} alt="QR" className="w-12 h-12" />
+                  ) : (
+                    <div className="w-12 h-12 bg-gray-800 rounded" />
+                  )}
+                  <div className="text-[9px] font-bold mt-1">T0060</div>
+                  <div className="text-[6px] text-gray-500">Elas Aidukas</div>
+                  <div className="text-[6px] font-bold">Pilot: Mehmet</div>
+                  <div className="text-[5px] text-gray-400">18.04.2026</div>
+                </div>
               </div>
-            </div>
-            <div className="text-xs text-gray-500 mt-2 text-center">QR ustte, bilgiler altta (portrait)</div>
-          </button>
+              <div className="text-xs text-gray-500 mt-2 text-center">QR ustte, bilgiler altta</div>
+            </button>
+
+            {/* Yatay (Landscape) — 4x2 in */}
+            <button
+              onClick={() => {
+                if (!demoQR) return
+                printLabelLandscape({
+                  qrCode: demoQR,
+                  displayId: 'T0060',
+                  customerName: 'Elas Aidukas',
+                  pilotName: 'Mehmet Ermetin',
+                })
+              }}
+              className="border-2 border-dashed border-green-300 rounded-lg p-4 hover:bg-green-50 transition-colors"
+            >
+              <div className="text-sm font-bold mb-2 text-center">Yatay (4x2 in)</div>
+              <div className="border rounded bg-white p-2 mx-auto" style={{ width: '170px', height: '90px' }}>
+                <div className="flex h-full items-center">
+                  <div className="w-1/2 flex items-center justify-center pr-1">
+                    {demoQR ? (
+                      <img src={demoQR} alt="QR" className="w-12 h-12" />
+                    ) : (
+                      <div className="w-12 h-12 bg-gray-800 rounded" />
+                    )}
+                  </div>
+                  <div className="w-1/2 flex flex-col items-center justify-center text-center pl-1">
+                    <div className="text-[9px] font-bold">T0060</div>
+                    <div className="text-[6px] text-gray-500">Elas Aidukas</div>
+                    <div className="text-[6px] font-bold">Pilot: Mehmet</div>
+                    <div className="text-[5px] text-gray-400">18.04.2026</div>
+                  </div>
+                </div>
+              </div>
+              <div className="text-xs text-gray-500 mt-2 text-center">QR solda, bilgiler sagda</div>
+            </button>
+          </div>
         </CardContent>
       </Card>
     </div>
