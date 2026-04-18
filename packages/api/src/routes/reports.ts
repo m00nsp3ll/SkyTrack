@@ -1024,4 +1024,105 @@ function formatBytes(bytes: number): string {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
 
+// GET /api/reports/company - Firma raporu
+router.get('/company', authenticate, asyncHandler(async (req: AuthRequest, res: any) => {
+  const { from, to } = req.query as { from?: string; to?: string };
+
+  const fromDate = from ? new Date(from as string) : new Date(new Date().getFullYear(), 2, 1); // 1 Mart
+  const toDate = to ? new Date(to as string) : new Date();
+  toDate.setHours(23, 59, 59, 999);
+
+  const companies = await prisma.company.findMany({
+    orderBy: { name: 'asc' },
+    include: {
+      pilots: {
+        where: { isActive: true, isInExcel: true },
+        select: {
+          id: true,
+          name: true,
+          queuePosition: true,
+          roundCount: true,
+          forfeitCount: true,
+          flightFee: true,
+          flights: {
+            where: {
+              status: 'COMPLETED',
+              createdAt: { gte: fromDate, lte: toDate },
+            },
+            select: {
+              id: true,
+              createdAt: true,
+              durationMinutes: true,
+              customer: {
+                select: {
+                  displayId: true,
+                  firstName: true,
+                  lastName: true,
+                },
+              },
+            },
+            orderBy: { createdAt: 'desc' },
+          },
+          payments: {
+            select: { amount: true },
+          },
+        },
+        orderBy: { queuePosition: 'asc' },
+      },
+    },
+  });
+
+  const feeSetting = await prisma.setting.findUnique({ where: { key: 'flightFee' } });
+  const globalFlightFee = parseFloat(feeSetting?.value || '1000');
+
+  const result = companies.map(company => {
+    const pilots = company.pilots.map(pilot => {
+      const realFlights = pilot.flights.filter(f => f.customer?.displayId !== 'EXCEL-IMPORT');
+      const allFlights = pilot.flights;
+      const fee = pilot.flightFee ? Number(pilot.flightFee) : globalFlightFee;
+      const totalPaid = pilot.payments.reduce((s, p) => s + Number(p.amount), 0);
+      const hakedis = allFlights.length * fee;
+
+      return {
+        id: pilot.id,
+        name: pilot.name,
+        queuePosition: pilot.queuePosition,
+        totalFlights: allFlights.length,
+        realFlights: realFlights.length,
+        forfeitCount: pilot.forfeitCount,
+        roundCount: pilot.roundCount,
+        flightFee: fee,
+        hakedis,
+        totalPaid,
+        kalan: hakedis - totalPaid,
+        flightDetails: realFlights.map(f => ({
+          date: f.createdAt,
+          duration: f.durationMinutes,
+          customer: f.customer ? `${f.customer.displayId} - ${f.customer.firstName} ${f.customer.lastName}` : 'Excel Import',
+        })),
+      };
+    });
+
+    const totalFlights = pilots.reduce((s, p) => s + p.totalFlights, 0);
+    const totalRealFlights = pilots.reduce((s, p) => s + p.realFlights, 0);
+    const totalHakedis = pilots.reduce((s, p) => s + p.hakedis, 0);
+    const totalPaid = pilots.reduce((s, p) => s + p.totalPaid, 0);
+
+    return {
+      id: company.id,
+      name: company.name,
+      color: company.color,
+      pilotCount: pilots.length,
+      totalFlights,
+      totalRealFlights,
+      totalHakedis,
+      totalPaid,
+      totalKalan: totalHakedis - totalPaid,
+      pilots,
+    };
+  });
+
+  res.json({ success: true, data: { companies: result } });
+}));
+
 export default router;
