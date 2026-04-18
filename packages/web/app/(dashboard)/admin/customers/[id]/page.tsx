@@ -439,7 +439,7 @@ export default function CustomerDetailPage() {
           <title>QR Kod - ${customer.displayId}</title>
           <style>
             @page {
-              size: auto;
+              size: 70mm 50mm;
               margin: 0;
             }
             @media print {
@@ -450,7 +450,7 @@ export default function CustomerDetailPage() {
             }
             body { font-family: Arial, sans-serif; text-align: center; padding: 0; margin: 0; }
             .qr-container { width: 5cm; margin: 0 auto; padding: 0; }
-            .qr-code { width: 4cm; height: 4cm; }
+            .qr-code { width: 3.2cm; height: 3.2cm; }
             .display-id { font-size: 14px; font-weight: bold; margin-top: 0; }
             .customer-name { font-size: 12px; color: #666; }
             .pilot-name { font-size: 12px; font-weight: bold; color: #000; margin-top: 0; }
