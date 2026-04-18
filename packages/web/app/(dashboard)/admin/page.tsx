@@ -783,21 +783,27 @@ export default function AdminDashboard() {
         </CardContent>
       </Card>
 
-      {/* Etiket Yazıcı Test */}
+      {/* Etiket Yazıcı Test — inline template (cache bypass) */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Etiket Test (60mm x 40mm)</CardTitle>
+          <CardTitle className="text-lg">Etiket Test (7x5cm)</CardTitle>
         </CardHeader>
         <CardContent>
           <button
             onClick={() => {
               if (!demoQR) return
-              printLabel({
-                qrCode: demoQR,
-                displayId: 'T0060',
-                customerName: 'Elas Aidukas',
-                pilotName: 'Mehmet Ermetin',
-              })
+              const now = new Date()
+              const ds = now.toLocaleDateString('tr-TR')
+              const ts = now.toLocaleTimeString('tr-TR')
+              const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Etiket</title><style>@page{margin:0}*{margin:0;padding:0;box-sizing:border-box}html,body{width:100%;height:100%;margin:0;padding:0;overflow:hidden}body{display:flex;align-items:center;justify-content:center;font-family:Arial,sans-serif}.label{display:flex;flex-direction:row;align-items:center;gap:5px}.qr img{width:65px;height:65px;display:block}.info{display:flex;align-items:center;justify-content:center;height:65px}.info-inner{transform:rotate(90deg);white-space:nowrap;text-align:center}.id{font-size:10px;font-weight:bold}.name{font-size:6px;color:#333;margin-top:2px}.pilot{font-size:6px;font-weight:bold;margin-top:1px}.dt{font-size:5px;color:#888;margin-top:2px}</style></head><body><div class="label"><div class="qr"><img src="${demoQR}"/></div><div class="info"><div class="info-inner"><div class="id">T0060</div><div class="name">Elas Aidukas</div><div class="pilot">Pilot: Mehmet Ermetin</div><div class="dt">${ds} ${ts}</div></div></div></div></body></html>`
+              const w = window.open('', '_blank', 'width=300,height=200')
+              if (!w) return
+              w.document.write(html)
+              w.document.close()
+              const img = w.document.querySelector('img')
+              const go = () => { w.focus(); w.print() }
+              if (img && !img.complete) { img.onload = () => setTimeout(go, 200) }
+              else { w.onload = () => setTimeout(go, 200) }
             }}
             className="border-2 border-dashed border-blue-400 rounded-lg p-4 hover:bg-blue-50 transition-colors w-full max-w-sm mx-auto block"
           >
@@ -821,7 +827,7 @@ export default function AdminDashboard() {
                 </div>
               </div>
             </div>
-            <div className="text-xs text-gray-500 mt-2 text-center">60x40mm yatay — QR solda, yazi 90° donuk</div>
+            <div className="text-xs text-gray-500 mt-2 text-center">7x5cm yatay — QR solda, yazi 90° donuk</div>
           </button>
         </CardContent>
       </Card>
