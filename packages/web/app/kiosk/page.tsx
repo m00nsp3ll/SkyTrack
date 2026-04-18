@@ -550,7 +550,9 @@ ${ticket('PILOT')}
                 }, 300)
               }
             } catch (err) {
-              alert('Yazici hatasi: ' + (err instanceof Error ? err.message : String(err)))
+              const isNative = Capacitor.isNativePlatform()
+              const hasBridge = typeof window._nativeAirPrint === 'function'
+              alert('Hata: ' + (err instanceof Error ? err.message : String(err)) + '\nNative: ' + isNative + '\nBridge: ' + hasBridge)
             }
           }}
           className="mt-4 px-6 py-3 bg-orange-100 border-2 border-orange-300 rounded-xl text-orange-700 font-bold text-sm"
