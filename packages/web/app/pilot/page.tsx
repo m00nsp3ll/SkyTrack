@@ -539,10 +539,16 @@ export default function PilotPanel() {
 
   // Gerçek sıra: müsait pilotlar arasındaki konum (API zaten roundCount+queuePosition sıralı döner)
   const actualQueueRank = (() => {
-    if (!pilot?.id || !pilot.inQueue || pilot.status !== 'AVAILABLE') return null
-    const available = queueList
-      .filter(p => p.inQueue && p.status === 'AVAILABLE' && p.dailyFlightCount < p.maxDailyFlights)
-    const idx = available.findIndex(p => p.id === pilot.id)
+    if (!pilot?.id || !pilot.inQueue) return null
+    const allQueued = queueList
+      .filter(p => p.inQueue)
+      .sort((a, b) => {
+        const ar = (a as any).roundCount ?? 0
+        const br = (b as any).roundCount ?? 0
+        if (ar !== br) return ar - br
+        return a.queuePosition - b.queuePosition
+      })
+    const idx = allQueued.findIndex(p => p.id === pilot.id)
     return idx >= 0 ? idx + 1 : null
   })()
 
@@ -1163,10 +1169,10 @@ export default function PilotPanel() {
             </div>
             <div className="flex-1 overflow-y-auto divide-y">
               {(() => {
-                // Pilotlar SADECE Müsait pilotları görür (mesai dışı/molada/atanmış/uçuşta gizli)
+                // Tüm pilotlar görünür (mesai dışı, uçuşta vs dahil)
                 // Sıralama: roundCount asc → queuePosition asc (Excel TOP+forma mantığı)
                 const inQueueActive = queueList
-                  .filter(p => p.inQueue && p.status === 'AVAILABLE' && p.dailyFlightCount < p.maxDailyFlights)
+                  .filter(p => p.inQueue)
                   .sort((a, b) => {
                     const ar = (a as any).roundCount ?? 0
                     const br = (b as any).roundCount ?? 0
@@ -1196,8 +1202,9 @@ export default function PilotPanel() {
                   <>
                     {inQueueActive.map((p, index) => {
                       const isMe = p.id === pilot?.id
+                      const isInactive = p.status === 'OFF_DUTY' || p.status === 'ON_BREAK'
                       return (
-                        <div key={p.id} className={`flex items-center gap-3 px-4 py-3 ${isMe ? 'bg-yellow-50 border-l-4 border-yellow-400' : ''}`}>
+                        <div key={p.id} className={`flex items-center gap-3 px-4 py-3 ${isMe ? 'bg-yellow-50 border-l-4 border-yellow-400' : ''} ${isInactive && !isMe ? 'opacity-50' : ''}`}>
                           <span className={`w-8 text-center font-bold text-lg ${isMe ? 'text-yellow-600' : 'text-muted-foreground'}`}>{index + 1}</span>
                           <div className="flex-1 min-w-0">
                             <p className={`font-semibold truncate ${isMe ? 'text-yellow-700' : ''}`}>
