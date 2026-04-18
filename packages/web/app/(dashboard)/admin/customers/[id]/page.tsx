@@ -455,7 +455,9 @@ export default function CustomerDetailPage() {
             .customer-name { font-size: 12px; color: #666; }
             .pilot-name { font-size: 12px; font-weight: bold; color: #000; margin-top: 0; }
             .datetime { font-size: 10px; font-weight: bold; color: #000; margin-top: 0; }
+            body { overflow: hidden; }
           </style>
+          <script>window.onload = function() { setTimeout(function() { window.print(); }, 200); };</script>
         </head>
         <body>
           <div class="qr-container">
@@ -464,7 +466,6 @@ export default function CustomerDetailPage() {
             <div class="display-id">${customer.displayId} - ${customer.firstName} ${customer.lastName}</div>
             ${customer.assignedPilot ? `<div class="pilot-name">Pilot: ${customer.assignedPilot.name}</div>` : ''}
           </div>
-          <script>window.onload = () => { setTimeout(() => window.print(), 200); };</script>
         </body>
         </html>
       `)
