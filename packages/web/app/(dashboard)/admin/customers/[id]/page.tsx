@@ -455,17 +455,18 @@ export default function CustomerDetailPage() {
             .customer-name { font-size: 7px; color: #666; }
             .pilot-name { font-size: 7px; font-weight: bold; color: #333; margin-top: 1px; }
             .datetime { font-size: 6px; color: #888; margin-top: 1px; }
+            body { overflow: hidden; }
           </style>
+          <script>window.onload = () => { setTimeout(() => window.print(), 200); };</script>
         </head>
         <body>
           <div class="qr-container">
-            <img src="${qrCodeData}" alt="QR Code" class="qr-code" />
             <div class="display-id">${customer.displayId}</div>
             <div class="customer-name">${customer.firstName} ${customer.lastName}</div>
             ${customer.assignedPilot ? `<div class="pilot-name">Pilot: ${customer.assignedPilot.name}</div>` : ''}
-            <div class="datetime">${dateStr} - ${timeStr}</div>
+            <img src="${qrCodeData}" alt="QR Code" class="qr-code" />
+            <div class="datetime">${dateStr} ${timeStr}</div>
           </div>
-          <script>window.onload = () => { setTimeout(() => window.print(), 200); };</script>
         </body>
         </html>
       `)
