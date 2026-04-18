@@ -442,14 +442,17 @@ export default function CustomerDetailPage() {
               size: 50mm 70mm;
               margin: 0;
             }
-            @media print {
-              html, body {
-                margin: 0;
-                padding: 0;
-              }
+            html, body {
+              width: 50mm;
+              height: 70mm;
+              max-height: 70mm;
+              margin: 0;
+              padding: 0;
+              overflow: hidden;
+              font-family: Arial, sans-serif;
+              text-align: center;
             }
-            body { font-family: Arial, sans-serif; text-align: center; padding: 0; margin: 0; }
-            .qr-container { width: 5cm; margin: 0 auto; padding: 0; }
+            .qr-container { width: 50mm; margin: 0 auto; padding: 2mm; }
             .qr-code { width: 3.2cm; height: 3.2cm; }
             .display-id { font-size: 14px; font-weight: bold; margin-top: 0; }
             .customer-name { font-size: 12px; color: #666; }
