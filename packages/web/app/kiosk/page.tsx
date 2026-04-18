@@ -344,14 +344,14 @@ export default function KioskPage() {
     const now = new Date()
     const dateStr = now.toLocaleDateString('tr-TR')
     const timeStr = now.toLocaleTimeString('tr-TR')
-    const pilotHtml = res.pilot?.name ? `<div class="pilot-name">Pilot: ${res.pilot.name}</div>` : ''
+    const pilotHtml = res.pilot?.name ? `<div style="font-size:12px;font-weight:bold;margin-top:3px;">Pilot: ${res.pilot.name}</div>` : ''
 
     return `<!DOCTYPE html>
 <html><head><meta charset="utf-8"></head>
 <body style="margin:0;padding:5px;font-family:Arial,sans-serif;text-align:center;">
-<div style="width:5cm;margin:0 auto;padding:10px;">
+<div style="width:5cm;margin:0 auto;padding:10px;border:1px dashed #ccc;">
 <div style="font-size:10px;font-weight:bold;">${dateStr} - ${timeStr}</div>
-<img src="${res.qrCode}" alt="QR" style="width:4cm;height:4cm;" />
+<img src="${res.qrCode}" alt="QR" style="width:4cm;height:4cm;display:block;margin:0 auto;" />
 <div style="font-size:14px;font-weight:bold;">${res.customer.displayId} - ${res.customer.firstName} ${res.customer.lastName}</div>
 ${pilotHtml}
 </div>
