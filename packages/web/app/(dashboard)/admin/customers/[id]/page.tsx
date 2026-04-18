@@ -438,27 +438,19 @@ export default function CustomerDetailPage() {
         <head>
           <title>QR Kod - ${customer.displayId}</title>
           <style>
-            @page {
-              size: 50mm 70mm;
-              margin: 0;
-            }
+            @page { margin: 0; }
+            * { margin: 0; padding: 0; box-sizing: border-box; }
             html, body {
-              width: 50mm;
-              height: 70mm;
-              max-height: 70mm;
               margin: 0;
               padding: 0;
-              overflow: hidden;
               font-family: Arial, sans-serif;
               text-align: center;
             }
-            .qr-container { width: 50mm; margin: 0 auto; padding: 2mm; }
-            .qr-code { width: 3.2cm; height: 3.2cm; }
-            .display-id { font-size: 14px; font-weight: bold; margin-top: 0; }
-            .customer-name { font-size: 12px; color: #666; }
-            .pilot-name { font-size: 12px; font-weight: bold; color: #000; margin-top: 0; }
-            .datetime { font-size: 10px; font-weight: bold; color: #000; margin-top: 0; }
-            body { overflow: hidden; }
+            .qr-container { width: 5cm; margin: 0 auto; padding: 10px; }
+            .qr-code { width: 3.2cm; height: 3.2cm; display: block; margin: 0 auto; }
+            .display-id { font-size: 14px; font-weight: bold; margin-top: 3px; }
+            .pilot-name { font-size: 12px; font-weight: bold; color: #000; margin-top: 2px; }
+            .datetime { font-size: 10px; font-weight: bold; color: #000; margin-top: 2px; }
           </style>
           <script>window.onload = function() { setTimeout(function() { window.print(); }, 200); };</script>
         </head>
