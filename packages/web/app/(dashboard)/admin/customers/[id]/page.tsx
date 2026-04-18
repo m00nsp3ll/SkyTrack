@@ -42,6 +42,7 @@ import {
   Building,
 } from 'lucide-react'
 import { productsApi, salesApi, currencyApi } from '@/lib/api'
+// printLabel inline below
 
 // Types
 interface Customer {
@@ -427,49 +428,18 @@ export default function CustomerDetailPage() {
   const handlePrint = () => {
     if (!customer || !qrCodeData) return
     const now = new Date()
-    const dateStr = now.toLocaleDateString('tr-TR')
-    const timeStr = now.toLocaleTimeString('tr-TR')
-    const printWindow = window.open('', '_blank')
-    if (printWindow) {
-      printWindow.document.write(`
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <title>QR Kod - ${customer.displayId}</title>
-          <style>
-            @page {
-              size: auto;
-              margin: 0;
-            }
-            @media print {
-              html, body {
-                margin: 0;
-                padding: 0;
-              }
-            }
-            body { font-family: Arial, sans-serif; text-align: center; padding: 10px; margin: 0; }
-            .qr-container { width: 5cm; margin: 0 auto; padding: 10px; border: 1px dashed #ccc; }
-            .qr-code { width: 4cm; height: 4cm; }
-            .display-id { font-size: 14px; font-weight: bold; margin-top: 5px; }
-            .customer-name { font-size: 12px; color: #666; }
-            .pilot-name { font-size: 12px; font-weight: bold; color: #333; margin-top: 3px; }
-            .datetime { font-size: 10px; color: #888; margin-top: 5px; }
-          </style>
-        </head>
-        <body>
-          <div class="qr-container">
-            <img src="${qrCodeData}" alt="QR Code" class="qr-code" />
-            <div class="display-id">${customer.displayId}</div>
-            <div class="customer-name">${customer.firstName} ${customer.lastName}</div>
-            ${customer.assignedPilot ? `<div class="pilot-name">Pilot: ${customer.assignedPilot.name}</div>` : ''}
-            <div class="datetime">${dateStr} - ${timeStr}</div>
-          </div>
-          <script>window.onload = () => { setTimeout(() => window.print(), 200); };</script>
-        </body>
-        </html>
-      `)
-      printWindow.document.close()
-    }
+    const ds = now.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    const ts = now.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    const pilotHtml = customer.assignedPilot?.name ? `<div class="pilot">Pilot: ${customer.assignedPilot.name}</div>` : ''
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Etiket</title><style>@page{margin:0}*{margin:0;padding:0;box-sizing:border-box}html,body{width:100%;height:100%;margin:0;padding:0;overflow:hidden}body{display:flex;align-items:center;justify-content:center;font-family:Arial,sans-serif}.label{transform:scale(0.6);transform-origin:center center;display:flex;flex-direction:column;align-items:center;text-align:center}.qr img{width:180px;height:180px;display:block}.id{font-size:28px;font-weight:bold;margin-bottom:4px}.name{font-size:14px;color:#333;margin-bottom:2px}.pilot{font-size:14px;font-weight:bold;margin-bottom:6px}.dt{font-size:10px;color:#888;margin-top:4px}</style></head><body><div class="label"><div class="id">${customer.displayId}</div><div class="name">${customer.firstName} ${customer.lastName}</div>${pilotHtml}<div class="qr"><img src="${qrCodeData}"/></div><div class="dt">${ds} ${ts}</div></div></body></html>`
+    const w = window.open('', '_blank', 'width=300,height=400')
+    if (!w) return
+    w.document.write(html)
+    w.document.close()
+    const img = w.document.querySelector('img')
+    const go = () => { w.focus(); w.print() }
+    if (img && !img.complete) { img.onload = () => setTimeout(go, 200) }
+    else { w.onload = () => setTimeout(go, 200) }
   }
 
   const handlePrintWaiver = () => {
