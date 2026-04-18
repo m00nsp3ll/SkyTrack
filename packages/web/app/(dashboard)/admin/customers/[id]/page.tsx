@@ -461,8 +461,7 @@ export default function CustomerDetailPage() {
           <div class="qr-container">
             <div class="display-id">${customer.displayId}</div>
             <div class="customer-name">${customer.firstName} ${customer.lastName}</div>
-            ${customer.assignedPilot ? `<div class="pilot-name">Pilot: ${customer.assignedPilot.name}</div>` : ''}
-            <div class="datetime">${dateStr} - ${timeStr}</div>
+            <div class="pilot-name">${dateStr} - ${timeStr}</div>
             <img src="${qrCodeData}" alt="QR Code" class="qr-code" />
           </div>
           <script>window.onload = () => { setTimeout(() => window.print(), 200); };</script>
