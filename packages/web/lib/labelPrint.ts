@@ -1,7 +1,8 @@
 /**
  * Thermal label printing utility for Xprinter XP-490B
- * Physical label: 60mm wide x 40mm tall (landscape)
- * No @page size — content compact enough to fit on label at any driver paper size
+ * Physical label: 7cm x 5cm
+ * Layout: portrait — text top, QR bottom, centered
+ * Scale 0.6 baked in so user prints at 100%
  */
 
 export interface LabelData {
@@ -36,42 +37,47 @@ function buildLabelHtml(data: LabelData): string {
     font-family: Arial, sans-serif;
   }
   .label {
+    transform: scale(0.6);
+    transform-origin: center center;
     display: flex;
-    flex-direction: row;
+    flex-direction: column;
     align-items: center;
-    gap: 5px;
-  }
-  .qr img {
-    width: 65px;
-    height: 65px;
-    display: block;
-  }
-  .info {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    height: 65px;
-  }
-  .info-inner {
-    transform: rotate(90deg);
-    white-space: nowrap;
     text-align: center;
   }
-  .id { font-size: 10px; font-weight: bold; }
-  .name { font-size: 6px; color: #333; margin-top: 2px; }
-  .pilot { font-size: 6px; font-weight: bold; margin-top: 1px; }
-  .dt { font-size: 5px; color: #888; margin-top: 2px; }
+  .qr img {
+    width: 180px;
+    height: 180px;
+    display: block;
+  }
+  .id {
+    font-size: 28px;
+    font-weight: bold;
+    margin-bottom: 4px;
+  }
+  .name {
+    font-size: 14px;
+    color: #333;
+    margin-bottom: 2px;
+  }
+  .pilot {
+    font-size: 14px;
+    font-weight: bold;
+    margin-bottom: 6px;
+  }
+  .dt {
+    font-size: 10px;
+    color: #888;
+    margin-top: 4px;
+  }
 </style>
 </head>
 <body>
 <div class="label">
+  <div class="id">${data.displayId}</div>
+  <div class="name">${data.customerName}</div>
+  ${data.pilotName ? `<div class="pilot">Pilot: ${data.pilotName}</div>` : ''}
   <div class="qr"><img src="${data.qrCode}" /></div>
-  <div class="info"><div class="info-inner">
-    <div class="id">${data.displayId}</div>
-    <div class="name">${data.customerName}</div>
-    ${data.pilotName ? `<div class="pilot">Pilot: ${data.pilotName}</div>` : ''}
-    <div class="dt">${dateStr} ${timeStr}</div>
-  </div></div>
+  <div class="dt">${dateStr} ${timeStr}</div>
 </div>
 </body>
 </html>`
@@ -79,7 +85,7 @@ function buildLabelHtml(data: LabelData): string {
 
 export function printLabel(data: LabelData): void {
   const html = buildLabelHtml(data)
-  const w = window.open('', '_blank', 'width=300,height=200')
+  const w = window.open('', '_blank', 'width=300,height=400')
   if (!w) return
   w.document.write(html)
   w.document.close()

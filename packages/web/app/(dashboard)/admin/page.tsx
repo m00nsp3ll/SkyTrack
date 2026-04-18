@@ -795,7 +795,7 @@ export default function AdminDashboard() {
               const now = new Date()
               const ds = now.toLocaleDateString('tr-TR')
               const ts = now.toLocaleTimeString('tr-TR')
-              const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Etiket</title><style>@page{margin:0}*{margin:0;padding:0;box-sizing:border-box}html,body{width:100%;height:100%;margin:0;padding:0;overflow:hidden}body{display:flex;align-items:center;justify-content:center;font-family:Arial,sans-serif}.label{display:flex;flex-direction:row;align-items:center;gap:5px}.qr img{width:65px;height:65px;display:block}.info{display:flex;align-items:center;justify-content:center;height:65px}.info-inner{transform:rotate(90deg);white-space:nowrap;text-align:center}.id{font-size:10px;font-weight:bold}.name{font-size:6px;color:#333;margin-top:2px}.pilot{font-size:6px;font-weight:bold;margin-top:1px}.dt{font-size:5px;color:#888;margin-top:2px}</style></head><body><div class="label"><div class="qr"><img src="${demoQR}"/></div><div class="info"><div class="info-inner"><div class="id">T0060</div><div class="name">Elas Aidukas</div><div class="pilot">Pilot: Mehmet Ermetin</div><div class="dt">${ds} ${ts}</div></div></div></div></body></html>`
+              const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Etiket</title><style>@page{margin:0}*{margin:0;padding:0;box-sizing:border-box}html,body{width:100%;height:100%;margin:0;padding:0;overflow:hidden}body{display:flex;align-items:center;justify-content:center;font-family:Arial,sans-serif}.label{transform:scale(0.6);transform-origin:center center;display:flex;flex-direction:column;align-items:center;text-align:center}.qr img{width:180px;height:180px;display:block}.id{font-size:28px;font-weight:bold;margin-bottom:4px}.name{font-size:14px;color:#333;margin-bottom:2px}.pilot{font-size:14px;font-weight:bold;margin-bottom:6px}.dt{font-size:10px;color:#888;margin-top:4px}</style></head><body><div class="label"><div class="id">T0060</div><div class="name">Elas Aidukas</div><div class="pilot">Pilot: Mehmet Ermetin</div><div class="qr"><img src="${demoQR}"/></div><div class="dt">${ds} ${ts}</div></div></body></html>`
               const w = window.open('', '_blank', 'width=300,height=200')
               if (!w) return
               w.document.write(html)
@@ -808,26 +808,20 @@ export default function AdminDashboard() {
             className="border-2 border-dashed border-blue-400 rounded-lg p-4 hover:bg-blue-50 transition-colors w-full max-w-sm mx-auto block"
           >
             <div className="text-sm font-bold mb-2 text-center">Test Etiketi Yazdir</div>
-            <div className="border rounded bg-white p-3 mx-auto" style={{ width: '200px', height: '130px' }}>
-              <div className="flex h-full items-center">
-                <div className="w-1/2 flex items-center justify-center">
-                  {demoQR ? (
-                    <img src={demoQR} alt="QR" className="w-16 h-16" />
-                  ) : (
-                    <div className="w-16 h-16 bg-gray-800 rounded" />
-                  )}
-                </div>
-                <div className="w-1/2 flex items-center justify-center">
-                  <div className="transform -rotate-90 text-center whitespace-nowrap">
-                    <div className="text-[10px] font-bold">T0060</div>
-                    <div className="text-[7px] text-gray-500">Elas Aidukas</div>
-                    <div className="text-[7px] font-bold">Pilot: Mehmet</div>
-                    <div className="text-[5px] text-gray-400">18.04.2026</div>
-                  </div>
-                </div>
+            <div className="border rounded bg-white p-2 mx-auto" style={{ width: '120px', height: '160px' }}>
+              <div className="flex flex-col h-full items-center justify-center">
+                <div className="text-[10px] font-bold">T0060</div>
+                <div className="text-[6px] text-gray-500">Elas Aidukas</div>
+                <div className="text-[6px] font-bold">Pilot: Mehmet</div>
+                {demoQR ? (
+                  <img src={demoQR} alt="QR" className="w-14 h-14 mt-1" />
+                ) : (
+                  <div className="w-14 h-14 bg-gray-800 rounded mt-1" />
+                )}
+                <div className="text-[5px] text-gray-400 mt-1">18.04.2026</div>
               </div>
             </div>
-            <div className="text-xs text-gray-500 mt-2 text-center">7x5cm yatay — QR solda, yazi 90° donuk</div>
+            <div className="text-xs text-gray-500 mt-2 text-center">7x5cm — yazi ust, QR alt, %100 scale</div>
           </button>
         </CardContent>
       </Card>
