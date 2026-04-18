@@ -46,7 +46,7 @@ function buildLabelHtml(data: LabelData): string {
   .label {
     width: 3.6in;
     height: 1.8in;
-    transform: rotate(-90deg);
+    transform: rotate(-90deg) scale(0.6);
     display: flex;
     flex-direction: row;
     align-items: center;
