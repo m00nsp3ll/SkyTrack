@@ -39,14 +39,15 @@ function buildLabelHtml(data: LabelData): string {
     print-color-adjust: exact;
   }
   body {
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    position: relative;
   }
   .label {
+    position: absolute;
+    top: 50%;
+    left: 50%;
     width: 3.6in;
     height: 1.8in;
-    transform: rotate(-90deg) scale(0.6);
+    transform: translate(-50%, -50%) rotate(-90deg) scale(0.6);
     display: flex;
     flex-direction: row;
     align-items: center;
