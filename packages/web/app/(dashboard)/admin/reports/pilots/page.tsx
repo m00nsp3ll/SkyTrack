@@ -262,7 +262,23 @@ export default function PilotPerformanceReport() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Pilot Performans Raporu</h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-bold text-gray-900">Pilot Performans Raporu</h1>
+            <button
+              onClick={() => {
+                const table = document.getElementById('pilot-report-table')
+                if (!table) return
+                const w = window.open('', '_blank')
+                if (!w) return
+                w.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>Pilot Raporu</title><style>@page{margin:10mm}body{font-family:Arial,sans-serif;font-size:11px;margin:0}h2{font-size:16px;margin:0 0 8px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:4px 6px;text-align:center}th{background:#f0f0f0;font-size:10px}td{font-size:11px}</style></head><body><h2>Pilot Performans Raporu</h2>' + table.outerHTML + '</body></html>')
+                w.document.close()
+                setTimeout(() => { w.focus(); w.print() }, 300)
+              }}
+              className="px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg border"
+            >
+              Yazdir
+            </button>
+          </div>
           <p className="text-muted-foreground">
             {data?.dateRange && (
               <>
@@ -467,7 +483,7 @@ export default function PilotPerformanceReport() {
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table id="pilot-report-table" className="w-full text-sm">
               <thead>
                 <tr className="border-b">
                   <th className="text-left py-3 px-2 font-medium">#</th>
