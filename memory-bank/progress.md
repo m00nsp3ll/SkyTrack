@@ -35,7 +35,11 @@
 - [x] Pilot sırası yönetimi (drag & drop)
 - [x] Pilot detay sayfası (toplam uçuş, tarih filtresi)
 - [x] Pilot panel (mobil için)
-- [x] Pilot panelinde sıra gösterimi (dinamik hesaplama)
+- [x] Pilot panelinde sıra gösterimi (dinamik hesaplama — tüm inQueue pilotları sayar, OFF_DUTY dahil)
+- [x] Pilot panelinde tüm pilotlar görünür (mesai dışı soluk badge'li)
+- [x] Pilot panelinde serbest feragat kaldırıldı, müşteri atandığında feragat butonu
+- [x] Mesai dışı→içi geçişte otomatik feragat yok — pilot aynı konumuna döner
+- [x] Yeni pilot ekleme: roundCount/forfeitCount en yüksek tura eşitlenir otomatik
 - [x] Pilot profil sidebar (soldan açılan, animasyonlu)
 
 ### Uçuş Takibi
@@ -52,6 +56,12 @@
 - [x] HTTPS ile mobil kamera desteği
 - [x] Custom domain ile QR URL oluşturma (skytrackyp.com/c/xxx)
 - [x] Mevcut müşteri QR kodları güncelleme scripti
+- [x] QR etiket yazdırma: Xprinter XP-490B (termal, 7x5cm etiket)
+- [x] Etiket layout: tarih üstte, QR ortada, kod-isim ve pilot altta
+- [x] Müşteri sayfası + kiosk + admin test butonu — inline HTML template
+- [x] AirPrint Bridge: Mac üzerinden iPad'lere Xprinter paylaşımı (dns-sd)
+- [x] Kiosk AirPrint: WKScriptMessageHandler native bridge
+- [ ] Brother QL-810W yazıcıya geçiş planlandı (AirPrint native)
 
 ### Risk Formu
 - [x] Dijital imza alma
@@ -298,7 +308,8 @@
 - [x] Vezne Raporu (/admin/reports/cashier) - Tüm personel performansı
 - [x] Personel Detay Raporu (/admin/reports/staff-sales) - Bireysel satış analizi
 - [x] Gelir Raporu (/admin/reports/revenue) - Kategori, trend, personel performansı
-- [x] Pilot Raporu (/admin/reports/pilots) - Pilot performans istatistikleri
+- [x] Pilot Raporu (/admin/reports/pilots) - Pilot performans istatistikleri (forma sırası, Excel senkron, yazdır butonu)
+- [x] Firma Raporu (/admin/reports/company) - Firma bazlı uçuş/ödeme istatistikleri, pilot detay, uçuş geçmişi
 - [x] Müşteri Akışı Raporu (/admin/reports/customers) - Müşteri analizi
 - [x] Dönem Karşılaştırma (/admin/reports/compare) - İki dönem karşılaştırması
 - [x] Sistem İzleme (/admin/reports/system) - Disk, DB, memory kullanımı
@@ -350,6 +361,10 @@
 ### Pilot Sıra Yönetimi v2 & Kritik Düzeltmeler (2026-04-06)
 - [x] Pilot "Sırada Değil" (inQueue) toggle özelliği — sıra dışı pilotlara müşteri atanmıyor
 - [x] Pilot listesi renkli bölümler: Pilot Sırası / Limit Doldu / Molada / Mesai Dışı / Sırada Değil
+- [x] Pilot sıra sistemi Excel mantığına göre yeniden tasarlandı (forma numarası sabit, roundCount rotasyonu)
+- [x] Kuyruk sıralama bugları düzeltildi (getQueueStatus, refreshQueueCache, /queue endpoint, notify-next-first)
+- [x] Pilot ana ekranında gerçek sıra gösterimi (actualQueueRank — forma no yerine müsait pilotlar arası konum)
+- [x] Pilot rapor sayfası Excel ile birebir senkronize (forma sırası, uçuş/feragat/ödeme/kalan)
 - [x] Pilot paneli: inQueue=false → sıra numarası "-", profil sidebar'da "Sırada Değil" etiketi
 - [x] Login büyük/küçük harf sorunu: `findFirst + mode: insensitive` ile düzeltildi
 - [x] FCM keepalive endpoint (public): JWT süresi dolunca token aktif kalıyor, bildirimler kesilmiyor
