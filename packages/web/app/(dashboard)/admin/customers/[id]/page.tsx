@@ -430,40 +430,11 @@ export default function CustomerDetailPage() {
     const now = new Date()
     const dateStr = now.toLocaleDateString('tr-TR')
     const timeStr = now.toLocaleTimeString('tr-TR')
+    const pilotHtml = customer.assignedPilot ? `<div style="font-size:12px;font-weight:bold;margin-top:2px">Pilot: ${customer.assignedPilot.name}</div>` : ''
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Etiket</title><style>@page{margin:0}*{margin:0;padding:0;box-sizing:border-box}body{margin:0;padding:10px;font-family:Arial,sans-serif;text-align:center}</style><script>window.onload=function(){setTimeout(function(){window.print()},200)}</script></head><body><div style="width:5cm;margin:0 auto"><div style="font-size:10px;font-weight:bold">${dateStr} - ${timeStr}</div><img src="${qrCodeData}" style="width:3.2cm;height:3.2cm;display:block;margin:2px auto"><div style="font-size:14px;font-weight:bold;margin-top:2px">${customer.displayId} - ${customer.firstName} ${customer.lastName}</div>${pilotHtml}</div></body></html>`
     const printWindow = window.open('', '_blank')
     if (printWindow) {
-      printWindow.document.write(`
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <title>QR Kod - ${customer.displayId}</title>
-          <style>
-            @page { margin: 0; }
-            * { margin: 0; padding: 0; box-sizing: border-box; }
-            html, body {
-              margin: 0;
-              padding: 0;
-              font-family: Arial, sans-serif;
-              text-align: center;
-            }
-            .qr-container { width: 5cm; margin: 0 auto; padding: 10px; }
-            .qr-code { width: 3.2cm; height: 3.2cm; display: block; margin: 0 auto; }
-            .display-id { font-size: 14px; font-weight: bold; margin-top: 3px; }
-            .pilot-name { font-size: 12px; font-weight: bold; color: #000; margin-top: 2px; }
-            .datetime { font-size: 10px; font-weight: bold; color: #000; margin-top: 2px; }
-          </style>
-          <script>window.onload = function() { setTimeout(function() { window.print(); }, 200); };</script>
-        </head>
-        <body>
-          <div class="qr-container">
-            <div class="datetime">${dateStr} - ${timeStr}</div>
-            <img src="${qrCodeData}" alt="QR Code" class="qr-code" />
-            <div class="display-id">${customer.displayId} - ${customer.firstName} ${customer.lastName}</div>
-            ${customer.assignedPilot ? `<div class="pilot-name">Pilot: ${customer.assignedPilot.name}</div>` : ''}
-          </div>
-        </body>
-        </html>
-      `)
+      printWindow.document.write(html)
       printWindow.document.close()
     }
   }
