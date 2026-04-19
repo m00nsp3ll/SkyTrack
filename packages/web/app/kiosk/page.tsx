@@ -344,9 +344,7 @@ export default function KioskPage() {
     const now = new Date()
     const dateStr = now.toLocaleDateString('tr-TR')
     const timeStr = now.toLocaleTimeString('tr-TR')
-    const pilotHtml = res.pilot?.name ? `<div style="font-size:12px;font-weight:bold;margin-top:3px;">Pilot: ${res.pilot.name}</div>` : ''
-
-    return `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body style="margin:0;padding:10px;font-family:Arial,sans-serif;text-align:center"><div style="width:5cm;margin:0 auto"><div style="font-size:10px;font-weight:bold">${dateStr} - ${timeStr}</div><img src="${res.qrCode}" style="width:3.2cm;height:3.2cm;display:block;margin:4px auto"><div style="font-size:14px;font-weight:bold;margin-top:2px">${res.customer.displayId} - ${res.customer.firstName} ${res.customer.lastName}</div>${pilotHtml}</div></body></html>`
+    return '<html><body style="margin:0;padding:0;font-family:Arial;text-align:center;font-size:10px"><p style="margin:0"><b>' + dateStr + ' - ' + timeStr + '</b></p><img src="' + res.qrCode + '" style="width:80px;height:80px;display:block;margin:4px auto"><p style="margin:2px 0 0;font-size:12px"><b>' + res.customer.displayId + ' - ' + res.customer.firstName + ' ' + res.customer.lastName + '</b></p>' + (res.pilot?.name ? '<p style="margin:1px 0 0;font-size:11px"><b>Pilot: ' + res.pilot.name + '</b></p>' : '') + '</body></html>'
   }
 
   // Native AirPrint
@@ -513,7 +511,7 @@ export default function KioskPage() {
             try {
               const ds = new Date().toLocaleDateString('tr-TR')
               const ts = new Date().toLocaleTimeString('tr-TR')
-              const testHtml = `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body style="margin:0;padding:10px;font-family:Arial,sans-serif;text-align:center"><div style="width:5cm;margin:0 auto"><div style="font-size:10px;font-weight:bold">${ds} - ${ts}</div><div style="width:3.2cm;height:3.2cm;background:#000;margin:4px auto"></div><div style="font-size:14px;font-weight:bold;margin-top:2px">TEST - SkyTrack</div><div style="font-size:12px;font-weight:bold;margin-top:2px">Pilot: Test Pilot</div></div></body></html>`
+              const testHtml = '<html><body style="margin:0;padding:0;font-family:Arial;text-align:center;font-size:10px"><p style="margin:0"><b>' + ds + ' - ' + ts + '</b></p><table border="1" cellpadding="0" cellspacing="0" style="width:80px;height:80px;margin:4px auto;border-collapse:collapse"><tr><td style="background:#000"></td></tr></table><p style="margin:2px 0 0;font-size:12px"><b>TEST - SkyTrack</b></p><p style="margin:1px 0 0;font-size:11px"><b>Pilot: Test</b></p></body></html>'
               if (typeof window._nativeAirPrint === 'function' || (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios')) {
                 await AirPrint.print({ html: testHtml, jobName: 'SkyTrack-Test' })
               } else {
