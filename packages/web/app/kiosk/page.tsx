@@ -346,16 +346,7 @@ export default function KioskPage() {
     const timeStr = now.toLocaleTimeString('tr-TR')
     const pilotHtml = res.pilot?.name ? `<div style="font-size:12px;font-weight:bold;margin-top:3px;">Pilot: ${res.pilot.name}</div>` : ''
 
-    return `<!DOCTYPE html>
-<html><head><meta charset="utf-8"></head>
-<body style="margin:0;padding:5px;font-family:Arial,sans-serif;text-align:center;">
-<div style="width:5cm;margin:0 auto;padding:10px;border:1px dashed #ccc;">
-<div style="font-size:10px;font-weight:bold;">${dateStr} - ${timeStr}</div>
-<img src="${res.qrCode}" alt="QR" style="width:4cm;height:4cm;display:block;margin:0 auto;" />
-<div style="font-size:14px;font-weight:bold;">${res.customer.displayId} - ${res.customer.firstName} ${res.customer.lastName}</div>
-${pilotHtml}
-</div>
-</body></html>`
+    return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>@page{size:4in 6in;margin:0}body{margin:0;padding:0;width:4in;height:6in;display:flex;align-items:center;justify-content:center;font-family:Arial,sans-serif;text-align:center}</style></head><body><div><div style="font-size:10px;font-weight:bold">${dateStr} - ${timeStr}</div><img src="${res.qrCode}" style="width:3.2cm;height:3.2cm;display:block;margin:4px auto"><div style="font-size:14px;font-weight:bold;margin-top:2px">${res.customer.displayId} - ${res.customer.firstName} ${res.customer.lastName}</div>${pilotHtml}</div></body></html>`
   }
 
   // Native AirPrint
@@ -520,11 +511,7 @@ ${pilotHtml}
         <button
           onClick={async () => {
             try {
-              const testHtml = `<html><body style="font-family:sans-serif;text-align:center;padding:40px;">
-                <h1 style="font-size:28px;">SkyTrack Test</h1>
-                <p style="font-size:18px;margin-top:20px;">Yazici testi</p>
-                <p style="font-size:14px;color:#666;margin-top:10px;">${new Date().toLocaleString('tr-TR')}</p>
-              </body></html>`
+              const testHtml = `<html><head><style>@page{size:4in 6in;margin:0}body{margin:0;padding:0;width:4in;height:6in;display:flex;align-items:center;justify-content:center;font-family:sans-serif;text-align:center}</style></head><body><div><div style="font-size:14px;font-weight:bold">SkyTrack Test</div><div style="width:2cm;height:2cm;background:#000;margin:8px auto"></div><div style="font-size:10px">${new Date().toLocaleString('tr-TR')}</div></div></body></html>`
               if (typeof window._nativeAirPrint === 'function' || (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios')) {
                 await AirPrint.print({ html: testHtml, jobName: 'SkyTrack-Test' })
               } else {

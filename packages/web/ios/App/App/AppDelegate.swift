@@ -170,7 +170,7 @@ class AirPrintHandler: NSObject, WKScriptMessageHandler {
             printController.printInfo = printInfo
 
             let formatter = UIMarkupTextPrintFormatter(markupText: html)
-            formatter.perPageContentInsets = UIEdgeInsets(top: 10, left: 10, bottom: 10, right: 10)
+            formatter.perPageContentInsets = UIEdgeInsets(top: 0, left: 0, bottom: 0, right: 0)
             printController.printFormatter = formatter
 
             let webView = message.webView
