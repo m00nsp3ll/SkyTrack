@@ -757,21 +757,32 @@ export default function PilotPanel() {
                     {isFirst && (
                       <div className="grid grid-cols-1 gap-2">
                         {flight.status === 'ASSIGNED' && (
-                          <Button
-                            size="lg"
-                            className="w-full h-14 text-lg bg-yellow-500 hover:bg-yellow-600"
-                            onClick={() => handleFlightAction(flight.id, 'PICKED_UP')}
-                            disabled={updating === flight.id}
-                          >
-                            {updating === flight.id ? (
-                              <RefreshCw className="h-5 w-5 animate-spin" />
-                            ) : (
-                              <>
-                                <User className="h-5 w-5 mr-2" />
-                                Müşteriyi Aldım
-                              </>
-                            )}
-                          </Button>
+                          <>
+                            <Button
+                              size="lg"
+                              className="w-full h-14 text-lg bg-yellow-500 hover:bg-yellow-600"
+                              onClick={() => handleFlightAction(flight.id, 'PICKED_UP')}
+                              disabled={updating === flight.id}
+                            >
+                              {updating === flight.id ? (
+                                <RefreshCw className="h-5 w-5 animate-spin" />
+                              ) : (
+                                <>
+                                  <User className="h-5 w-5 mr-2" />
+                                  Müşteriyi Aldım
+                                </>
+                              )}
+                            </Button>
+                            <Button
+                              size="lg"
+                              variant="outline"
+                              className="w-full h-11 border-orange-300 text-orange-700 hover:bg-orange-50"
+                              onClick={() => setForfeitModal(true)}
+                              disabled={forfeiting}
+                            >
+                              Feragat Et
+                            </Button>
+                          </>
                         )}
 
                         {flight.status === 'PICKED_UP' && (
@@ -961,19 +972,6 @@ export default function PilotPanel() {
                   </p>
                 )}
 
-                {/* Feragat Butonu */}
-                {(pilot?.status === 'AVAILABLE' || pilot?.status === 'UNAVAILABLE' || pilot?.status === 'ON_BREAK') && (
-                  <Button
-                    variant="outline"
-                    className="w-full mt-3 border-orange-300 text-orange-700 hover:bg-orange-50 h-11"
-                    onClick={() => {
-                      setForfeitModal(true)
-                      setShowProfileSidebar(false)
-                    }}
-                  >
-                    ⏭️ Feragat Et
-                  </Button>
-                )}
               </div>
 
               {/* Stats Summary */}
