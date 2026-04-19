@@ -209,7 +209,7 @@ export default function PilotsPage() {
                 { value: 'IN_FLIGHT', label: 'Uçuşta' },
                 { value: 'ON_BREAK', label: 'Molada' },
                 { value: 'limit_reached', label: 'Limit Dolu' },
-                { value: 'inactive', label: 'Pasif' },
+                { value: 'OFF_DUTY', label: 'Mesai Disi' },
               ].map((option) => (
                 <Button
                   key={option.value}
