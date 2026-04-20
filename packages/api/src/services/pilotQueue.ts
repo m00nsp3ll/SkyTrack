@@ -126,9 +126,15 @@ export const pilotQueueService = {
   async assignPilotToCustomer(
     customerId: string,
     customerDisplayId: string,
-    io?: any
+    io?: any,
+    specificPilotId?: string
   ): Promise<{ pilot: Pilot; flightId: string; mediaFolderPath: string } | null> {
-    const pilot = await this.getNextPilot();
+    let pilot: Pilot | null;
+    if (specificPilotId) {
+      pilot = await prisma.pilot.findUnique({ where: { id: specificPilotId } });
+    } else {
+      pilot = await this.getNextPilot();
+    }
 
     if (!pilot) {
       return null;

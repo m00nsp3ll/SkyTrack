@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { api } from '@/lib/api'
 import { ArrowLeft, UserPlus, Printer, Eraser, Check, X, PenLine } from 'lucide-react'
+import { printLabel } from '@/lib/labelPrint'
 import Link from 'next/link'
 import { type Language, LANGUAGES, t, isRtl } from '@/lib/translations'
 
@@ -49,6 +50,7 @@ interface RegistrationResult {
   qrUrl: string
   pilotAssigned: boolean
   pilot: { id: string; name: string } | null
+  suggestedPilot: { id: string; name: string } | null
   message: string
 }
 
@@ -247,6 +249,9 @@ export default function NewCustomerPage() {
   const [signatureData, setSignatureData] = useState<string | null>(null)
   const [showWaiverModal, setShowWaiverModal] = useState(false)
   const [showKvkkModal, setShowKvkkModal] = useState(false)
+  const [showPilotSelect, setShowPilotSelect] = useState(false)
+  const [availablePilots, setAvailablePilots] = useState<{ id: string; name: string; queuePosition: number; roundCount: number }[]>([])
+  const [confirmingPilot, setConfirmingPilot] = useState(false)
   const [selectedLanguage, setSelectedLanguage] = useState<Language | null>(null)
 
   const [countryCode, setCountryCode] = useState('+90')
@@ -387,43 +392,48 @@ export default function NewCustomerPage() {
     await submitRegistration(signatureData)
   }
 
-  const handlePrint = () => {
-    const printWindow = window.open('', '_blank')
-    if (printWindow && result) {
-      const now = new Date()
-      const dateStr = now.toLocaleDateString('tr-TR')
-      const timeStr = now.toLocaleTimeString('tr-TR')
-      printWindow.document.write(`
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <title>QR Kod - ${result.customer.displayId}</title>
-          <style>
-            @page { size: auto; margin: 0; }
-            @media print { html, body { margin: 0; padding: 0; } }
-            body { font-family: Arial, sans-serif; text-align: center; padding: 10px; margin: 0; }
-            .qr-container { width: 5cm; margin: 0 auto; padding: 10px; border: 1px dashed #ccc; }
-            .qr-code { width: 4cm; height: 4cm; }
-            .display-id { font-size: 14px; font-weight: bold; margin-top: 5px; }
-            .customer-name { font-size: 12px; color: #666; }
-            .pilot-name { font-size: 12px; font-weight: bold; color: #333; margin-top: 3px; }
-            .datetime { font-size: 10px; color: #888; margin-top: 5px; }
-          </style>
-        </head>
-        <body>
-          <div class="qr-container">
-            <img src="${result.qrCode}" alt="QR Code" class="qr-code" />
-            <div class="display-id">${result.customer.displayId}</div>
-            <div class="customer-name">${result.customer.firstName} ${result.customer.lastName}</div>
-            ${result.pilot ? `<div class="pilot-name">Pilot: ${result.pilot.name}</div>` : ''}
-            <div class="datetime">${dateStr} - ${timeStr}</div>
-          </div>
-          <script>window.onload = () => window.print();</script>
-        </body>
-        </html>
-      `)
-      printWindow.document.close()
+  const confirmPilot = async (pilotId?: string) => {
+    if (!result) return
+    setConfirmingPilot(true)
+    try {
+      const response = await api.post(`/customers/${result.customer.id}/confirm-pilot`, {
+        pilotId: pilotId || undefined,
+      })
+      setResult({
+        ...result,
+        pilotAssigned: true,
+        pilot: response.data.data.pilot,
+        suggestedPilot: null,
+      })
+      setShowPilotSelect(false)
+    } catch (err: any) {
+      setError(err.response?.data?.error?.message || 'Pilot atama hatası')
+    } finally {
+      setConfirmingPilot(false)
     }
+  }
+
+  const loadAvailablePilots = async () => {
+    try {
+      const response = await api.get('/pilots/queue')
+      const pilots = response.data.data.queue.filter(
+        (p: any) => p.status === 'AVAILABLE' && p.inQueue !== false && p.dailyFlightCount < p.maxDailyFlights
+      )
+      setAvailablePilots(pilots)
+      setShowPilotSelect(true)
+    } catch (err) {
+      console.error('Pilot listesi alınamadı:', err)
+    }
+  }
+
+  const handlePrint = () => {
+    if (!result) return
+    printLabel({
+      qrCode: result.qrCode,
+      displayId: result.customer.displayId,
+      customerName: `${result.customer.firstName} ${result.customer.lastName}`,
+      pilotName: result.pilot?.name,
+    })
   }
 
   const resetForm = () => {
@@ -648,10 +658,72 @@ export default function NewCustomerPage() {
               </div>
             </div>
 
-            {result.pilot && (
-              <div className="text-center p-4 bg-blue-50 rounded-lg">
+            {/* Pilot onaylanmış */}
+            {result.pilotAssigned && result.pilot && (
+              <div className="text-center p-4 bg-green-50 rounded-lg border border-green-200">
                 <p className="text-sm text-gray-600">Atanan Pilot</p>
-                <p className="text-lg font-semibold text-blue-700">{result.pilot.name}</p>
+                <p className="text-lg font-semibold text-green-700">{result.pilot.name}</p>
+              </div>
+            )}
+
+            {/* Pilot onay bekliyor */}
+            {!result.pilotAssigned && result.suggestedPilot && !showPilotSelect && (
+              <div className="space-y-3">
+                <div className="text-center p-4 bg-yellow-50 rounded-lg border border-yellow-300">
+                  <p className="text-sm text-gray-600">Önerilen Pilot</p>
+                  <p className="text-xl font-bold text-yellow-700">{result.suggestedPilot.name}</p>
+                  <p className="text-xs text-gray-500 mt-1">Onay bekleniyor...</p>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={() => confirmPilot()}
+                    disabled={confirmingPilot}
+                    className="flex-1 h-12 text-base bg-green-600 hover:bg-green-700"
+                  >
+                    {confirmingPilot ? 'Atanıyor...' : 'Onayla'}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={loadAvailablePilots}
+                    className="flex-1 h-12 text-base border-orange-400 text-orange-600 hover:bg-orange-50"
+                  >
+                    Pilot Değiştir
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Pilot seçim listesi */}
+            {showPilotSelect && (
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-gray-700">Pilot Seçin:</p>
+                <div className="max-h-60 overflow-y-auto border rounded-lg divide-y">
+                  {availablePilots.map((p) => (
+                    <button
+                      key={p.id}
+                      onClick={() => confirmPilot(p.id)}
+                      disabled={confirmingPilot}
+                      className="w-full px-4 py-3 text-left hover:bg-blue-50 flex justify-between items-center"
+                    >
+                      <span className="font-medium">{p.name}</span>
+                      <span className="text-xs text-gray-400">Sıra: {p.queuePosition}</span>
+                    </button>
+                  ))}
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={() => setShowPilotSelect(false)}
+                  className="w-full"
+                >
+                  İptal
+                </Button>
+              </div>
+            )}
+
+            {/* Müsait pilot yok */}
+            {!result.pilotAssigned && !result.suggestedPilot && (
+              <div className="text-center p-4 bg-red-50 rounded-lg border border-red-200">
+                <p className="text-sm text-red-600">Müsait pilot bulunamadı</p>
               </div>
             )}
 

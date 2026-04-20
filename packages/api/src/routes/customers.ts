@@ -298,54 +298,22 @@ router.post('/', authenticate, requireRole('ADMIN', 'OFFICE_STAFF', 'KIOSK'), as
     }
   }
 
-  // Try to assign a pilot
-  const io = req.app.get('io');
-  const assignment = await pilotQueueService.assignPilotToCustomer(
-    customer.id,
-    customer.displayId,
-    io
-  );
-
-  // Get updated customer with pilot info
-  const updatedCustomer = await prisma.customer.findUnique({
-    where: { id: customer.id },
-    include: {
-      assignedPilot: { select: { id: true, name: true, dailyFlightCount: true } },
-    },
-  });
-
-  // QNAP NAS'ta müşteri klasörü oluştur (hata olsa da kayıt devam eder)
-  // Format: YYYY-MM-DD/PILOT_ADI/N_sorti/DISPLAYID
-  try {
-    const today = new Date().toISOString().split('T')[0];
-    const pilot = updatedCustomer?.assignedPilot;
-    if (pilot) {
-      const safeName = pilot.name.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_çÇğĞıİöÖşŞüÜ-]/g, '').trim();
-      const sortiNo = Math.max(1, (pilot.dailyFlightCount ?? 0) + 1);
-      const relPath = `${today}/${safeName}/${sortiNo}_sorti/${customer.displayId}`;
-      await qnap.createFolder(relPath);
-      await prisma.customer.update({
-        where: { id: customer.id },
-        data: { mediaFolderPath: `media/${relPath}` },
-      });
-    }
-  } catch (err) {
-    console.error('[QNAP] Klasör oluşturma hatası, kayıt devam ediyor:', err);
-  }
+  // Pilot otomatik atama YAPMA — sadece önerilen pilotu bul
+  const suggestedPilot = await pilotQueueService.getNextPilot();
 
   res.status(201).json({
     success: true,
     data: {
-      customer: updatedCustomer,
+      customer,
       qrCode,
       qrUrl: `${getServerBaseUrl()}/c/${displayId}`,
-      pilotAssigned: assignment !== null,
-      pilot: assignment?.pilot ? {
-        id: assignment.pilot.id,
-        name: assignment.pilot.name,
+      pilotAssigned: false,
+      suggestedPilot: suggestedPilot ? {
+        id: suggestedPilot.id,
+        name: suggestedPilot.name,
       } : null,
-      message: assignment
-        ? `Pilot atandı: ${assignment.pilot.name}`
+      message: suggestedPilot
+        ? `Önerilen pilot: ${suggestedPilot.name} — Onay bekleniyor`
         : 'Şu an müsait pilot yok. Müşteri bekleme listesinde.',
     },
   });
@@ -380,6 +348,73 @@ router.put('/:id', authenticate, asyncHandler(async (req: AuthRequest, res: any)
   res.json({
     success: true,
     data: customer,
+  });
+}));
+
+// POST /api/customers/:id/confirm-pilot - Admin onayı ile pilot ata ve bildirim gönder
+router.post('/:id/confirm-pilot', authenticate, asyncHandler(async (req: AuthRequest, res: any) => {
+  const { id } = req.params;
+  const { pilotId } = req.body; // Opsiyonel: farklı pilot seçildiyse
+
+  const customer = await prisma.customer.findUnique({ where: { id } });
+  if (!customer) {
+    throw new AppError('Müşteri bulunamadı', 404, 'CUSTOMER_NOT_FOUND');
+  }
+
+  const io = req.app.get('io');
+  let assignment;
+
+  if (pilotId) {
+    // Admin farklı bir pilot seçti — doğrudan o pilotu ata
+    assignment = await pilotQueueService.assignPilotToCustomer(
+      customer.id,
+      customer.displayId,
+      io,
+      pilotId
+    );
+  } else {
+    // Admin önerilen pilotu onayladı — sıradaki pilotu ata
+    assignment = await pilotQueueService.assignPilotToCustomer(
+      customer.id,
+      customer.displayId,
+      io
+    );
+  }
+
+  if (!assignment) {
+    throw new AppError('Müsait pilot bulunamadı', 400, 'NO_AVAILABLE_PILOT');
+  }
+
+  // QNAP NAS'ta müşteri klasörü oluştur
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const pilot = assignment.pilot;
+    const safeName = pilot.name.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_çÇğĞıİöÖşŞüÜ-]/g, '').trim();
+    const sortiNo = Math.max(1, (pilot.dailyFlightCount ?? 0) + 1);
+    const relPath = `${today}/${safeName}/${sortiNo}_sorti/${customer.displayId}`;
+    await qnap.createFolder(relPath);
+    await prisma.customer.update({
+      where: { id: customer.id },
+      data: { mediaFolderPath: `media/${relPath}` },
+    });
+  } catch (err) {
+    console.error('[QNAP] Klasör oluşturma hatası:', err);
+  }
+
+  const updatedCustomer = await prisma.customer.findUnique({
+    where: { id: customer.id },
+    include: {
+      assignedPilot: { select: { id: true, name: true, dailyFlightCount: true } },
+    },
+  });
+
+  res.json({
+    success: true,
+    data: {
+      customer: updatedCustomer,
+      pilot: { id: assignment.pilot.id, name: assignment.pilot.name },
+      message: `Pilot atandı: ${assignment.pilot.name}`,
+    },
   });
 }));
 
