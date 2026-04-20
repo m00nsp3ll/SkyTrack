@@ -59,6 +59,7 @@ export const pilotQueueService = {
         ],
       },
       orderBy: [
+        { priorityOverride: 'desc' },
         { roundCount: 'asc' },
         { queuePosition: 'asc' },
       ],
@@ -87,6 +88,7 @@ export const pilotQueueService = {
       const pilots = await prisma.pilot.findMany({
         where: { isActive: true },
         orderBy: [
+          { priorityOverride: 'desc' },
           { roundCount: 'asc' },
           { queuePosition: 'asc' },
         ],
@@ -98,6 +100,7 @@ export const pilotQueueService = {
           status: true,
           queuePosition: true,
           roundCount: true,
+          priorityOverride: true,
         },
       });
 
@@ -189,11 +192,13 @@ export const pilotQueueService = {
       });
 
       // FORMA SİSTEMİ: queue_position SABİT (forma numarası). Sıralama roundCount ile dönüyor.
+      // priorityOverride varsa atama sonrası otomatik kaldır (tek seferlik istisnai durum)
       await tx.pilot.update({
         where: { id: pilot.id },
         data: {
           dailyFlightCount: { increment: 1 },
           status: 'ASSIGNED',
+          priorityOverride: false,
         },
       });
 
@@ -255,7 +260,7 @@ export const pilotQueueService = {
           dailyFlightCount: { lt: prisma.pilot.fields.maxDailyFlights },
           id: { not: pilot.id },
         },
-        orderBy: [{ roundCount: 'asc' }, { queuePosition: 'asc' }],
+        orderBy: [{ priorityOverride: 'desc' }, { roundCount: 'asc' }, { queuePosition: 'asc' }],
       });
       if (nextFirst) {
         getNotificationConfig('pilot_first_in_queue').then(config => {
@@ -486,6 +491,7 @@ export const pilotQueueService = {
     const pilots = await prisma.pilot.findMany({
       where: { isActive: true },
       orderBy: [
+        { priorityOverride: 'desc' },
         { roundCount: 'asc' },
         { queuePosition: 'asc' },
       ],
@@ -497,6 +503,7 @@ export const pilotQueueService = {
         status: true,
         queuePosition: true,
         roundCount: true,
+        priorityOverride: true,
       },
     });
 

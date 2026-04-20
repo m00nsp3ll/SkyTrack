@@ -130,6 +130,8 @@ model Pilot {
   flightFee        Decimal?           @db.Decimal(10, 2) @map("flight_fee")
   // Per-pilot TUR sayacı (uçtukça veya feragat ettikçe artar)
   roundCount       Int                @default(0) @map("round_count")
+  // İstisnai durum: bu pilot sıra fark etmeksizin ilk sıraya alınır
+  priorityOverride Boolean            @default(false) @map("priority_override")
   // Firma bilgisi
   companyId        String?            @map("company_id")
   company          Company?           @relation(fields: [companyId], references: [id])
