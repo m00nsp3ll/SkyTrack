@@ -103,10 +103,13 @@ export default function PilotsPage() {
   })
 
   // Excel mantığı: tüm sıradakiler (Müsait + Müşteri Almış + Mesai Dışı + Molada) tek listede
-  // Sıralama: roundCount ASC → queuePosition (forma) ASC. Herkes eşit tur dönsün.
+  // Sıralama: priorityOverride DESC → roundCount ASC → queuePosition (forma) ASC
   const queuePilots = filteredPilots
     .filter((p) => p.isActive && p.inQueue && p.dailyFlightCount < p.maxDailyFlights)
     .sort((a, b) => {
+      const ap = (a as any).priorityOverride ? 1 : 0
+      const bp = (b as any).priorityOverride ? 1 : 0
+      if (ap !== bp) return bp - ap
       const ar = (a as any).roundCount ?? 0
       const br = (b as any).roundCount ?? 0
       if (ar !== br) return ar - br

@@ -156,6 +156,9 @@ export default function PilotQueuePage() {
   const inQueuePilots = pilots
     .filter((p: any) => p.isInExcel === true)
     .sort((a, b) => {
+      const ap = (a as any).priorityOverride ? 1 : 0
+      const bp = (b as any).priorityOverride ? 1 : 0
+      if (ap !== bp) return bp - ap
       const ar = (a as any).roundCount ?? 0
       const br = (b as any).roundCount ?? 0
       if (ar !== br) return ar - br
