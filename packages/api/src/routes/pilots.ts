@@ -66,6 +66,38 @@ router.get('/queue', authenticate, asyncHandler(async (req: AuthRequest, res: an
   });
 }));
 
+// PATCH /api/pilots/:id/priority-override - Toggle priority override (admin only)
+router.patch('/:id/priority-override', authenticate, requireRole('ADMIN'), asyncHandler(async (req: AuthRequest, res: any) => {
+  const { id } = req.params;
+  const { enabled } = req.body;
+
+  const pilot = await prisma.pilot.findUnique({ where: { id } });
+  if (!pilot) {
+    throw new AppError('Pilot bulunamadı', 404, 'PILOT_NOT_FOUND');
+  }
+
+  const newValue = typeof enabled === 'boolean' ? enabled : !pilot.priorityOverride;
+
+  await prisma.pilot.update({
+    where: { id },
+    data: { priorityOverride: newValue },
+  });
+
+  await cache.pilotQueue.invalidate();
+  await cache.pilot.invalidate(id);
+
+  const io = req.app.get('io');
+  if (io) {
+    io.emit('pilot:queue-updated');
+  }
+
+  res.json({
+    success: true,
+    data: { id, priorityOverride: newValue },
+    message: newValue ? 'Pilot ilk sıraya alındı' : 'Öncelik kaldırıldı',
+  });
+}));
+
 // POST /api/pilots/queue/reorder - Reorder pilot queue (admin only)
 router.post('/queue/reorder', authenticate, requireRole('ADMIN'), asyncHandler(async (req: AuthRequest, res: any) => {
   const { order } = req.body; // Array of { id: string, position: number }

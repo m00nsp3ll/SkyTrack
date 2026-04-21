@@ -126,6 +126,8 @@ export const pilotsApi = {
     api.patch(`/pilots/${id}/queue-toggle`),
   forfeit: (id: string) => api.post(`/pilots/${id}/forfeit`),
   forfeitMe: () => api.post('/pilots/me/forfeit'),
+  setPriorityOverride: (id: string, enabled: boolean) =>
+    api.patch(`/pilots/${id}/priority-override`, { enabled }),
 }
 
 // FCM / Notification API

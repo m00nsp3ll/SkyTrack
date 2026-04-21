@@ -911,15 +911,16 @@ router.patch('/:id/status', authenticate, asyncHandler(async (req: AuthRequest, 
         data: { status: 'IN_FLIGHT' },
       });
     } else if (status === 'COMPLETED') {
-      // Increment daily flight count, set OFF_DUTY if limit reached
+      // dailyFlightCount is already incremented during assignment (assignPilotToCustomer)
+      // Only update status here — check current count against limit
       const pilotForLimit = await tx.pilot.findUnique({ where: { id: flight.pilotId } });
-      const newCount = (pilotForLimit?.dailyFlightCount ?? 0) + 1;
-      const limitReached = newCount >= (pilotForLimit?.maxDailyFlights ?? 7);
+      const currentCount = pilotForLimit?.dailyFlightCount ?? 0;
+      const limitReached = currentCount >= (pilotForLimit?.maxDailyFlights ?? 7);
       await tx.pilot.update({
         where: { id: flight.pilotId },
         data: {
           status: limitReached ? 'OFF_DUTY' : 'AVAILABLE',
-          dailyFlightCount: { increment: 1 },
+          roundCount: { increment: 1 },
         },
       });
 

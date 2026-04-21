@@ -17,6 +17,7 @@ import {
   UserPlus,
   User,
   Users,
+  ArrowUpToLine,
 } from 'lucide-react'
 
 interface Pilot {
@@ -28,6 +29,8 @@ interface Pilot {
   queuePosition: number
   inQueue: boolean
   isInExcel?: boolean
+  priorityOverride?: boolean
+  roundCount?: number
 }
 
 const statusConfig = {
@@ -124,6 +127,15 @@ export default function PilotQueuePage() {
     const outOfQueue = pilots.filter(p => !p.inQueue)
     setPilots([...newInQueue, ...outOfQueue])
     setHasChanges(true)
+  }
+
+  const handlePriorityOverride = async (pilotId: string, enabled: boolean) => {
+    try {
+      await pilotsApi.setPriorityOverride(pilotId, enabled)
+      await fetchQueue()
+    } catch (error) {
+      console.error('Failed to set priority override:', error)
+    }
   }
 
   const handleSave = async () => {
@@ -293,9 +305,33 @@ export default function PilotQueuePage() {
                       </span>
                     </div>
                   </div>
-                  <div className="flex flex-col gap-1 flex-shrink-0">
-                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => moveUp(index)} disabled={index === 0}>↑</Button>
-                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => moveDown(index)} disabled={index === inQueuePilots.length - 1}>↓</Button>
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    {(pilot as any).priorityOverride ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 px-2 text-xs border-orange-400 bg-orange-50 text-orange-700 hover:bg-orange-100"
+                        onClick={() => handlePriorityOverride(pilot.id, false)}
+                        title="Önceliği kaldır"
+                      >
+                        <ArrowUpToLine className="h-3 w-3 mr-1" />
+                        Öncelikli
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 px-2 text-xs text-muted-foreground hover:text-orange-700 hover:bg-orange-50"
+                        onClick={() => handlePriorityOverride(pilot.id, true)}
+                        title="İlk sıraya al (bir uçuşluk)"
+                      >
+                        <ArrowUpToLine className="h-3 w-3" />
+                      </Button>
+                    )}
+                    <div className="flex flex-col gap-1">
+                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => moveUp(index)} disabled={index === 0}>↑</Button>
+                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => moveDown(index)} disabled={index === inQueuePilots.length - 1}>↓</Button>
+                    </div>
                   </div>
                 </div>
               )
