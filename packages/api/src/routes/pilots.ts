@@ -78,9 +78,15 @@ router.patch('/:id/priority-override', authenticate, requireRole('ADMIN'), async
 
   const newValue = typeof enabled === 'boolean' ? enabled : !pilot.priorityOverride;
 
+  const updateData: any = { priorityOverride: newValue };
+  // Öncelik açılırken pilotu AVAILABLE yap (Mesai Dışı/Molada olsa bile)
+  if (newValue && pilot.status !== 'AVAILABLE') {
+    updateData.status = 'AVAILABLE';
+  }
+
   await prisma.pilot.update({
     where: { id },
-    data: { priorityOverride: newValue },
+    data: updateData,
   });
 
   await cache.pilotQueue.invalidate();
