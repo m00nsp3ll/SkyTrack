@@ -289,6 +289,8 @@ router.get('/live', authenticate, asyncHandler(async (req: AuthRequest, res: any
           id: true,
           name: true,
           status: true,
+          queuePosition: true,
+          roundCount: true,
         },
       },
     },
@@ -332,11 +334,20 @@ router.get('/live', authenticate, asyncHandler(async (req: AuthRequest, res: any
       : 0,
   }));
 
-  // Add wait time for waiting customers
-  const waitingWithTime = waiting.map(f => ({
-    ...f,
-    waitMinutes: Math.round((now.getTime() - f.createdAt.getTime()) / 60000),
-  }));
+  // Add wait time for waiting customers, sort by pilot queue position
+  const waitingWithTime = waiting
+    .map(f => ({
+      ...f,
+      waitMinutes: Math.round((now.getTime() - f.createdAt.getTime()) / 60000),
+    }))
+    .sort((a, b) => {
+      const aRound = (a.pilot as any)?.roundCount ?? 999;
+      const bRound = (b.pilot as any)?.roundCount ?? 999;
+      if (aRound !== bRound) return aRound - bRound;
+      const aPos = (a.pilot as any)?.queuePosition ?? 999;
+      const bPos = (b.pilot as any)?.queuePosition ?? 999;
+      return aPos - bPos;
+    });
 
   res.json({
     success: true,
