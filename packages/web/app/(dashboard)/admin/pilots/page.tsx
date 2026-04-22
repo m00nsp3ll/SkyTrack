@@ -104,9 +104,21 @@ export default function PilotsPage() {
 
   // Excel mantığı: tüm sıradakiler (Müsait + Müşteri Almış + Mesai Dışı + Molada) tek listede
   // Sıralama: priorityOverride DESC → roundCount ASC → queuePosition (forma) ASC
+  const statusOrder: Record<string, number> = {
+    AVAILABLE: 0,
+    OFF_DUTY: 1,
+    ON_BREAK: 2,
+    ASSIGNED: 3,
+    PICKED_UP: 4,
+    IN_FLIGHT: 5,
+  }
   const queuePilots = filteredPilots
     .filter((p) => p.isActive && p.inQueue && p.dailyFlightCount < p.maxDailyFlights)
     .sort((a, b) => {
+      // Müsait olanlar üstte, meşgul olanlar altta
+      const aStatus = statusOrder[a.status] ?? 6
+      const bStatus = statusOrder[b.status] ?? 6
+      if (aStatus !== bStatus) return aStatus - bStatus
       const ap = (a as any).priorityOverride ? 1 : 0
       const bp = (b as any).priorityOverride ? 1 : 0
       if (ap !== bp) return bp - ap
