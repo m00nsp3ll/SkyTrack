@@ -920,7 +920,6 @@ router.patch('/:id/status', authenticate, asyncHandler(async (req: AuthRequest, 
         where: { id: flight.pilotId },
         data: {
           status: limitReached ? 'OFF_DUTY' : 'AVAILABLE',
-          roundCount: { increment: 1 },
         },
       });
 

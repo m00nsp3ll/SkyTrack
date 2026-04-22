@@ -203,6 +203,7 @@ export const pilotQueueService = {
         where: { id: pilot.id },
         data: {
           dailyFlightCount: { increment: 1 },
+          roundCount: { increment: 1 },
           status: 'ASSIGNED',
           priorityOverride: false,
         },
