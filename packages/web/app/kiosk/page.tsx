@@ -328,10 +328,26 @@ export default function KioskPage() {
         signatureData: sigData,
         language: lang,
       })
-      setResult(response.data.data)
+      let regData = response.data.data
+      // Otomatik pilot ata (confirm-pilot)
+      if (!regData.pilotAssigned && regData.customer?.id) {
+        try {
+          const confirmRes = await api.post(`/customers/${regData.customer.id}/confirm-pilot`)
+          if (confirmRes.data.success) {
+            regData = {
+              ...regData,
+              pilotAssigned: true,
+              pilot: confirmRes.data.data.pilot,
+            }
+          }
+        } catch (e) {
+          console.error('Auto confirm-pilot failed:', e)
+        }
+      }
+      setResult(regData)
       setStep('success')
       // UI render + AirPrint discovery için 2 saniye bekle
-      setTimeout(() => autoPrint(response.data.data), 2000)
+      setTimeout(() => autoPrint(regData), 2000)
     } catch (err: any) {
       setError(err.response?.data?.error?.message || tr.registrationFailed)
       setStep('form')
