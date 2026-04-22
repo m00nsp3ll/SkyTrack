@@ -298,8 +298,23 @@ router.post('/', authenticate, requireRole('ADMIN', 'OFFICE_STAFF', 'KIOSK'), as
     }
   }
 
-  // Pilot otomatik atama YAPMA — sadece önerilen pilotu bul
-  const suggestedPilot = await pilotQueueService.getNextPilot();
+  // Otomatik pilot ata (bildirim göndermeden — admin onayında gidecek)
+  const assignment = await pilotQueueService.assignPilotToCustomer(
+    customer.id,
+    displayId,
+    null // io=null → bildirim gönderme, admin onaylayınca gidecek
+  );
+
+  // Admin panele bildir (socket üzerinden bekleyen müşteri var)
+  const io = req.app.get('io');
+  if (io) {
+    io.to('admin').emit('customer:pending-approval', {
+      customerId: customer.id,
+      displayId,
+      pilotId: assignment?.pilot?.id,
+      pilotName: assignment?.pilot?.name,
+    });
+  }
 
   res.status(201).json({
     success: true,
@@ -307,14 +322,18 @@ router.post('/', authenticate, requireRole('ADMIN', 'OFFICE_STAFF', 'KIOSK'), as
       customer,
       qrCode,
       qrUrl: `${getServerBaseUrl()}/c/${displayId}`,
-      pilotAssigned: false,
-      suggestedPilot: suggestedPilot ? {
-        id: suggestedPilot.id,
-        name: suggestedPilot.name,
+      pilotAssigned: !!assignment,
+      pilot: assignment ? {
+        id: assignment.pilot.id,
+        name: assignment.pilot.name,
       } : null,
-      message: suggestedPilot
-        ? `Önerilen pilot: ${suggestedPilot.name} — Onay bekleniyor`
-        : 'Şu an müsait pilot yok. Müşteri bekleme listesinde.',
+      suggestedPilot: assignment ? {
+        id: assignment.pilot.id,
+        name: assignment.pilot.name,
+      } : null,
+      message: assignment
+        ? `Pilot atandı: ${assignment.pilot.name} — Onay bekleniyor`
+        : 'Şu an müsait pilot yok.',
     },
   });
 }));
