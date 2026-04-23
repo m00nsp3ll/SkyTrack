@@ -423,22 +423,16 @@ export const pilotQueueService = {
           });
         }
 
-        // Reassign: eski pilot AVAILABLE+roundCount-1, yeni pilot ASSIGNED+roundCount+1
-        // Forma sabit, sıra bozulmaz (Excel mantığı)
+        // Pilot değiştirme sırayı ETKİLEMEZ — roundCount değişmez
+        // Sadece status güncelle: eski pilot AVAILABLE, yeni pilot ASSIGNED
         if (oldPilotId !== pilot!.id) {
           await tx.pilot.update({
             where: { id: oldPilotId },
-            data: {
-              status: 'AVAILABLE',
-              roundCount: { decrement: 1 },
-            },
+            data: { status: 'AVAILABLE' },
           });
           await tx.pilot.update({
             where: { id: pilot!.id },
-            data: {
-              status: 'ASSIGNED',
-              roundCount: { increment: 1 },
-            },
+            data: { status: 'ASSIGNED' },
           });
         }
       });
