@@ -7,9 +7,7 @@ import { Button } from '@/components/ui/button'
 import { pilotsApi } from '@/lib/api'
 import {
   ArrowLeft,
-  Save,
   Loader2,
-  GripVertical,
   CheckCircle,
   Plane,
   Coffee,
@@ -46,10 +44,7 @@ const statusConfig = {
 export default function PilotQueuePage() {
   const [pilots, setPilots] = useState<Pilot[]>([])
   const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [hasChanges, setHasChanges] = useState(false)
-  const [draggedId, setDraggedId] = useState<string | null>(null)
-  const [dragOverId, setDragOverId] = useState<string | null>(null)
+  // queue_position sabit Excel forma numarası — sürükle-bırak devre dışı
 
   const fetchQueue = async () => {
     try {
@@ -66,69 +61,6 @@ export default function PilotQueuePage() {
     fetchQueue()
   }, [])
 
-  // Drag & drop — ID tabanlı, index karışıklığı yok
-  const handleDragStart = (e: React.DragEvent, id: string) => {
-    setDraggedId(id)
-    e.dataTransfer.effectAllowed = 'move'
-  }
-
-  const handleDragOver = (e: React.DragEvent, id: string) => {
-    e.preventDefault()
-    e.dataTransfer.dropEffect = 'move'
-    if (id !== draggedId) setDragOverId(id)
-  }
-
-  const handleDrop = (e: React.DragEvent, targetId: string) => {
-    e.preventDefault()
-    if (!draggedId || draggedId === targetId) return
-
-    const inQueue = pilots.filter(p => p.inQueue)
-    const draggedPilot = inQueue.find(p => p.id === draggedId)
-    const targetPilot = inQueue.find(p => p.id === targetId)
-
-    // Only allow reorder within inQueue pilots
-    if (!draggedPilot || !targetPilot) return
-
-    const fromIndex = inQueue.findIndex(p => p.id === draggedId)
-    const toIndex = inQueue.findIndex(p => p.id === targetId)
-
-    const newInQueue = [...inQueue]
-    newInQueue.splice(fromIndex, 1)
-    newInQueue.splice(toIndex, 0, draggedPilot)
-
-    // Merge back with out-of-queue pilots
-    const outOfQueue = pilots.filter(p => !p.inQueue)
-    setPilots([...newInQueue, ...outOfQueue])
-    setHasChanges(true)
-    setDraggedId(null)
-    setDragOverId(null)
-  }
-
-  const handleDragEnd = () => {
-    setDraggedId(null)
-    setDragOverId(null)
-  }
-
-  const moveUp = (index: number) => {
-    const inQueue = pilots.filter(p => p.inQueue)
-    if (index === 0) return
-    const newInQueue = [...inQueue]
-    ;[newInQueue[index - 1], newInQueue[index]] = [newInQueue[index], newInQueue[index - 1]]
-    const outOfQueue = pilots.filter(p => !p.inQueue)
-    setPilots([...newInQueue, ...outOfQueue])
-    setHasChanges(true)
-  }
-
-  const moveDown = (index: number) => {
-    const inQueue = pilots.filter(p => p.inQueue)
-    if (index === inQueue.length - 1) return
-    const newInQueue = [...inQueue]
-    ;[newInQueue[index], newInQueue[index + 1]] = [newInQueue[index + 1], newInQueue[index]]
-    const outOfQueue = pilots.filter(p => !p.inQueue)
-    setPilots([...newInQueue, ...outOfQueue])
-    setHasChanges(true)
-  }
-
   const handlePriorityOverride = async (pilotId: string, enabled: boolean) => {
     try {
       await pilotsApi.setPriorityOverride(pilotId, enabled)
@@ -138,22 +70,6 @@ export default function PilotQueuePage() {
     }
   }
 
-  const handleSave = async () => {
-    setSaving(true)
-    try {
-      const inQueue = pilots.filter(p => p.inQueue)
-      const order = inQueue.map((pilot, index) => ({
-        id: pilot.id,
-        position: index + 1,
-      }))
-      await pilotsApi.reorderQueue(order)
-      setHasChanges(false)
-    } catch (error) {
-      console.error('Failed to save order:', error)
-    } finally {
-      setSaving(false)
-    }
-  }
 
   if (loading) {
     return (
@@ -192,7 +108,7 @@ export default function PilotQueuePage() {
           <div>
             <h1 className="text-2xl font-bold">Pilot Sırası</h1>
             <p className="text-muted-foreground">
-              Sürükle-bırak veya okları kullanarak sırayı değiştir
+              Excel forma numarasına göre sabit sıralama
             </p>
           </div>
         </div>
@@ -203,16 +119,6 @@ export default function PilotQueuePage() {
               Takım Yönetimi
             </Button>
           </Link>
-          {hasChanges && (
-            <Button onClick={handleSave} disabled={saving}>
-              {saving ? (
-                <Loader2 className="h-4 w-4 animate-spin mr-1" />
-              ) : (
-                <Save className="h-4 w-4 mr-1" />
-              )}
-              Kaydet
-            </Button>
-          )}
         </div>
       </div>
 
@@ -248,9 +154,6 @@ export default function PilotQueuePage() {
               const isOffDuty = pilot.status === 'OFF_DUTY'
               const isOnBreak = pilot.status === 'ON_BREAK'
               const isNotInQueue = !pilot.inQueue
-              const isDragging = draggedId === pilot.id
-              const isDragOver = dragOverId === pilot.id
-
               // Renklendirme: sırada değil (turuncu), limit dolan (kırmızı), mesai dışı (gri), molada (sarı)
               const rowBg = isNotInQueue
                 ? 'bg-orange-50 border-l-4 border-orange-400'
@@ -274,18 +177,11 @@ export default function PilotQueuePage() {
               return (
                 <div
                   key={pilot.id}
-                  draggable
-                  onDragStart={(e) => handleDragStart(e, pilot.id)}
-                  onDragOver={(e) => handleDragOver(e, pilot.id)}
-                  onDrop={(e) => handleDrop(e, pilot.id)}
-                  onDragEnd={handleDragEnd}
-                  className={`flex items-center gap-4 p-4 cursor-grab active:cursor-grabbing transition-colors select-none
+                  className={`flex items-center gap-4 p-4 transition-colors
                     ${rowBg}
-                    ${isDragging ? 'opacity-40 bg-blue-50' : ''}
-                    ${isDragOver && !isDragging ? 'bg-blue-100 border-t-2 border-blue-500' : 'hover:bg-gray-50'}
+                    hover:bg-gray-50
                   `}
                 >
-                  <GripVertical className="h-5 w-5 text-gray-400 flex-shrink-0" />
                   <div className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-bold flex-shrink-0 ${numberBg}`}>
                     {displayPos}
                   </div>
@@ -328,10 +224,6 @@ export default function PilotQueuePage() {
                         <ArrowUpToLine className="h-3 w-3" />
                       </Button>
                     )}
-                    <div className="flex flex-col gap-1">
-                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => moveUp(index)} disabled={index === 0}>↑</Button>
-                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => moveDown(index)} disabled={index === inQueuePilots.length - 1}>↓</Button>
-                    </div>
                   </div>
                 </div>
               )

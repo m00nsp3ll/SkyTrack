@@ -358,9 +358,9 @@ export default function KioskPage() {
 
   const buildPrintHtml = (res: RegistrationResult) => {
     const now = new Date()
-    const dateStr = now.toLocaleDateString('tr-TR')
-    const timeStr = now.toLocaleTimeString('tr-TR')
-    return '<html><body style="margin:0;padding:0;font-family:Arial;text-align:center;font-size:10px"><p style="margin:0"><b>' + dateStr + ' - ' + timeStr + '</b></p><img src="' + res.qrCode + '" style="width:80px;height:80px;display:block;margin:4px auto"><p style="margin:2px 0 0;font-size:12px"><b>' + res.customer.displayId + ' - ' + res.customer.firstName + ' ' + res.customer.lastName + '</b></p>' + (res.pilot?.name ? '<p style="margin:1px 0 0;font-size:11px"><b>Pilot: ' + res.pilot.name + '</b></p>' : '') + '</body></html>'
+    const dateStr = now.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    const timeStr = now.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    return '<!DOCTYPE html><html><head><style>@page{size:58mm 58mm;margin:0}*{margin:0;padding:0;box-sizing:border-box}html,body{width:58mm;height:58mm;overflow:hidden}body{display:flex;align-items:center;justify-content:center;font-family:Arial,sans-serif}</style></head><body><div style="width:54mm;display:flex;flex-direction:column;align-items:center;text-align:center;gap:1mm"><div style="font-size:11pt;font-weight:bold">' + dateStr + ' - ' + timeStr + '</div><img src="' + res.qrCode + '" style="width:32mm;height:32mm;display:block;image-rendering:pixelated"><div style="font-size:10pt;font-weight:bold">' + res.customer.displayId + ' - ' + res.customer.firstName + ' ' + res.customer.lastName + '</div>' + (res.pilot?.name ? '<div style="font-size:10pt;font-weight:bold">Pilot: ' + res.pilot.name + '</div>' : '') + '</div></body></html>'
   }
 
   // Native AirPrint

@@ -1,8 +1,7 @@
 /**
- * Thermal label printing utility for Xprinter XP-490B
- * Physical label: 7cm x 5cm
- * Layout: portrait — text top, QR bottom, centered
- * Scale 0.6 baked in so user prints at 100%
+ * Thermal label printing utility
+ * Supports Brother QL-810W (58x58mm) and similar label printers
+ * Layout: date top, QR center, ID+name+pilot bottom
  */
 
 export interface LabelData {
@@ -23,10 +22,13 @@ function buildLabelHtml(data: LabelData): string {
 <meta charset="utf-8">
 <title>Etiket</title>
 <style>
-  @page { margin: 0; }
+  @page {
+    size: 58mm 58mm;
+    margin: 0;
+  }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body {
-    width: 100%; height: 100%;
+    width: 58mm; height: 58mm;
     margin: 0; padding: 0;
     overflow: hidden;
   }
@@ -34,50 +36,48 @@ function buildLabelHtml(data: LabelData): string {
     display: flex;
     align-items: center;
     justify-content: center;
-    font-family: Arial, sans-serif;
+    font-family: Arial, Helvetica, sans-serif;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
   .label {
-    transform: scale(0.6);
-    transform-origin: center center;
+    width: 54mm;
     display: flex;
     flex-direction: column;
     align-items: center;
     text-align: center;
-  }
-  .qr img {
-    width: 180px;
-    height: 180px;
-    display: block;
-  }
-  .id {
-    font-size: 28px;
-    font-weight: bold;
-    margin-bottom: 4px;
-  }
-  .name {
-    font-size: 14px;
-    color: #333;
-    margin-bottom: 2px;
-  }
-  .pilot {
-    font-size: 14px;
-    font-weight: bold;
-    margin-bottom: 6px;
+    gap: 1mm;
   }
   .dt {
-    font-size: 10px;
-    color: #888;
-    margin-top: 4px;
+    font-size: 11pt;
+    font-weight: bold;
+    color: #000;
+  }
+  .qr img {
+    width: 32mm;
+    height: 32mm;
+    display: block;
+    image-rendering: pixelated;
+  }
+  .info {
+    font-size: 10pt;
+    font-weight: bold;
+    color: #000;
+    line-height: 1.3;
+  }
+  .pilot {
+    font-size: 10pt;
+    font-weight: bold;
+    color: #000;
   }
 </style>
 </head>
 <body>
 <div class="label">
-  <div class="id">${data.displayId}</div>
-  <div class="name">${data.customerName}</div>
-  ${data.pilotName ? `<div class="pilot">Pilot: ${data.pilotName}</div>` : ''}
+  <div class="dt">${dateStr} - ${timeStr}</div>
   <div class="qr"><img src="${data.qrCode}" /></div>
-  <div class="dt">${dateStr} ${timeStr}</div>
+  <div class="info">${data.displayId} - ${data.customerName}</div>
+  ${data.pilotName ? `<div class="pilot">Pilot: ${data.pilotName}</div>` : ''}
 </div>
 </body>
 </html>`

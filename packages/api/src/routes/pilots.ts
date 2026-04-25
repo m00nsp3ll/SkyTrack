@@ -98,15 +98,17 @@ router.patch('/:id/priority-override', authenticate, requireRole('ADMIN'), async
   });
 }));
 
-// POST /api/pilots/queue/reorder - Reorder pilot queue (admin only)
+// POST /api/pilots/queue/reorder - DEVRE DIŞI: queue_position sabit Excel forma numarası
 router.post('/queue/reorder', authenticate, requireRole('ADMIN'), asyncHandler(async (req: AuthRequest, res: any) => {
-  const { order } = req.body; // Array of { id: string, position: number }
+  throw new AppError('Sıra pozisyonu sabittir (Excel forma numarası). Manuel sıralama devre dışı.', 403, 'REORDER_DISABLED');
+
+  // ESKİ KOD — devre dışı bırakıldı
+  /* const { order } = req.body;
 
   if (!Array.isArray(order)) {
     throw new AppError('Geçersiz sıralama verisi', 400, 'INVALID_ORDER');
   }
 
-  // Update each pilot's queue position
   await prisma.$transaction(
     order.map((item: { id: string; position: number }) =>
       prisma.pilot.update({
@@ -114,7 +116,7 @@ router.post('/queue/reorder', authenticate, requireRole('ADMIN'), asyncHandler(a
         data: { queuePosition: item.position },
       })
     )
-  );
+  ); */
 
   // Invalidate cache
   await cache.pilotQueue.invalidate();

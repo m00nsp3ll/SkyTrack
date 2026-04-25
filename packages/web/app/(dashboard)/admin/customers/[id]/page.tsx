@@ -428,10 +428,10 @@ export default function CustomerDetailPage() {
   const handlePrint = () => {
     if (!customer || !qrCodeData) return
     const now = new Date()
-    const dateStr = now.toLocaleDateString('tr-TR')
-    const timeStr = now.toLocaleTimeString('tr-TR')
-    const pilotHtml = customer.assignedPilot ? `<div style="font-size:12px;font-weight:bold;margin-top:2px">Pilot: ${customer.assignedPilot.name}</div>` : ''
-    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Etiket</title><style>@page{margin:0}*{margin:0;padding:0;box-sizing:border-box}body{margin:0;padding:10px;font-family:Arial,sans-serif;text-align:center}</style><script>window.onload=function(){setTimeout(function(){window.print()},200)}</script></head><body><div style="width:5cm;margin:0 auto"><div style="font-size:10px;font-weight:bold">${dateStr} - ${timeStr}</div><img src="${qrCodeData}" style="width:3.2cm;height:3.2cm;display:block;margin:2px auto"><div style="font-size:14px;font-weight:bold;margin-top:2px">${customer.displayId} - ${customer.firstName} ${customer.lastName}</div>${pilotHtml}</div></body></html>`
+    const dateStr = now.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    const timeStr = now.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    const pilotHtml = customer.assignedPilot ? `<div style="font-size:10pt;font-weight:bold">Pilot: ${customer.assignedPilot.name}</div>` : ''
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Etiket</title><style>@page{size:58mm 58mm;margin:0}*{margin:0;padding:0;box-sizing:border-box}html,body{width:58mm;height:58mm;overflow:hidden}body{display:flex;align-items:center;justify-content:center;font-family:Arial,sans-serif;-webkit-print-color-adjust:exact;print-color-adjust:exact}</style><script>window.onload=function(){setTimeout(function(){window.print()},200)}</script></head><body><div style="width:54mm;display:flex;flex-direction:column;align-items:center;text-align:center;gap:1mm"><div style="font-size:11pt;font-weight:bold">${dateStr} - ${timeStr}</div><img src="${qrCodeData}" style="width:32mm;height:32mm;display:block;image-rendering:pixelated"><div style="font-size:10pt;font-weight:bold">${customer.displayId} - ${customer.firstName} ${customer.lastName}</div>${pilotHtml}</div></body></html>`
     const printWindow = window.open('', '_blank')
     if (printWindow) {
       printWindow.document.write(html)
