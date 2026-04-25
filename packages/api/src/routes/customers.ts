@@ -304,7 +304,7 @@ router.post('/', authenticate, requireRole('ADMIN', 'OFFICE_STAFF', 'KIOSK'), as
   if (suggestedPilot) {
     await prisma.customer.update({
       where: { id: customer.id },
-      data: { suggestedPilotId: suggestedPilot.id },
+      data: { suggestedPilotId: suggestedPilot.id } as any,
     });
   }
 
@@ -387,16 +387,16 @@ router.post('/:id/confirm-pilot', authenticate, asyncHandler(async (req: AuthReq
 
   const io = req.app.get('io');
   // Hangi pilot atanacak: admin seçtiyse o, yoksa önerilen pilot
-  const targetPilotId = pilotId || customer.suggestedPilotId;
+  const targetPilotId = pilotId || (customer as any).suggestedPilotId;
 
   if (!targetPilotId) {
     throw new AppError('Atanacak pilot bulunamadı', 400, 'NO_PILOT');
   }
 
   // Eğer admin farklı pilot seçtiyse ve önerilen pilot varsa → önerilen pilota feragat ver
-  if (pilotId && customer.suggestedPilotId && pilotId !== customer.suggestedPilotId) {
+  if (pilotId && (customer as any).suggestedPilotId && pilotId !== (customer as any).suggestedPilotId) {
     const { forfeitPilot } = await import('../services/roundCounter.js');
-    await forfeitPilot(customer.suggestedPilotId);
+    await forfeitPilot((customer as any).suggestedPilotId);
   }
 
   // Gerçek atamayı yap (flight oluştur, round_count +1, bildirim gönder)
@@ -414,7 +414,7 @@ router.post('/:id/confirm-pilot', authenticate, asyncHandler(async (req: AuthReq
   // suggestedPilotId temizle
   await prisma.customer.update({
     where: { id: customer.id },
-    data: { suggestedPilotId: null },
+    data: { suggestedPilotId: null } as any,
   });
 
   // QNAP NAS'ta müşteri klasörü oluştur
@@ -459,17 +459,18 @@ router.post('/:id/forfeit-pilot', authenticate, requireRole('ADMIN'), asyncHandl
     throw new AppError('Müşteri bulunamadı', 404, 'CUSTOMER_NOT_FOUND');
   }
 
-  if (!customer.suggestedPilotId) {
+  const sugPilotId = (customer as any).suggestedPilotId;
+  if (!sugPilotId) {
     throw new AppError('Feragat edilecek pilot yok', 400, 'NO_SUGGESTED_PILOT');
   }
 
   // Önerilen pilota feragat ver (round_count +1, forfeit_count +1)
   const { forfeitPilot } = await import('../services/roundCounter.js');
-  await forfeitPilot(customer.suggestedPilotId);
+  await forfeitPilot(sugPilotId);
 
   // Cache temizle
   await cache.pilotQueue.invalidate();
-  await cache.pilot.invalidate(customer.suggestedPilotId);
+  await cache.pilot.invalidate(sugPilotId);
 
   // Sıradaki pilotu bul
   const nextPilot = await pilotQueueService.getNextPilot();
@@ -477,7 +478,7 @@ router.post('/:id/forfeit-pilot', authenticate, requireRole('ADMIN'), asyncHandl
   // Yeni öneriyi kaydet
   await prisma.customer.update({
     where: { id: customer.id },
-    data: { suggestedPilotId: nextPilot?.id || null },
+    data: { suggestedPilotId: nextPilot?.id || null } as any,
   });
 
   const io = req.app.get('io');
