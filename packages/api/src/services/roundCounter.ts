@@ -18,16 +18,11 @@ const prisma = new PrismaClient();
  * - Global assignmentsInRound 1 artar
  * - Tur biterse currentRound++ (feragat lock'u için)
  */
-export async function recordAssignment(pilotId?: string, tx?: any): Promise<{ currentRound: number; assignmentsInRound: number; roundCompleted: boolean }> {
+export async function recordAssignment(_pilotId?: string, tx?: any): Promise<{ currentRound: number; assignmentsInRound: number; roundCompleted: boolean }> {
   const db = tx || prisma;
 
-  // İlgili pilotun kendi TUR sayacını artır
-  if (pilotId) {
-    await db.pilot.update({
-      where: { id: pilotId },
-      data: { roundCount: { increment: 1 } },
-    });
-  }
+  // NOT: Pilotun roundCount artışı assignPilotToCustomer() içinde zaten yapılıyor.
+  // Burada tekrar artırmak çift artışa neden olur — bu yüzden kaldırıldı.
 
   // Aktif sıradaki pilot sayısı (round size)
   const activeQueueSize = await db.pilot.count({
