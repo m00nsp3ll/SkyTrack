@@ -137,7 +137,8 @@ model Pilot {
   company          Company?           @relation(fields: [companyId], references: [id])
   payments         PilotPayment[]
   user             User?
-  customers        Customer[]
+  customers          Customer[]       @relation("AssignedPilot")
+  suggestedCustomers Customer[]       @relation("SuggestedPilot")
   flights          Flight[]
   mediaFolders     MediaFolder[]
   requesterSwaps   PilotSwapRequest[] @relation("RequesterSwaps")
@@ -170,9 +171,11 @@ model Customer {
   waiverPdfPath    String?        @map("waiver_pdf_path")
   mediaFolderPath  String?        @map("media_folder_path")
   language         String         @default("tr")
-  assignedPilotId  String?        @map("assigned_pilot_id")
-  assignedPilot    Pilot?         @relation(fields: [assignedPilotId], references: [id])
-  status           CustomerStatus @default(REGISTERED)
+  assignedPilotId    String?        @map("assigned_pilot_id")
+  assignedPilot      Pilot?         @relation("AssignedPilot", fields: [assignedPilotId], references: [id])
+  suggestedPilotId   String?        @map("suggested_pilot_id")
+  suggestedPilot     Pilot?         @relation("SuggestedPilot", fields: [suggestedPilotId], references: [id])
+  status             CustomerStatus @default(REGISTERED)
   flights          Flight[]
   mediaFolders     MediaFolder[]
   sales            Sale[]

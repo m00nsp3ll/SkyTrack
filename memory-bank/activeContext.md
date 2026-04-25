@@ -1,45 +1,37 @@
 # Active Context - SkyTrack
 
-## Son Çalışma Oturumu: 2026-04-18 / 2026-04-19
+## Son Çalışma Oturumu: 2026-04-20
 
-### ✅ QR Etiket Yazdırma Sistemi (Xprinter XP-490B)
-- Etiket boyutu: 7cm x 5cm (70mm x 50mm)
-- Çalışan format: portrait, yazı üstte (tarih→kod-isim→pilot), QR altta
-- Müşteri sayfası: inline HTML template (labelPrint.ts webpack bundle sorunu nedeniyle)
-- Print dialog ayarları: Custom paper size 50x70mm, Scale %60
-- `@page size` CSS tarayıcıda sorun çıkarıyor — kaldırıldı, basit HTML kullanılıyor
-- AirPrint Bridge: dns-sd ile Mac üzerinden iPad'lere Xprinter paylaşımı
-- Kiosk (iPad): AirPrint native bridge (WKScriptMessageHandler) ile yazdırma
-- **Yazıcı değişecek**: Brother QL-810W (AirPrint native destekli, 62mm etiket)
+### ✅ Pilot Sıra Öncelik Sistemi (priorityOverride)
+- DB'ye `priority_override` boolean kolonu eklendi (pilots tablosu)
+- Sıralama: `priorityOverride DESC → roundCount ASC → queuePosition ASC`
+- Backend (pilotQueue.ts): getNextPilot, getQueueStatus, refreshQueueCache, nextFirst sorgularında priority eklendi
+- Frontend (pilots/page.tsx, pilots/queue/page.tsx): sort fonksiyonlarına priorityOverride desteği
+- Pilot uçuş aldığında priorityOverride otomatik false'a döner (tek seferlik)
+- **ÖNEMLİ DERS**: Operasyon sırasında DB'de roundCount/queuePosition değişikliği yapılırken Redis cache eski sırayı tuttu → yanlış pilotlara atama yapıldı. **DB değişikliği sonrası mutlaka `redis-cli FLUSHALL && pm2 restart skytrack-api` yapılmalı.**
 
-### ✅ Pilot Sıra Sistemi Düzeltmeleri
-- Mesai dışı→içi geçişte otomatik feragat kaldırıldı — pilot aynı konumuna döner
-- Mesai dışı pilotlar sırada kalır, müşteri geldiğinde otomatik feragat alır
-- Pilot panelinde serbest feragat butonu kaldırıldı
-- Müşteri atandığında (ASSIGNED) feragat butonu eklendi
-- Pilot paneli sıra listesinde tüm pilotlar görünür (mesai dışı soluk badge'li)
-- Sıra numarası tüm inQueue pilotları sayar (OFF_DUTY dahil)
-- Yeni pilot ekleme: roundCount ve forfeitCount en yüksek tura eşitlenir
+### ✅ Pilot Atama Onay Sistemi (Admin Gate)
+- Müşteri kaydedilince pilot otomatik atanMIYOR, sadece önerilen pilot gösteriliyor
+- Admin ekranında sarı kutuda önerilen pilot + "Onayla" ve "Pilot Değiştir" butonları
+- "Pilot Değiştir" → müsait pilot listesi açılır, istenen pilot seçilir
+- Onay verilene kadar pilota hiçbir bildirim (FCM/Socket.IO) gitmez
+- Yeni API endpoint: `POST /api/customers/:id/confirm-pilot` (opsiyonel `pilotId` body)
+- `assignPilotToCustomer()` artık opsiyonel `specificPilotId` parametresi kabul ediyor
+- QNAP klasör oluşturma confirm-pilot endpoint'ine taşındı
 
-### ✅ Firma Raporu Eklendi
-- `/admin/reports/company` — firma bazlı uçuş/ödeme istatistikleri
-- Her firma: pilot sayısı, toplam uçuş, hakediş, ödenen, kalan
-- Firma açılınca pilot detay tablosu + gerçek uçuş detayları
-- Sidebar'da Pilot Raporu altına menü eklendi
+### ✅ Pilot Sıra Düzeltmeleri
+- Bahadır Ahmet Yalçın: queuePosition=9 (forma), roundCount düşürülerek ilk sıraya alındı
+- Duplike Mehmet Başdağ kaydı silindi (roundCount=0 olan), doğru kayıt (BLUE SKYLIFE, rc=35) korundu
+- m.basdag kullanıcısı doğru pilot kaydına bağlandı
+- ESRA OLGAÇ: in_queue = true yapıldı (listede olmasına rağmen false'muş)
+- Harun Sivaslı: is_active = false, in_queue = false (test hesabı, sıraya girmesin)
 
-### ✅ Pilot Raporu Güncellemeleri
-- Mevcut Tur: en yüksek roundCount gösteriliyor (queueState yerine)
-- Yazdır butonu eklendi — tabloyu temiz popup'ta yazdırır
-- Pilot listesine "Mesai Disi" filtresi eklendi (Pasif yerine)
-
-### ✅ Gerçek Müşteri Uçuşları Entegrasyonu
-- 74 gerçek müşteri (T0001-T0074) → flight kaydı oluşturuldu (doğru pilotlarla)
-- 74 Excel-import flight silindi — toplam sayılar korundu
-- Müşteri listesinde pilot adları görünür
-
-### ✅ Emre Elkap Ödeme Düzeltmesi
-- Kalan bakiye negatif gösterebiliyor (avans durumu: 2K hak ediş, 4K ödenmiş = -2K)
-- `Math.max(0, ...)` kaldırıldı — negatif bakiye gösteriliyor
+### 🔑 Pilotu İlk Sıraya Alma Prosedürü
+Bir pilotu istisnai olarak ilk sıraya almak için:
+1. `roundCount`'unu mevcut en düşük roundCount'un altına çek (ör: herkes 35 ise 34 yap)
+2. `redis-cli FLUSHALL && pm2 restart skytrack-api`
+3. Pilot uçuş alınca roundCount artar, doğal olarak sona gider
+4. Alternatif: `priority_override = true` yap (kod desteği var, uçuş sonrası otomatik false olur)
 
 ### 🔐 Kimlik Bilgileri
 ```

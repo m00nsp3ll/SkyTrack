@@ -413,6 +413,23 @@ export default function NewCustomerPage() {
     }
   }
 
+  const forfeitPilot = async () => {
+    if (!result) return
+    setConfirmingPilot(true)
+    try {
+      const response = await api.post(`/customers/${result.customer.id}/forfeit-pilot`)
+      const newSuggested = response.data.data.suggestedPilot
+      setResult({
+        ...result,
+        suggestedPilot: newSuggested,
+      })
+    } catch (err: any) {
+      setError(err.response?.data?.error?.message || 'Feragat hatası')
+    } finally {
+      setConfirmingPilot(false)
+    }
+  }
+
   const loadAvailablePilots = async () => {
     try {
       const response = await api.get('/pilots/queue')
@@ -681,6 +698,14 @@ export default function NewCustomerPage() {
                     className="flex-1 h-12 text-base bg-green-600 hover:bg-green-700"
                   >
                     {confirmingPilot ? 'Atanıyor...' : 'Onayla'}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={forfeitPilot}
+                    disabled={confirmingPilot}
+                    className="flex-1 h-12 text-base border-red-400 text-red-600 hover:bg-red-50"
+                  >
+                    Feragat et
                   </Button>
                   <Button
                     variant="outline"

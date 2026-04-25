@@ -41,6 +41,10 @@
 - [x] Mesai dışı→içi geçişte otomatik feragat yok — pilot aynı konumuna döner
 - [x] Yeni pilot ekleme: roundCount/forfeitCount en yüksek tura eşitlenir otomatik
 - [x] Pilot profil sidebar (soldan açılan, animasyonlu)
+- [x] priorityOverride: istisnai durumlarda pilotu roundCount değiştirmeden ilk sıraya alma (2026-04-20)
+- [x] Pilot atama onay sistemi: müşteri kaydında pilot otomatik atanmaz, admin onayı gerekir (2026-04-20)
+- [x] Admin "Onayla" / "Pilot Değiştir" butonları — farklı pilot seçme imkanı
+- [x] confirm-pilot API endpoint: POST /api/customers/:id/confirm-pilot (opsiyonel pilotId)
 
 ### Uçuş Takibi
 - [x] Canlı uçuş takip paneli

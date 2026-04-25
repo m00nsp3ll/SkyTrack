@@ -298,12 +298,15 @@ router.post('/', authenticate, requireRole('ADMIN', 'OFFICE_STAFF', 'KIOSK'), as
     }
   }
 
-  // Otomatik pilot ata (bildirim göndermeden — admin onayında gidecek)
-  const assignment = await pilotQueueService.assignPilotToCustomer(
-    customer.id,
-    displayId,
-    null // io=null → bildirim gönderme, admin onaylayınca gidecek
-  );
+  // Sıradaki pilotu ÖNERİ olarak kaydet (flight oluşturma, round_count artırma)
+  const suggestedPilot = await pilotQueueService.getNextPilot();
+
+  if (suggestedPilot) {
+    await prisma.customer.update({
+      where: { id: customer.id },
+      data: { suggestedPilotId: suggestedPilot.id },
+    });
+  }
 
   // Admin panele bildir (socket üzerinden bekleyen müşteri var)
   const io = req.app.get('io');
@@ -311,28 +314,25 @@ router.post('/', authenticate, requireRole('ADMIN', 'OFFICE_STAFF', 'KIOSK'), as
     io.to('admin').emit('customer:pending-approval', {
       customerId: customer.id,
       displayId,
-      pilotId: assignment?.pilot?.id,
-      pilotName: assignment?.pilot?.name,
+      pilotId: suggestedPilot?.id,
+      pilotName: suggestedPilot?.name,
     });
   }
 
   res.status(201).json({
     success: true,
     data: {
-      customer,
+      customer: { ...customer, suggestedPilotId: suggestedPilot?.id },
       qrCode,
       qrUrl: `${getServerBaseUrl()}/c/${displayId}`,
-      pilotAssigned: !!assignment,
-      pilot: assignment ? {
-        id: assignment.pilot.id,
-        name: assignment.pilot.name,
+      pilotAssigned: false,
+      pilot: null,
+      suggestedPilot: suggestedPilot ? {
+        id: suggestedPilot.id,
+        name: suggestedPilot.name,
       } : null,
-      suggestedPilot: assignment ? {
-        id: assignment.pilot.id,
-        name: assignment.pilot.name,
-      } : null,
-      message: assignment
-        ? `Pilot atandı: ${assignment.pilot.name} — Onay bekleniyor`
+      message: suggestedPilot
+        ? `Önerilen pilot: ${suggestedPilot.name} — Onay bekleniyor`
         : 'Şu an müsait pilot yok.',
     },
   });
@@ -370,7 +370,7 @@ router.put('/:id', authenticate, asyncHandler(async (req: AuthRequest, res: any)
   });
 }));
 
-// POST /api/customers/:id/confirm-pilot - Admin onayı ile pilot ata ve bildirim gönder
+// POST /api/customers/:id/confirm-pilot - Admin onayı: önerilen pilotu ata veya farklı pilot seç
 router.post('/:id/confirm-pilot', authenticate, asyncHandler(async (req: AuthRequest, res: any) => {
   const { id } = req.params;
   const { pilotId } = req.body; // Opsiyonel: farklı pilot seçildiyse
@@ -380,29 +380,42 @@ router.post('/:id/confirm-pilot', authenticate, asyncHandler(async (req: AuthReq
     throw new AppError('Müşteri bulunamadı', 404, 'CUSTOMER_NOT_FOUND');
   }
 
-  const io = req.app.get('io');
-  let assignment;
-
-  if (pilotId) {
-    // Admin farklı bir pilot seçti — doğrudan o pilotu ata
-    assignment = await pilotQueueService.assignPilotToCustomer(
-      customer.id,
-      customer.displayId,
-      io,
-      pilotId
-    );
-  } else {
-    // Admin önerilen pilotu onayladı — sıradaki pilotu ata
-    assignment = await pilotQueueService.assignPilotToCustomer(
-      customer.id,
-      customer.displayId,
-      io
-    );
+  // Zaten atanmış müşteriyi tekrar atama
+  if (customer.assignedPilotId && customer.status !== 'REGISTERED') {
+    throw new AppError('Bu müşteriye zaten pilot atanmış', 400, 'ALREADY_ASSIGNED');
   }
+
+  const io = req.app.get('io');
+  // Hangi pilot atanacak: admin seçtiyse o, yoksa önerilen pilot
+  const targetPilotId = pilotId || customer.suggestedPilotId;
+
+  if (!targetPilotId) {
+    throw new AppError('Atanacak pilot bulunamadı', 400, 'NO_PILOT');
+  }
+
+  // Eğer admin farklı pilot seçtiyse ve önerilen pilot varsa → önerilen pilota feragat ver
+  if (pilotId && customer.suggestedPilotId && pilotId !== customer.suggestedPilotId) {
+    const { forfeitPilot } = await import('../services/roundCounter.js');
+    await forfeitPilot(customer.suggestedPilotId);
+  }
+
+  // Gerçek atamayı yap (flight oluştur, round_count +1, bildirim gönder)
+  const assignment = await pilotQueueService.assignPilotToCustomer(
+    customer.id,
+    customer.displayId,
+    io,
+    targetPilotId
+  );
 
   if (!assignment) {
-    throw new AppError('Müsait pilot bulunamadı', 400, 'NO_AVAILABLE_PILOT');
+    throw new AppError('Pilot atanamadı', 400, 'ASSIGNMENT_FAILED');
   }
+
+  // suggestedPilotId temizle
+  await prisma.customer.update({
+    where: { id: customer.id },
+    data: { suggestedPilotId: null },
+  });
 
   // QNAP NAS'ta müşteri klasörü oluştur
   try {
@@ -433,6 +446,52 @@ router.post('/:id/confirm-pilot', authenticate, asyncHandler(async (req: AuthReq
       customer: updatedCustomer,
       pilot: { id: assignment.pilot.id, name: assignment.pilot.name },
       message: `Pilot atandı: ${assignment.pilot.name}`,
+    },
+  });
+}));
+
+// POST /api/customers/:id/forfeit-pilot - Önerilen pilota feragat ver, sıradaki pilotu öner
+router.post('/:id/forfeit-pilot', authenticate, requireRole('ADMIN'), asyncHandler(async (req: AuthRequest, res: any) => {
+  const { id } = req.params;
+
+  const customer = await prisma.customer.findUnique({ where: { id } });
+  if (!customer) {
+    throw new AppError('Müşteri bulunamadı', 404, 'CUSTOMER_NOT_FOUND');
+  }
+
+  if (!customer.suggestedPilotId) {
+    throw new AppError('Feragat edilecek pilot yok', 400, 'NO_SUGGESTED_PILOT');
+  }
+
+  // Önerilen pilota feragat ver (round_count +1, forfeit_count +1)
+  const { forfeitPilot } = await import('../services/roundCounter.js');
+  await forfeitPilot(customer.suggestedPilotId);
+
+  // Cache temizle
+  await cache.pilotQueue.invalidate();
+  await cache.pilot.invalidate(customer.suggestedPilotId);
+
+  // Sıradaki pilotu bul
+  const nextPilot = await pilotQueueService.getNextPilot();
+
+  // Yeni öneriyi kaydet
+  await prisma.customer.update({
+    where: { id: customer.id },
+    data: { suggestedPilotId: nextPilot?.id || null },
+  });
+
+  const io = req.app.get('io');
+  if (io) {
+    io.emit('pilot:queue-updated');
+  }
+
+  res.json({
+    success: true,
+    data: {
+      suggestedPilot: nextPilot ? { id: nextPilot.id, name: nextPilot.name } : null,
+      message: nextPilot
+        ? `Feragat verildi. Yeni öneri: ${nextPilot.name}`
+        : 'Feragat verildi. Müsait pilot yok.',
     },
   });
 }));
