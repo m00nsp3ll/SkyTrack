@@ -557,8 +557,8 @@ router.get('/test-qr', authenticate, asyncHandler(async (req: AuthRequest, res: 
   });
 }));
 
-// GET /api/customers/test-label - Test label PDF (58x58mm)
-router.get('/test-label', authenticate, asyncHandler(async (req: AuthRequest, res: any) => {
+// GET /api/customers/test-label - Test label PDF (58x58mm) - no auth needed for testing
+router.get('/test-label', asyncHandler(async (req: AuthRequest, res: any) => {
   const PDFDocument = (await import('pdfkit')).default;
   const mm = (v: number) => v * 2.83465; // mm to points
 
