@@ -17,7 +17,6 @@ import {
   ArrowDownRight,
 } from 'lucide-react'
 import { reportsApi } from '@/lib/api'
-import { printLabel } from '@/lib/labelPrint'
 import { useSocket } from '@/hooks/useSocket'
 import Link from 'next/link'
 import {
@@ -741,22 +740,26 @@ export default function AdminDashboard() {
               if (testPrinting) return
               setTestPrinting(true)
               try {
-                const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/customers/test-qr`)
+                const token = localStorage.getItem('token') || ''
+                const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/customers/test-qr`, {
+                  headers: { Authorization: `Bearer ${token}` },
+                })
                 const data = await res.json()
-                printLabel({
-                  qrCode: data.qrCode,
-                  displayId: data.displayId || 'T0000',
-                  customerName: data.customerName || 'Test Müşteri',
-                  pilotName: data.pilotName || 'Test Pilot',
-                })
-              } catch {
-                // Fallback: API'ye erişilemezse sabit test verisi ile yazdır
-                printLabel({
-                  qrCode: '',
-                  displayId: 'T0000',
-                  customerName: 'Test Müşteri',
-                  pilotName: 'Test Pilot',
-                })
+                const qrCode = data.qrCode || ''
+                const displayId = data.displayId || 'T0000'
+                const customerName = data.customerName || 'Test Müşteri'
+                const pilotName = data.pilotName || 'Test Pilot'
+                const now = new Date()
+                const dateStr = now.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+                const timeStr = now.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+                const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Etiket</title><style>@page{size:58mm 58mm;margin:0}*{margin:0;padding:0;box-sizing:border-box}html,body{width:58mm;height:58mm;overflow:hidden}body{display:flex;align-items:center;justify-content:center;font-family:Arial,sans-serif;-webkit-print-color-adjust:exact;print-color-adjust:exact}</style><script>window.onload=function(){setTimeout(function(){window.print()},200)}</script></head><body><div style="width:54mm;display:flex;flex-direction:column;align-items:center;text-align:center;gap:1mm"><div style="font-size:11pt;font-weight:bold">${dateStr} - ${timeStr}</div><img src="${qrCode}" style="width:32mm;height:32mm;display:block;image-rendering:pixelated"><div style="font-size:10pt;font-weight:bold">${displayId} - ${customerName}</div><div style="font-size:10pt;font-weight:bold">Pilot: ${pilotName}</div></div></body></html>`
+                const printWindow = window.open('', '_blank')
+                if (printWindow) {
+                  printWindow.document.write(html)
+                  printWindow.document.close()
+                }
+              } catch (err) {
+                console.error('Test yazdırma hatası:', err)
               } finally {
                 setTestPrinting(false)
               }
