@@ -395,11 +395,25 @@ export const pilotQueueService = {
       const oldPilotId = customer.flights[0].pilotId;
 
       await prisma.$transaction(async (tx) => {
-        // Decrement old pilot's count
         if (oldPilotId !== pilot!.id) {
+          // Eski pilot: uçmadı → dailyFlightCount ve roundCount geri al, sırasında kalsın
           await tx.pilot.update({
             where: { id: oldPilotId },
-            data: { dailyFlightCount: { decrement: 1 } },
+            data: {
+              dailyFlightCount: { decrement: 1 },
+              roundCount: { decrement: 1 },
+              status: 'AVAILABLE',
+            },
+          });
+
+          // Yeni pilot: uçacak → dailyFlightCount ve roundCount artır
+          await tx.pilot.update({
+            where: { id: pilot!.id },
+            data: {
+              dailyFlightCount: { increment: 1 },
+              roundCount: { increment: 1 },
+              status: 'ASSIGNED',
+            },
           });
         }
 
@@ -414,27 +428,6 @@ export const pilotQueueService = {
           where: { id: customerId },
           data: { assignedPilotId: pilot!.id },
         });
-
-        // Increment new pilot's count (if different)
-        if (oldPilotId !== pilot!.id) {
-          await tx.pilot.update({
-            where: { id: pilot!.id },
-            data: { dailyFlightCount: { increment: 1 } },
-          });
-        }
-
-        // Pilot değiştirme sırayı ETKİLEMEZ — roundCount değişmez
-        // Sadece status güncelle: eski pilot AVAILABLE, yeni pilot ASSIGNED
-        if (oldPilotId !== pilot!.id) {
-          await tx.pilot.update({
-            where: { id: oldPilotId },
-            data: { status: 'AVAILABLE' },
-          });
-          await tx.pilot.update({
-            where: { id: pilot!.id },
-            data: { status: 'ASSIGNED' },
-          });
-        }
       });
 
       // Invalidate caches (both old and new pilot)
