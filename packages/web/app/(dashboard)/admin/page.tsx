@@ -109,7 +109,6 @@ export default function AdminDashboard() {
   const [recentData, setRecentData] = useState<RecentData | null>(null)
   const [loading, setLoading] = useState(true)
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date())
-  const [testPrinting, setTestPrinting] = useState(false)
   const { socket } = useSocket()
 
   const fetchData = useCallback(async () => {
@@ -736,23 +735,12 @@ export default function AdminDashboard() {
         </CardHeader>
         <CardContent>
           <button
-            onClick={async () => {
-              if (testPrinting) return
-              setTestPrinting(true)
-              try {
-                const token = localStorage.getItem('token') || ''
-                const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/customers/test-qr`, {
-                  headers: { Authorization: `Bearer ${token}` },
-                })
-                const data = await res.json()
-                const qrCode = data.qrCode || ''
-                const displayId = data.displayId || 'T0000'
-                const customerName = data.customerName || 'Test Müşteri'
-                const pilotName = data.pilotName || 'Test Pilot'
-                const now = new Date()
-                const dateStr = now.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' })
-                const timeStr = now.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-                const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Etiket - ${displayId}</title>
+            onClick={() => {
+              const now = new Date()
+              const dateStr = now.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+              const timeStr = now.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+              const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Test Etiket</title>
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"><\/script>
 <style>
 @page{size:58mm 58mm;margin:0}
 *{margin:0;padding:0;box-sizing:border-box}
@@ -764,27 +752,27 @@ body{font-family:Arial,Helvetica,sans-serif;-webkit-print-color-adjust:exact;pri
 </style></head><body>
 <div class="label">
 <div style="font-size:14pt;font-weight:bold">${dateStr} - ${timeStr}</div>
-<img src="${qrCode}" style="width:34mm;height:34mm;display:block;image-rendering:pixelated;margin:1mm 0">
-<div style="font-size:12pt;font-weight:bold">${displayId} - ${customerName}</div>
-<div style="font-size:14pt;font-weight:bold;margin-top:1mm">Pilot: ${pilotName}</div>
+<canvas id="qr" style="width:34mm;height:34mm;margin:1mm 0;image-rendering:pixelated"></canvas>
+<div style="font-size:12pt;font-weight:bold">T0000 - Test Müşteri</div>
+<div style="font-size:14pt;font-weight:bold;margin-top:1mm">Pilot: Test Pilot</div>
 </div>
 <button class="btn" onclick="window.print()">Yazdır</button>
+<script>
+window.onload = function() {
+  QRCode.toCanvas(document.getElementById('qr'), 'https://skytrackyp.com/c/T0000', {width:300,margin:2});
+};
+<\/script>
 </body></html>`
-                const printWindow = window.open('', '_blank')
-                if (printWindow) {
-                  printWindow.document.write(html)
-                  printWindow.document.close()
-                }
-              } catch (err) {
-                console.error('Test yazdırma hatası:', err)
-              } finally {
-                setTestPrinting(false)
+              const printWindow = window.open('', '_blank')
+              if (printWindow) {
+                printWindow.document.write(html)
+                printWindow.document.close()
               }
             }}
             className="border-2 border-dashed border-blue-400 rounded-lg p-4 hover:bg-blue-50 transition-colors w-full max-w-sm mx-auto block"
           >
             <div className="text-sm font-bold mb-2 text-center">
-              {testPrinting ? 'Hazırlanıyor...' : 'Test Etiketi Yazdır'}
+              Test Etiketi Yazdır
             </div>
             <div className="text-xs text-gray-500 mt-2 text-center">58x58mm — Brother QL-810W</div>
           </button>
