@@ -557,6 +557,82 @@ router.get('/test-qr', authenticate, asyncHandler(async (req: AuthRequest, res: 
   });
 }));
 
+// GET /api/customers/test-label - Test label PDF (58x58mm)
+router.get('/test-label', authenticate, asyncHandler(async (req: AuthRequest, res: any) => {
+  const displayId = 'T0000';
+  const qrBuffer = await generateQRCodeBuffer(displayId);
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const timeStr = now.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+  const PDFDocument = (await import('pdfkit')).default;
+  const mm = (v: number) => v * 2.83465; // mm to points
+
+  const doc = new PDFDocument({ size: [mm(58), mm(58)], margin: 0 });
+  res.set('Content-Type', 'application/pdf');
+  res.set('Content-Disposition', 'inline; filename="test-label.pdf"');
+  doc.pipe(res);
+
+  const cx = mm(29); // center x
+  doc.font('Helvetica-Bold');
+
+  // Date/time
+  doc.fontSize(11).text(`${dateStr} - ${timeStr}`, 0, mm(3), { align: 'center', width: mm(58) });
+
+  // QR code
+  const qrSize = mm(32);
+  const qrX = cx - qrSize / 2;
+  doc.image(qrBuffer, qrX, mm(11), { width: qrSize, height: qrSize });
+
+  // Display ID + name
+  doc.fontSize(10).text('T0000 - Test Müşteri', 0, mm(45), { align: 'center', width: mm(58) });
+  doc.fontSize(10).text('Pilot: Test Pilot', 0, mm(50), { align: 'center', width: mm(58) });
+
+  doc.end();
+}));
+
+// GET /api/customers/:id/label - Customer label PDF (58x58mm)
+router.get('/:id/label', authenticate, asyncHandler(async (req: AuthRequest, res: any) => {
+  const { id } = req.params;
+  const customer = await prisma.customer.findFirst({
+    where: { OR: [{ id }, { displayId: id }] },
+    include: { assignedPilot: true },
+  });
+  if (!customer) throw new AppError('Müşteri bulunamadı', 404, 'CUSTOMER_NOT_FOUND');
+
+  const qrBuffer = await generateQRCodeBuffer(customer.displayId);
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const timeStr = now.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+  const PDFDocument = (await import('pdfkit')).default;
+  const mm = (v: number) => v * 2.83465;
+
+  const doc = new PDFDocument({ size: [mm(58), mm(58)], margin: 0 });
+  res.set('Content-Type', 'application/pdf');
+  res.set('Content-Disposition', `inline; filename="${customer.displayId}-label.pdf"`);
+  doc.pipe(res);
+
+  const cx = mm(29);
+  doc.font('Helvetica-Bold');
+
+  // Date/time
+  doc.fontSize(11).text(`${dateStr} - ${timeStr}`, 0, mm(3), { align: 'center', width: mm(58) });
+
+  // QR code
+  const qrSize = mm(32);
+  doc.image(qrBuffer, cx - qrSize / 2, mm(11), { width: qrSize, height: qrSize });
+
+  // Display ID + name
+  const name = `${customer.firstName} ${customer.lastName}`;
+  doc.fontSize(10).text(`${customer.displayId} - ${name}`, 0, mm(45), { align: 'center', width: mm(58) });
+  if (customer.assignedPilot) {
+    doc.fontSize(10).text(`Pilot: ${customer.assignedPilot.name}`, 0, mm(50), { align: 'center', width: mm(58) });
+  }
+
+  doc.end();
+}));
+
 router.get('/:id/qr', authenticate, asyncHandler(async (req: AuthRequest, res: any) => {
   const { id } = req.params;
   const { format = 'png' } = req.query;

@@ -30,7 +30,7 @@ export const authenticate = async (
     const authHeader = req.headers.authorization;
     const token = authHeader?.startsWith('Bearer ')
       ? authHeader.slice(7)
-      : req.cookies?.token;
+      : req.cookies?.token || (req.query.token as string | undefined);
 
     if (!token) {
       throw new AppError('Oturum açmanız gerekiyor', 401, 'UNAUTHORIZED');

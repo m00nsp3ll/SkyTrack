@@ -736,38 +736,8 @@ export default function AdminDashboard() {
         <CardContent>
           <button
             onClick={() => {
-              const now = new Date()
-              const dateStr = now.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' })
-              const timeStr = now.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-              const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Test Etiket</title>
-<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"><\/script>
-<style>
-@page{size:58mm 58mm;margin:0}
-*{margin:0;padding:0;box-sizing:border-box}
-html,body{width:58mm;height:58mm;margin:0;padding:0;overflow:hidden}
-body{font-family:Arial,Helvetica,sans-serif;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-.label{width:58mm;height:58mm;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
-.btn{display:block;margin:20px auto;padding:12px 32px;font-size:16pt;font-weight:bold;background:#000;color:#fff;border:none;border-radius:8px;cursor:pointer}
-@media print{.btn{display:none !important}}
-</style></head><body>
-<div class="label">
-<div style="font-size:14pt;font-weight:bold">${dateStr} - ${timeStr}</div>
-<canvas id="qr" style="width:34mm;height:34mm;margin:1mm 0;image-rendering:pixelated"></canvas>
-<div style="font-size:12pt;font-weight:bold">T0000 - Test Müşteri</div>
-<div style="font-size:14pt;font-weight:bold;margin-top:1mm">Pilot: Test Pilot</div>
-</div>
-<button class="btn" onclick="window.print()">Yazdır</button>
-<script>
-window.onload = function() {
-  QRCode.toCanvas(document.getElementById('qr'), 'https://skytrackyp.com/c/T0000', {width:300,margin:2});
-};
-<\/script>
-</body></html>`
-              const printWindow = window.open('', '_blank')
-              if (printWindow) {
-                printWindow.document.write(html)
-                printWindow.document.close()
-              }
+              const token = localStorage.getItem('token') || ''
+              window.open(`${process.env.NEXT_PUBLIC_API_URL}/customers/test-label?token=${token}`, '_blank')
             }}
             className="border-2 border-dashed border-blue-400 rounded-lg p-4 hover:bg-blue-50 transition-colors w-full max-w-sm mx-auto block"
           >
