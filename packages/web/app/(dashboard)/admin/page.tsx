@@ -103,55 +103,6 @@ const statusLabels: Record<string, string> = {
   CANCELLED: 'İptal',
 }
 
-function generateDemoQR(text: string, size = 200): string {
-  const canvas = document.createElement('canvas')
-  canvas.width = size
-  canvas.height = size
-  const ctx = canvas.getContext('2d')
-  if (!ctx) return ''
-
-  // Simple QR-like pattern for demo (real QR would need a library)
-  ctx.fillStyle = '#ffffff'
-  ctx.fillRect(0, 0, size, size)
-  ctx.fillStyle = '#000000'
-
-  // Generate a deterministic pattern from text
-  const cellCount = 25
-  const cellSize = size / cellCount
-  const hash = text.split('').reduce((acc, c) => ((acc << 5) - acc + c.charCodeAt(0)) | 0, 0)
-
-  // Position detection patterns (3 corners)
-  const drawFinder = (x: number, y: number) => {
-    for (let r = 0; r < 7; r++) {
-      for (let c = 0; c < 7; c++) {
-        const isOuter = r === 0 || r === 6 || c === 0 || c === 6
-        const isInner = r >= 2 && r <= 4 && c >= 2 && c <= 4
-        if (isOuter || isInner) {
-          ctx.fillRect((x + c) * cellSize, (y + r) * cellSize, cellSize, cellSize)
-        }
-      }
-    }
-  }
-  drawFinder(0, 0)
-  drawFinder(cellCount - 7, 0)
-  drawFinder(0, cellCount - 7)
-
-  // Fill data area with pseudo-random pattern
-  let seed = Math.abs(hash)
-  for (let r = 0; r < cellCount; r++) {
-    for (let c = 0; c < cellCount; c++) {
-      const inFinder =
-        (r < 8 && c < 8) || (r < 8 && c > cellCount - 9) || (r > cellCount - 9 && c < 8)
-      if (inFinder) continue
-      seed = (seed * 1103515245 + 12345) & 0x7fffffff
-      if (seed % 3 !== 0) {
-        ctx.fillRect(c * cellSize, r * cellSize, cellSize, cellSize)
-      }
-    }
-  }
-
-  return canvas.toDataURL('image/png')
-}
 
 export default function AdminDashboard() {
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null)
@@ -159,12 +110,8 @@ export default function AdminDashboard() {
   const [recentData, setRecentData] = useState<RecentData | null>(null)
   const [loading, setLoading] = useState(true)
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date())
-  const [demoQR, setDemoQR] = useState<string>('')
+  const [testPrinting, setTestPrinting] = useState(false)
   const { socket } = useSocket()
-
-  useEffect(() => {
-    setDemoQR(generateDemoQR('http://192.168.1.100/c/T0060'))
-  }, [])
 
   const fetchData = useCallback(async () => {
     try {
@@ -783,45 +730,43 @@ export default function AdminDashboard() {
         </CardContent>
       </Card>
 
-      {/* Etiket Yazıcı Test — inline template (cache bypass) */}
+      {/* Etiket Yazıcı Test — Brother QL-810W 58x58mm */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Etiket Test (7x5cm)</CardTitle>
+          <CardTitle className="text-lg">Etiket Test (58x58mm)</CardTitle>
         </CardHeader>
         <CardContent>
           <button
-            onClick={() => {
-              if (!demoQR) return
-              const now = new Date()
-              const ds = now.toLocaleDateString('tr-TR')
-              const ts = now.toLocaleTimeString('tr-TR')
-              const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>QR Kod - T0060</title><style>@page{size:auto;margin:0}@media print{html,body{margin:0;padding:0}}body{font-family:Arial,sans-serif;text-align:center;padding:2px;margin:0}.qr-container{width:3cm;margin:0 auto;padding:2px}.qr-code{width:2.2cm;height:2.2cm}.display-id{font-size:8px;font-weight:bold;margin-top:1px}.customer-name{font-size:7px;color:#666}.pilot-name{font-size:7px;font-weight:bold;color:#333;margin-top:1px}.datetime{font-size:6px;color:#888;margin-top:1px}body{overflow:hidden}</style><script>window.onload=function(){setTimeout(function(){window.print()},200)};</script></head><body><div class="qr-container"><div class="display-id">T0060</div><div class="customer-name">Elas Aidukas</div><div class="pilot-name">Pilot: Mehmet Ermetin</div><img src="${demoQR}" class="qr-code"/><div class="datetime">${ds} ${ts}</div></div></body></html>`
-              const w = window.open('', '_blank', 'width=300,height=200')
-              if (!w) return
-              w.document.write(html)
-              w.document.close()
-              const img = w.document.querySelector('img')
-              const go = () => { w.focus(); w.print() }
-              if (img && !img.complete) { img.onload = () => setTimeout(go, 200) }
-              else { w.onload = () => setTimeout(go, 200) }
+            onClick={async () => {
+              if (testPrinting) return
+              setTestPrinting(true)
+              try {
+                const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/customers/test-qr`)
+                const data = await res.json()
+                printLabel({
+                  qrCode: data.qrCode,
+                  displayId: data.displayId || 'T0000',
+                  customerName: data.customerName || 'Test Müşteri',
+                  pilotName: data.pilotName || 'Test Pilot',
+                })
+              } catch {
+                // Fallback: API'ye erişilemezse sabit test verisi ile yazdır
+                printLabel({
+                  qrCode: '',
+                  displayId: 'T0000',
+                  customerName: 'Test Müşteri',
+                  pilotName: 'Test Pilot',
+                })
+              } finally {
+                setTestPrinting(false)
+              }
             }}
             className="border-2 border-dashed border-blue-400 rounded-lg p-4 hover:bg-blue-50 transition-colors w-full max-w-sm mx-auto block"
           >
-            <div className="text-sm font-bold mb-2 text-center">Test Etiketi Yazdir</div>
-            <div className="border rounded bg-white p-2 mx-auto" style={{ width: '120px', height: '160px' }}>
-              <div className="flex flex-col h-full items-center justify-center">
-                <div className="text-[10px] font-bold">T0060</div>
-                <div className="text-[6px] text-gray-500">Elas Aidukas</div>
-                <div className="text-[6px] font-bold">Pilot: Mehmet</div>
-                {demoQR ? (
-                  <img src={demoQR} alt="QR" className="w-14 h-14 mt-1" />
-                ) : (
-                  <div className="w-14 h-14 bg-gray-800 rounded mt-1" />
-                )}
-                <div className="text-[5px] text-gray-400 mt-1">18.04.2026</div>
-              </div>
+            <div className="text-sm font-bold mb-2 text-center">
+              {testPrinting ? 'Hazırlanıyor...' : 'Test Etiketi Yazdır'}
             </div>
-            <div className="text-xs text-gray-500 mt-2 text-center">7x5cm — yazi ust, QR alt, %100 scale</div>
+            <div className="text-xs text-gray-500 mt-2 text-center">58x58mm — Brother QL-810W</div>
           </button>
         </CardContent>
       </Card>

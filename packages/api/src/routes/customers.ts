@@ -545,6 +545,18 @@ router.get('/:id/waiver-pdf', asyncHandler(async (req: AuthRequest, res: any) =>
 }));
 
 // GET /api/customers/:id/qr - Get QR code as image
+// Test QR endpoint for label printer testing
+router.get('/test-qr', authenticate, asyncHandler(async (req: AuthRequest, res: any) => {
+  const displayId = 'T0000';
+  const qrCode = await generateQRCodeDataURL(displayId);
+  return res.json({
+    qrCode,
+    displayId,
+    customerName: 'Test Müşteri',
+    pilotName: 'Test Pilot',
+  });
+}));
+
 router.get('/:id/qr', authenticate, asyncHandler(async (req: AuthRequest, res: any) => {
   const { id } = req.params;
   const { format = 'png' } = req.query;
