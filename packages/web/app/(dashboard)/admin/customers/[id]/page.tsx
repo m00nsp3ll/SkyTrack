@@ -430,8 +430,25 @@ export default function CustomerDetailPage() {
     const now = new Date()
     const dateStr = now.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' })
     const timeStr = now.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-    const pilotHtml = customer.assignedPilot ? `<div style="font-size:10pt;font-weight:bold">Pilot: ${customer.assignedPilot.name}</div>` : ''
-    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Etiket</title><style>@page{size:58mm 58mm;margin:0}*{margin:0;padding:0;box-sizing:border-box}html,body{width:58mm;height:58mm;overflow:hidden}body{display:flex;align-items:center;justify-content:center;font-family:Arial,sans-serif;-webkit-print-color-adjust:exact;print-color-adjust:exact}</style><script>window.onload=function(){setTimeout(function(){window.print()},200)}</script></head><body><div style="width:54mm;display:flex;flex-direction:column;align-items:center;text-align:center;gap:1mm"><div style="font-size:11pt;font-weight:bold">${dateStr} - ${timeStr}</div><img src="${qrCodeData}" style="width:32mm;height:32mm;display:block;image-rendering:pixelated"><div style="font-size:10pt;font-weight:bold">${customer.displayId} - ${customer.firstName} ${customer.lastName}</div>${pilotHtml}</div></body></html>`
+    const pilotHtml = customer.assignedPilot ? `<div style="font-size:14pt;font-weight:bold;margin-top:1mm">Pilot: ${customer.assignedPilot.name}</div>` : ''
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Etiket - ${customer.displayId}</title>
+<style>
+@page{size:58mm 58mm;margin:0}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:58mm;height:58mm;margin:0;padding:0;overflow:hidden}
+body{font-family:Arial,Helvetica,sans-serif;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.label{width:58mm;height:58mm;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
+.btn{display:block;margin:20px auto;padding:12px 32px;font-size:16pt;font-weight:bold;background:#000;color:#fff;border:none;border-radius:8px;cursor:pointer}
+@media print{.btn{display:none !important}}
+</style></head><body>
+<div class="label">
+<div style="font-size:14pt;font-weight:bold">${dateStr} - ${timeStr}</div>
+<img src="${qrCodeData}" style="width:34mm;height:34mm;display:block;image-rendering:pixelated;margin:1mm 0">
+<div style="font-size:12pt;font-weight:bold">${customer.displayId} - ${customer.firstName} ${customer.lastName}</div>
+${pilotHtml}
+</div>
+<button class="btn" onclick="window.print()">Yazdır</button>
+</body></html>`
     const printWindow = window.open('', '_blank')
     if (printWindow) {
       printWindow.document.write(html)
