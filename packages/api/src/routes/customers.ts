@@ -559,34 +559,29 @@ router.get('/test-qr', authenticate, asyncHandler(async (req: AuthRequest, res: 
 
 // GET /api/customers/test-label - Test label PDF (58x58mm)
 router.get('/test-label', authenticate, asyncHandler(async (req: AuthRequest, res: any) => {
-  const displayId = 'T0000';
-  const qrBuffer = await generateQRCodeBuffer(displayId);
-  const now = new Date();
-  const dateStr = now.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' });
-  const timeStr = now.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-
   const PDFDocument = (await import('pdfkit')).default;
   const mm = (v: number) => v * 2.83465; // mm to points
 
-  const doc = new PDFDocument({ size: [mm(58), mm(58)], margin: 0 });
+  const w = mm(58);
+  const h = mm(58);
+  const doc = new PDFDocument({ size: [w, h], margin: 0 });
   res.set('Content-Type', 'application/pdf');
   res.set('Content-Disposition', 'inline; filename="test-label.pdf"');
   doc.pipe(res);
 
-  const cx = mm(29); // center x
-  doc.font('Helvetica-Bold');
+  // 58x58mm kare çerçeve çiz
+  doc.lineWidth(1)
+     .rect(mm(1), mm(1), mm(56), mm(56))
+     .stroke('#000000');
 
-  // Date/time
-  doc.fontSize(11).text(`${dateStr} - ${timeStr}`, 0, mm(3), { align: 'center', width: mm(58) });
+  // Ortaya "TEST" yaz
+  doc.font('Helvetica-Bold')
+     .fontSize(24)
+     .text('TEST', 0, mm(24), { align: 'center', width: w });
 
-  // QR code
-  const qrSize = mm(32);
-  const qrX = cx - qrSize / 2;
-  doc.image(qrBuffer, qrX, mm(11), { width: qrSize, height: qrSize });
-
-  // Display ID + name
-  doc.fontSize(10).text('T0000 - Test Müşteri', 0, mm(45), { align: 'center', width: mm(58) });
-  doc.fontSize(10).text('Pilot: Test Pilot', 0, mm(50), { align: 'center', width: mm(58) });
+  // Boyut bilgisi
+  doc.fontSize(10)
+     .text('58 x 58 mm', 0, mm(32), { align: 'center', width: w });
 
   doc.end();
 }));
