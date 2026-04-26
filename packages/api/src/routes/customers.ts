@@ -149,22 +149,22 @@ router.get('/test-qr', authenticate, asyncHandler(async (req: AuthRequest, res: 
   return res.json({ qrCode, displayId, customerName: 'Test Müşteri', pilotName: 'Test Pilot' });
 }));
 
-// Test label PDF (58x58mm) — kare çerçeve + TEST yazısı
+// Test label PNG (58x58mm at 300dpi = 685x685px)
 router.get('/test-label', asyncHandler(async (req: AuthRequest, res: any) => {
-  const PDFDocument = (await import('pdfkit')).default;
-  const mm = (v: number) => v * 2.83465;
-  const w = mm(58);
-  const doc = new PDFDocument({ size: [w, w], margin: 0 });
-  res.set('Content-Type', 'application/pdf');
-  res.set('Content-Disposition', 'inline; filename="test-label.pdf"');
-  doc.pipe(res);
+  const sharp = (await import('sharp')).default;
+  const size = 685;
+  const svg = `<svg width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg">
+    <rect width="${size}" height="${size}" fill="white"/>
+    <rect x="10" y="10" width="${size-20}" height="${size-20}" fill="none" stroke="black" stroke-width="4"/>
+    <text x="${size/2}" y="${size/2 - 40}" text-anchor="middle" font-family="Arial,sans-serif" font-size="72" font-weight="bold" fill="black">SkyTrack</text>
+    <text x="${size/2}" y="${size/2 + 30}" text-anchor="middle" font-family="Arial,sans-serif" font-size="48" font-weight="bold" fill="black">TEST</text>
+    <text x="${size/2}" y="${size/2 + 80}" text-anchor="middle" font-family="Arial,sans-serif" font-size="28" fill="black">58 x 58 mm</text>
+  </svg>`;
 
-  doc.lineWidth(1).rect(mm(1), mm(1), mm(56), mm(56)).stroke('#000000');
-  doc.font('Helvetica-Bold').fontSize(24).text('SkyTrack', 0, mm(22), { align: 'center', width: w });
-  doc.fontSize(14).text('TEST', 0, mm(30), { align: 'center', width: w });
-  doc.fontSize(10).text('58 x 58 mm', 0, mm(38), { align: 'center', width: w });
-
-  doc.end();
+  const buffer = await sharp(Buffer.from(svg)).png().toBuffer();
+  res.set('Content-Type', 'image/png');
+  res.set('Content-Disposition', 'inline; filename="test-label.png"');
+  res.send(buffer);
 }));
 
 // GET /api/customers/:id - Get customer by ID or displayId
