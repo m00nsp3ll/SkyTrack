@@ -142,6 +142,31 @@ router.get('/', authenticate, asyncHandler(async (req: AuthRequest, res: any) =>
   });
 }));
 
+// Test QR endpoint
+router.get('/test-qr', authenticate, asyncHandler(async (req: AuthRequest, res: any) => {
+  const displayId = 'T0000';
+  const qrCode = await generateQRCodeDataURL(displayId);
+  return res.json({ qrCode, displayId, customerName: 'Test Müşteri', pilotName: 'Test Pilot' });
+}));
+
+// Test label PDF (58x58mm) — kare çerçeve + TEST yazısı
+router.get('/test-label', asyncHandler(async (req: AuthRequest, res: any) => {
+  const PDFDocument = (await import('pdfkit')).default;
+  const mm = (v: number) => v * 2.83465;
+  const w = mm(58);
+  const doc = new PDFDocument({ size: [w, w], margin: 0 });
+  res.set('Content-Type', 'application/pdf');
+  res.set('Content-Disposition', 'inline; filename="test-label.pdf"');
+  doc.pipe(res);
+
+  doc.lineWidth(1).rect(mm(1), mm(1), mm(56), mm(56)).stroke('#000000');
+  doc.font('Helvetica-Bold').fontSize(24).text('SkyTrack', 0, mm(22), { align: 'center', width: w });
+  doc.fontSize(14).text('TEST', 0, mm(30), { align: 'center', width: w });
+  doc.fontSize(10).text('58 x 58 mm', 0, mm(38), { align: 'center', width: w });
+
+  doc.end();
+}));
+
 // GET /api/customers/:id - Get customer by ID or displayId
 router.get('/:id', authenticate, asyncHandler(async (req: AuthRequest, res: any) => {
   const { id } = req.params;
@@ -545,46 +570,6 @@ router.get('/:id/waiver-pdf', asyncHandler(async (req: AuthRequest, res: any) =>
 }));
 
 // GET /api/customers/:id/qr - Get QR code as image
-// Test QR endpoint for label printer testing
-router.get('/test-qr', authenticate, asyncHandler(async (req: AuthRequest, res: any) => {
-  const displayId = 'T0000';
-  const qrCode = await generateQRCodeDataURL(displayId);
-  return res.json({
-    qrCode,
-    displayId,
-    customerName: 'Test Müşteri',
-    pilotName: 'Test Pilot',
-  });
-}));
-
-// GET /api/customers/test-label - Test label PDF (58x58mm) - no auth needed for testing
-router.get('/test-label', asyncHandler(async (req: AuthRequest, res: any) => {
-  const PDFDocument = (await import('pdfkit')).default;
-  const mm = (v: number) => v * 2.83465; // mm to points
-
-  const w = mm(58);
-  const h = mm(58);
-  const doc = new PDFDocument({ size: [w, h], margin: 0 });
-  res.set('Content-Type', 'application/pdf');
-  res.set('Content-Disposition', 'inline; filename="test-label.pdf"');
-  doc.pipe(res);
-
-  // 58x58mm kare çerçeve çiz
-  doc.lineWidth(1)
-     .rect(mm(1), mm(1), mm(56), mm(56))
-     .stroke('#000000');
-
-  // Ortaya "TEST" yaz
-  doc.font('Helvetica-Bold')
-     .fontSize(24)
-     .text('TEST', 0, mm(24), { align: 'center', width: w });
-
-  // Boyut bilgisi
-  doc.fontSize(10)
-     .text('58 x 58 mm', 0, mm(32), { align: 'center', width: w });
-
-  doc.end();
-}));
 
 // GET /api/customers/:id/label - Customer label PDF (58x58mm)
 router.get('/:id/label', authenticate, asyncHandler(async (req: AuthRequest, res: any) => {
