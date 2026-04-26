@@ -9,7 +9,6 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { api } from '@/lib/api'
 import { ArrowLeft, UserPlus, Printer, Eraser, Check, X, PenLine } from 'lucide-react'
-import { printLabel } from '@/lib/labelPrint'
 import Link from 'next/link'
 import { type Language, LANGUAGES, t, isRtl } from '@/lib/translations'
 
@@ -445,12 +444,16 @@ export default function NewCustomerPage() {
 
   const handlePrint = () => {
     if (!result) return
-    printLabel({
-      qrCode: result.qrCode,
-      displayId: result.customer.displayId,
-      customerName: `${result.customer.firstName} ${result.customer.lastName}`,
-      pilotName: result.pilot?.name,
-    })
+    const now = new Date()
+    const dateStr = now.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    const timeStr = now.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    const pilotHtml = result.pilot?.name ? `<div style="font-size:10pt;font-weight:bold">Pilot: ${result.pilot.name}</div>` : ''
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Etiket</title><style>@page{size:58mm 58mm;margin:0}*{margin:0;padding:0;box-sizing:border-box}html,body{width:58mm;height:58mm;overflow:hidden}body{display:flex;align-items:center;justify-content:center;font-family:Arial,sans-serif;-webkit-print-color-adjust:exact;print-color-adjust:exact}</style><script>window.onload=function(){setTimeout(function(){window.print()},200)}</script></head><body><div style="width:54mm;display:flex;flex-direction:column;align-items:center;text-align:center;gap:1mm"><div style="font-size:11pt;font-weight:bold">${dateStr} - ${timeStr}</div><img src="${result.qrCode}" style="width:32mm;height:32mm;display:block;image-rendering:pixelated"><div style="font-size:10pt;font-weight:bold">${result.customer.displayId} - ${result.customer.firstName} ${result.customer.lastName}</div>${pilotHtml}</div></body></html>`
+    const printWindow = window.open('', '_blank')
+    if (printWindow) {
+      printWindow.document.write(html)
+      printWindow.document.close()
+    }
   }
 
   const resetForm = () => {
