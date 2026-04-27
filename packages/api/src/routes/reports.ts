@@ -57,13 +57,18 @@ router.get('/dashboard', authenticate, asyncHandler(async (req: AuthRequest, res
   const completedFlights = flightsToday.filter(f => f.status === 'COMPLETED');
   const paidSales = salesToday.filter(s => s.paymentStatus === 'PAID');
 
-  const posRevenueEUR = paidSales.reduce((sum, s) => sum + (s.totalAmountEUR || s.totalPrice), 0);
-  const posRevenueTRY = paidSales.reduce((sum, s) => sum + (s.totalAmountTRY || 0), 0);
-
-  // Foto/Video geliri: sale tablosundan hesapla (eski 'MEDIA' kayıtları dahil)
+  // Foto/Video geliri
   const mediaRevenue = paidSales
     .filter(s => s.itemType === 'Foto/Video' || s.itemType === 'MEDIA')
     .reduce((sum, s) => sum + (s.totalAmountEUR || s.totalPrice), 0);
+
+  // POS geliri: Foto/Video HARİÇ
+  const posRevenueEUR = paidSales
+    .filter(s => s.itemType !== 'Foto/Video' && s.itemType !== 'MEDIA')
+    .reduce((sum, s) => sum + (s.totalAmountEUR || s.totalPrice), 0);
+  const posRevenueTRY = paidSales
+    .filter(s => s.itemType !== 'Foto/Video' && s.itemType !== 'MEDIA')
+    .reduce((sum, s) => sum + (s.totalAmountTRY || 0), 0);
 
   const mediaSoldCount = mediaFoldersToday.filter(m => m.paymentStatus === 'PAID').length;
 
