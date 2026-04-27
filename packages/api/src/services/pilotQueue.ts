@@ -209,8 +209,34 @@ export const pilotQueueService = {
         },
       });
 
-      // Müsait olmayan pilotlara dokunma — Excel'de de dokunulmuyor.
-      // Düşük roundCount'lu pilot geri geldiğinde doğal olarak öncelik alır.
+      // ATLANAN PİLOT FERAGATİ: Aynı turda sırası gelmiş ama mesai dışı olan pilotlar feragat yer.
+      // Sadece AYNI roundCount + önde olan queuePosition → çift feragat lastForfeitRound ile engellenir.
+      const oldRound = pilot.roundCount; // atama öncesi round
+      const skipped = await tx.pilot.findMany({
+        where: {
+          isActive: true,
+          isInExcel: true,
+          id: { not: pilot.id },
+          roundCount: oldRound,
+          queuePosition: { lt: pilot.queuePosition },
+          lastForfeitRound: { not: oldRound },
+          OR: [
+            { inQueue: false },
+            { status: { in: ['OFF_DUTY', 'ON_BREAK'] } },
+          ],
+        },
+        select: { id: true },
+      });
+      for (const sp of skipped) {
+        await tx.pilot.update({
+          where: { id: sp.id },
+          data: {
+            roundCount: { increment: 1 },
+            forfeitCount: { increment: 1 },
+            lastForfeitRound: oldRound,
+          },
+        });
+      }
 
       return flight;
     });
