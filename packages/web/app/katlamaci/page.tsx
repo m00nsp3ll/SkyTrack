@@ -41,26 +41,32 @@ export default function KatlamaciPage() {
       return
     }
     // Push notification izni iste ve FCM token kaydet
-    initNativePush(token).catch(console.error)
+    initNativePush(token || undefined).catch(console.error)
   }, [router])
 
   // Fetch data
   const fetchData = useCallback(async () => {
     try {
       const token = localStorage.getItem('token')
+      if (!token) { setLoading(false); return }
       const res = await fetch(`${getBaseUrl()}/katlamaci/live`, {
         headers: { Authorization: `Bearer ${token}` },
       })
-      if (!res.ok) throw new Error('Unauthorized')
+      if (res.status === 401) {
+        localStorage.clear()
+        router.replace('/login')
+        return
+      }
+      if (!res.ok) throw new Error('API error')
       const data = await res.json()
       setInFlight(data.data.inFlight)
       setWaiting(data.data.waiting)
-    } catch {
-      console.error('Veri alınamadı')
+    } catch (err) {
+      console.error('Veri alınamadı:', err)
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [router])
 
   useEffect(() => {
     fetchData()
