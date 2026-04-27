@@ -594,7 +594,9 @@ router.get('/:id/label', authenticate, asyncHandler(async (req: AuthRequest, res
   doc.pipe(res);
 
   const cx = mm(29);
-  doc.font('Helvetica-Bold');
+  const fontPath = '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf';
+  doc.registerFont('Label', fontPath);
+  doc.font('Label');
 
   // Date/time
   doc.fontSize(11).text(`${dateStr} - ${timeStr}`, 0, mm(3), { align: 'center', width: mm(58) });
