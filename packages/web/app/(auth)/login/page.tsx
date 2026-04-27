@@ -47,6 +47,8 @@ export default function LoginPage() {
         authApi.me().then(() => {
           if (userData.role === 'PILOT') {
             router.replace('/pilot')
+          } else if (userData.role === 'KATLAMACI') {
+            router.replace('/katlamaci')
           } else {
             router.replace('/admin')
           }
@@ -93,6 +95,8 @@ export default function LoginPage() {
       // Redirect based on role
       if (user.role === 'PILOT') {
         router.replace('/pilot')
+      } else if (user.role === 'KATLAMACI') {
+        router.replace('/katlamaci')
       } else {
         router.replace('/admin')
       }

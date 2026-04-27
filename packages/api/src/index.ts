@@ -35,6 +35,7 @@ import fcmRoutes from './routes/fcm.js';
 import currencyRoutes from './routes/currency.js';
 import networkRoutes from './routes/network.js';
 import nasRoutes from './routes/nas.js';
+import katlamaciRoutes from './routes/katlamaci.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { setupSocket } from './socket/index.js';
 import { setupCronJobs } from './cron/dailyReset.js';
@@ -167,6 +168,7 @@ app.use('/api/fcm', fcmRoutes);
 app.use('/api/currency', currencyRoutes);
 app.use('/api/network', networkRoutes);
 app.use('/api/nas', nasRoutes);
+app.use('/api/katlamaci', katlamaciRoutes);
 
 // Error handler
 app.use(errorHandler);

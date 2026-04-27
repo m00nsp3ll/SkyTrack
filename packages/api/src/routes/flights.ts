@@ -985,8 +985,15 @@ router.patch('/:id/status', authenticate, asyncHandler(async (req: AuthRequest, 
         },
       };
 
-      // Notify admin
+      // Notify admin + katlamaci
       io.to('admin').emit(event, eventData);
+      io.to('katlamaci').emit(event, {
+        flightId: updatedFlight.id,
+        status: updatedFlight.status,
+        pilotName: updatedFlight.pilot.name,
+        takeoffAt: updatedFlight.takeoffAt,
+        assignedAt: updatedFlight.createdAt,
+      });
 
       // Notify pilot
       io.to(`pilot:${flight.pilotId}`).emit(event, eventData);
@@ -994,12 +1001,17 @@ router.patch('/:id/status', authenticate, asyncHandler(async (req: AuthRequest, 
       // Send FCM notifications based on status
       if (status === 'PICKED_UP') {
         // FCM to admin: Customer picked up
-        // (Pilot already knows - they triggered the action)
       } else if (status === 'IN_FLIGHT') {
-        // FCM to admin: Flight started
-        // (Pilot already knows - they triggered the action)
+        // FCM to katlamaci: pilot uçuşa başladı
+        import('../services/firebaseNotification.js').then(({ sendNativeToRole }) => {
+          sendNativeToRole('KATLAMACI', {
+            title: 'Uçuş Başladı',
+            body: `${updatedFlight.pilot.name} uçuşa başladı`,
+            data: { type: 'katlamaci_flight_started', flightId: updatedFlight.id },
+          }).catch(err => console.error('FCM katlamaci error:', err));
+        });
       } else if (status === 'COMPLETED') {
-        // Pilot triggered this action — no FCM notification needed
+        // Pilot triggered this action
       }
 
       // Check if pilot is approaching/reached limit

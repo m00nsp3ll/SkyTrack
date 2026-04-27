@@ -166,6 +166,18 @@ export async function sendNativeToAllPilots(payload: NotificationPayload) {
   console.log(`FCM sent to ${tokens.length} pilot devices`);
 }
 
+// Belirli role sahip kullanıcılara gönder
+export async function sendNativeToRole(role: string, payload: NotificationPayload) {
+  if (!firebaseInitialized) return;
+  const tokens = await prisma.fcmToken.findMany({
+    where: { user: { role: role as any }, isActive: true },
+    select: { token: true },
+  });
+  if (tokens.length === 0) return;
+  await Promise.all(tokens.map(t => sendNativeNotification(t.token, payload)));
+  console.log(`FCM sent to ${tokens.length} ${role} devices`);
+}
+
 // Tüm kullanıcılara gönder (paralel)
 export async function sendNativeBroadcast(payload: NotificationPayload) {
   if (!firebaseInitialized) return;
