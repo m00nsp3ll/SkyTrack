@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSocket } from '@/hooks/useSocket'
+import { initNativePush } from '@/lib/nativePush'
 
 interface FlightInfo {
   flightId: string
@@ -37,7 +38,10 @@ export default function KatlamaciPage() {
     const user = JSON.parse(userStr)
     if (!['KATLAMACI', 'ADMIN', 'SUPER_ADMIN'].includes(user.role)) {
       router.replace('/login')
+      return
     }
+    // Push notification izni iste ve FCM token kaydet
+    initNativePush(token).catch(console.error)
   }, [router])
 
   // Fetch data
