@@ -29,12 +29,12 @@ export default function KatlamaciPage() {
   // Auth check
   useEffect(() => {
     const token = localStorage.getItem('token')
-    const userData = localStorage.getItem('userData')
-    if (!token || !userData) {
+    const userStr = localStorage.getItem('user')
+    if (!token || !userStr) {
       router.replace('/login')
       return
     }
-    const user = JSON.parse(userData)
+    const user = JSON.parse(userStr)
     if (!['KATLAMACI', 'ADMIN', 'SUPER_ADMIN'].includes(user.role)) {
       router.replace('/login')
     }
