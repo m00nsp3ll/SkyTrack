@@ -36,7 +36,7 @@ interface User {
   id: string
   username: string
   name: string | null
-  role: 'ADMIN' | 'OFFICE_STAFF' | 'PILOT' | 'MEDIA_SELLER' | 'CUSTOM'
+  role: 'ADMIN' | 'OFFICE_STAFF' | 'PILOT' | 'MEDIA_SELLER' | 'CUSTOM' | 'KATLAMACI'
   isActive: boolean
   pilotId: string | null
   plainPassword: string | null
@@ -65,6 +65,7 @@ const roleLabels: Record<string, { label: string; color: string; bgColor: string
   PILOT: { label: 'Pilot', color: 'text-green-700', bgColor: 'bg-green-100', icon: UserCog },
   MEDIA_SELLER: { label: 'Foto Satış', color: 'text-orange-700', bgColor: 'bg-orange-100', icon: Camera },
   CUSTOM: { label: 'Özel Yetki', color: 'text-indigo-700', bgColor: 'bg-indigo-100', icon: Key },
+  KATLAMACI: { label: 'Katlamacı', color: 'text-teal-700', bgColor: 'bg-teal-100', icon: UserCog },
 }
 
 // POS product categories for permission control
@@ -316,6 +317,7 @@ export default function StaffPage() {
     mediaSellers: users.filter(u => u.role === 'MEDIA_SELLER').length,
     pilots: users.filter(u => u.role === 'PILOT').length,
     custom: users.filter(u => u.role === 'CUSTOM').length,
+    katlamaci: users.filter(u => u.role === 'KATLAMACI').length,
   }
 
   // ============ ROLES TAB HELPERS ============
@@ -587,6 +589,14 @@ export default function StaffPage() {
                 </div>
               </CardContent>
             </Card>
+            <Card className="cursor-pointer hover:bg-teal-50" onClick={() => setFilterRole(filterRole === 'KATLAMACI' ? 'all' : 'KATLAMACI')}>
+              <CardContent className="pt-4">
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-teal-600">{stats.katlamaci}</p>
+                  <p className="text-xs text-muted-foreground">Katlamacı</p>
+                </div>
+              </CardContent>
+            </Card>
           </div>
 
           {/* Filter badge */}
@@ -677,7 +687,7 @@ export default function StaffPage() {
               <RefreshCw className="w-8 h-8 animate-spin text-muted-foreground" />
             </div>
           ) : (
-            ['ADMIN', 'OFFICE_STAFF', 'PILOT', 'MEDIA_SELLER', 'CUSTOM'].map(role => {
+            ['ADMIN', 'OFFICE_STAFF', 'PILOT', 'MEDIA_SELLER', 'CUSTOM', 'KATLAMACI'].map(role => {
               const roleInfo = roleLabels[role]
               const RoleIcon = roleInfo.icon
               const isExpanded = expandedRole === role
