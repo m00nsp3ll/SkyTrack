@@ -475,14 +475,14 @@ router.post('/:id/cancel', authenticate, asyncHandler(async (req: AuthRequest, r
 
     // Pilot status değişimi
     if (preserveQueue) {
-      // Kötü hava / müşteri iptal: pilot UNAVAILABLE'a geçer, dailyFlightCount + roundCount geri al
-      // Pilot uçmadı, sırası da geri gelmeli
+      // Kötü hava / müşteri iptal: pilot UNAVAILABLE'a geçer, geri al (0'ın altına düşürme)
+      const cancelPilot = await tx.pilot.findUnique({ where: { id: flight.pilotId } });
       await tx.pilot.update({
         where: { id: flight.pilotId },
         data: {
           status: 'UNAVAILABLE',
-          dailyFlightCount: { decrement: 1 },
-          roundCount: { decrement: 1 },
+          dailyFlightCount: cancelPilot && cancelPilot.dailyFlightCount > 0 ? { decrement: 1 } : 0,
+          roundCount: cancelPilot && cancelPilot.roundCount > 0 ? { decrement: 1 } : 0,
         },
       });
     } else {

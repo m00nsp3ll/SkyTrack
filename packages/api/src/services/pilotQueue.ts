@@ -366,17 +366,20 @@ export const pilotQueueService = {
 
       await prisma.$transaction(async (tx) => {
         if (oldPilotId !== pilot!.id) {
-          // Eski pilot: uçmadı → dailyFlightCount ve roundCount geri al, sırasında kalsın
+          // Eski pilotun mevcut değerlerini oku
+          const oldPilot = await tx.pilot.findUnique({ where: { id: oldPilotId } });
+
+          // Eski pilot: uçmadı → geri al (0'ın altına düşürme)
           await tx.pilot.update({
             where: { id: oldPilotId },
             data: {
-              dailyFlightCount: { decrement: 1 },
-              roundCount: { decrement: 1 },
+              dailyFlightCount: oldPilot && oldPilot.dailyFlightCount > 0 ? { decrement: 1 } : 0,
+              roundCount: oldPilot && oldPilot.roundCount > 0 ? { decrement: 1 } : 0,
               status: 'AVAILABLE',
             },
           });
 
-          // Yeni pilot: uçacak → dailyFlightCount ve roundCount artır
+          // Yeni pilot: uçacak → artır
           await tx.pilot.update({
             where: { id: pilot!.id },
             data: {
