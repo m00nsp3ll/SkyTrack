@@ -68,7 +68,7 @@ const prisma = new PrismaClient();
 
 // Helper: ensure all roles have a permission record
 async function ensureDefaultPermissions() {
-  const roles: UserRole[] = ['ADMIN', 'OFFICE_STAFF', 'PILOT', 'MEDIA_SELLER', 'CUSTOM'];
+  const roles: UserRole[] = ['ADMIN', 'OFFICE_STAFF', 'PILOT', 'MEDIA_SELLER', 'CUSTOM', 'KATLAMACI'];
   for (const role of roles) {
     const existing = await prisma.rolePermission.findUnique({ where: { role } });
     if (!existing) {
@@ -237,7 +237,7 @@ router.post('/', authenticate, requireRole('ADMIN'), asyncHandler(async (req: Au
     throw new AppError('Bu kullanıcı adı zaten kullanılıyor', 400, 'USERNAME_EXISTS');
   }
 
-  const validRoles = ['ADMIN', 'OFFICE_STAFF', 'PILOT', 'MEDIA_SELLER', 'CUSTOM'];
+  const validRoles = ['ADMIN', 'OFFICE_STAFF', 'PILOT', 'MEDIA_SELLER', 'CUSTOM', 'KATLAMACI'];
   if (!validRoles.includes(role)) {
     throw new AppError('Geçersiz rol', 400, 'INVALID_ROLE');
   }

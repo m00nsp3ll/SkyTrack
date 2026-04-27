@@ -103,7 +103,7 @@ router.post('/send-role/:role', authenticate, requireRole('ADMIN'), asyncHandler
     throw new AppError('Başlık ve mesaj zorunludur', 400, 'MISSING_FIELDS');
   }
 
-  const validRoles = ['ADMIN', 'OFFICE_STAFF', 'PILOT', 'MEDIA_SELLER', 'CUSTOM'];
+  const validRoles = ['ADMIN', 'OFFICE_STAFF', 'PILOT', 'MEDIA_SELLER', 'CUSTOM', 'KATLAMACI'];
   if (!validRoles.includes(role)) {
     throw new AppError('Geçersiz rol', 400, 'INVALID_ROLE');
   }
