@@ -209,38 +209,8 @@ export const pilotQueueService = {
         },
       });
 
-      // OTOMATİK FERAGAT: Excel'deki ama uçamayan pilotlar (mesai dışı/molada/sırada değil)
-      const skipped = await tx.pilot.findMany({
-        where: {
-          isActive: true,
-          isInExcel: true,
-          OR: [
-            { inQueue: false }, // Excel'de ama sıraya katılmıyor
-            { status: { in: ['OFF_DUTY', 'ON_BREAK'] } },
-          ],
-          AND: [{
-            OR: [
-              { roundCount: { lt: pilot.roundCount } },
-              {
-                roundCount: pilot.roundCount,
-                queuePosition: { lt: pilot.queuePosition },
-              },
-            ],
-          }],
-        },
-        select: { id: true, roundCount: true, queuePosition: true },
-      });
-      for (const sp of skipped) {
-        // Sıra konumu değişmez, sadece round + forfeit sayaçları artar
-        await tx.pilot.update({
-          where: { id: sp.id },
-          data: {
-            roundCount: { increment: 1 },
-            forfeitCount: { increment: 1 },
-            lastForfeitRound: pilot.roundCount,
-          },
-        });
-      }
+      // Müsait olmayan pilotlara dokunma — Excel'de de dokunulmuyor.
+      // Düşük roundCount'lu pilot geri geldiğinde doğal olarak öncelik alır.
 
       return flight;
     });
