@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSocket } from '@/hooks/useSocket'
 import { initNativePush } from '@/lib/nativePush'
+import { api } from '@/lib/api'
 
 interface FlightInfo {
   flightId: string
@@ -13,10 +14,6 @@ interface FlightInfo {
   waitMinutes?: number
   assignedAt?: string
   status?: string
-}
-
-function getBaseUrl() {
-  return process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001/api'
 }
 
 export default function KatlamaciPage() {
@@ -47,21 +44,15 @@ export default function KatlamaciPage() {
   // Fetch data
   const fetchData = useCallback(async () => {
     try {
-      const token = localStorage.getItem('token')
-      if (!token) { setLoading(false); return }
-      const res = await fetch(`${getBaseUrl()}/katlamaci/live`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      if (res.status === 401) {
+      const res = await api.get('/katlamaci/live')
+      setInFlight(res.data.data.inFlight)
+      setWaiting(res.data.data.waiting)
+    } catch (err: any) {
+      if (err?.response?.status === 401) {
         localStorage.clear()
         router.replace('/login')
         return
       }
-      if (!res.ok) throw new Error('API error')
-      const data = await res.json()
-      setInFlight(data.data.inFlight)
-      setWaiting(data.data.waiting)
-    } catch (err) {
       console.error('Veri alınamadı:', err)
     } finally {
       setLoading(false)
