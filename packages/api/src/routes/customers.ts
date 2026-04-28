@@ -250,6 +250,26 @@ router.post('/', authenticate, requireRole('ADMIN', 'OFFICE_STAFF', 'KIOSK'), as
     }
   }
 
+  // Duplicate kontrolü — aynı isim+telefon ile bugün kayıt var mı?
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const duplicate = await prisma.customer.findFirst({
+    where: {
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
+      phone: phone.replace(/\s/g, ''),
+      createdAt: { gte: today },
+      status: { not: 'CANCELLED' },
+    },
+  });
+  if (duplicate) {
+    throw new AppError(
+      `Bu müşteri bugün zaten kayıtlı (${duplicate.displayId})`,
+      400,
+      'DUPLICATE_CUSTOMER'
+    );
+  }
+
   // Generate display ID and QR code
   const displayId = await displayIdService.generateNext();
   const qrCode = await generateQRCodeDataURL(displayId);
