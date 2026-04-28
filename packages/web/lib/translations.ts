@@ -1,4 +1,4 @@
-export type Language = 'tr' | 'en' | 'ru' | 'de' | 'ar' | 'pl' | 'uk' | 'zh' | 'fr' | 'fa'
+export type Language = 'tr' | 'en' | 'ru' | 'de' | 'ar' | 'pl' | 'uk' | 'zh' | 'fr' | 'fa' | 'nl'
 
 export const RTL_LANGUAGES: Language[] = ['ar', 'fa']
 
@@ -13,6 +13,7 @@ export const LANGUAGES: { code: Language; flag: string; name: string }[] = [
   { code: 'zh', flag: '🇨🇳', name: '中文' },
   { code: 'fr', flag: '🇫🇷', name: 'Français' },
   { code: 'fa', flag: '🇮🇷', name: 'فارسی' },
+  { code: 'nl', flag: '🇳🇱', name: 'Nederlands' },
 ]
 
 export interface Translations {
@@ -634,8 +635,59 @@ const fa: Translations = {
   saving: 'در حال ذخیره...',
 }
 
+const nl: Translations = {
+  formTitle: 'Klantregistratieformulier',
+  firstName: 'Voornaam',
+  lastName: 'Achternaam',
+  phone: 'Telefoon',
+  email: 'E-mail',
+  emergencyContact: 'Hotelnaam',
+  weight: 'Gewicht (kg)',
+  weightHelper: 'Vereist voor vliegveiligheid (20-150 kg)',
+  next: 'Volgende',
+  back: 'Terug',
+  submit: 'Registratie voltooien & QR genereren',
+  required: 'Dit veld is verplicht',
+  personalInfo: 'Persoonlijke gegevens',
+  waiverTitle: 'Risicoacceptatie en aansprakelijkheidsvrijwaring',
+  waiverFullTitle: 'PARAGLIDING VLUCHT RISICOACCEPTATIE EN AANSPRAKELIJKHEIDSVRIJWARING',
+  waiverIntro: 'Dit document is opgesteld met betrekking tot de tandem paraglidingvlucht die wordt uitgevoerd onder de Alanya Paragliding en Sporttoerisme Ontwikkelingscoöperatie.',
+  waiverAccept: 'Door dit document te ondertekenen, aanvaard en verklaar ik het volgende:',
+  waiverItem1: 'Paragliding is van nature een gevaarlijke activiteit en brengt risico op ongevallen met zich mee.',
+  waiverItem2: 'Ik heb de noodzakelijke pre-vluchttraining en briefing van mijn piloot ontvangen, ik ben volledig op de hoogte en ik ben bereid om uit vrije wil te vliegen, waarbij ik alle risico\'s aanvaard.',
+  waiverItem3: 'Ik ben me ervan bewust dat er tijdens de vlucht ongevallen kunnen optreden als gevolg van weersomstandigheden, materiaaldefecten of andere onvoorziene omstandigheden.',
+  waiverItem4: 'Ik heb geen gezondheidsproblemen (hartziekte, epilepsie, zwangerschap, enz.), of als dat wel het geval is, heb ik de piloot en de autoriteiten geïnformeerd.',
+  waiverItem5: 'Ik verplicht me om alle veiligheidsinstructies die vóór de vlucht worden gegeven op te volgen.',
+  waiverItem6: 'De tandemvlucht is verzekerd door RAY SİGORTA A.Ş. Ik aanvaard dat ik in geval van een ongeval geen rechten of eisen zal indienen bij de Alanya District Sporttoerisme Commissie, de Coöperatie en het bedrijf/de piloot die het exploiteert, of andere personen.',
+  waiverItem7: 'Ik aanvaard dat foto\'s en video\'s die tijdens de vlucht worden gemaakt door de Coöperatie kunnen worden opgenomen en dat deze visuele/audio-opnamen kunnen worden gebruikt voor dienstverlening.',
+  waiverItem8: 'Ik verklaar dat ik ouder ben dan 18 jaar of dat ik de toestemming van mijn wettelijke voogd heb verkregen.',
+  waiverKvkkLine: 'Door dit formulier te ondertekenen, geef ik toestemming voor de verwerking van mijn persoonlijke gegevens binnen het kader van de {link}.',
+  kvkkLinkText: 'Privacyverklaring (KVKK)',
+  kvkkModalTitle: 'Privacyverklaring',
+  signHere: 'Hieronder ondertekenen:',
+  signClear: 'Wissen',
+  signHelper: 'Gebruik uw vinger of muis om te ondertekenen in het bovenstaande gebied',
+  signConfirm: 'Handtekening bevestigen',
+  signCancel: 'Annuleren',
+  signViewAndSign: 'Risicoformulier bekijken & ondertekenen',
+  signRequired: 'Onderteken alstublieft het risicoformulier',
+  signed: 'Risicoformulier ondertekend',
+  resignLabel: 'Opnieuw ondertekenen',
+  kvkkText: tr.kvkkText,
+  kvkkClose: 'Sluiten',
+  registrationSuccess: 'Registratie geslaagd!',
+  printQR: 'QR afdrukken',
+  newRegistration: 'Nieuwe registratie',
+  countrySearchPlaceholder: 'Landnaam of code...',
+  noResults: 'Geen resultaten gevonden',
+  fillNamePhone: 'Vul eerst voornaam, achternaam en telefoon in',
+  invalidPhone: 'Ongeldig telefoonformaat',
+  registrationFailed: 'Registratie mislukt',
+  saving: 'Opslaan...',
+}
+
 export const translations: Record<Language, Translations> = {
-  tr, en, ru, de, ar, pl, uk, zh, fr, fa,
+  tr, en, ru, de, ar, pl, uk, zh, fr, fa, nl,
 }
 
 export function t(lang: Language): Translations {

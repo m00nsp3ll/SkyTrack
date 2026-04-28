@@ -137,7 +137,7 @@ const ALL_COUNTRIES = [
   { code: '+1-876', flag: '🇯🇲', iso: 'JM' },
   { code: '+81', flag: '🇯🇵', iso: 'JP' },
   { code: '+962', flag: '🇯🇴', iso: 'JO' },
-  { code: '+7', flag: '🇰🇿', iso: 'KZ' },
+  { code: '+77', flag: '🇰🇿', iso: 'KZ' },
   { code: '+254', flag: '🇰🇪', iso: 'KE' },
   { code: '+686', flag: '🇰🇮', iso: 'KI' },
   { code: '+850', flag: '🇰🇵', iso: 'KP' },
