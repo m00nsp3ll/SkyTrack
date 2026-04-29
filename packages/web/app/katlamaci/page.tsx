@@ -8,30 +8,42 @@ export default function KatlamaciPage() {
   const [inFlight, setInFlight] = useState<any[]>([])
   const [waiting, setWaiting] = useState<any[]>([])
   const [now, setNow] = useState(Date.now())
-  const [loaded, setLoaded] = useState(false)
 
   useEffect(() => {
     const token = localStorage.getItem('token')
     if (!token) { window.location.href = '/login'; return }
 
-    let active = true
-
     const load = () => {
       fetch(`${API}/katlamaci/live`, { headers: { Authorization: `Bearer ${token}` } })
         .then(r => { if (r.status === 401) { window.location.href = '/login'; return null } return r.json() })
-        .then(data => { if (data && active) { setInFlight(data.data.inFlight); setWaiting(data.data.waiting); setLoaded(true) } })
-        .catch(() => { if (active) setLoaded(true) })
+        .then(data => { if (data) { setInFlight(data.data.inFlight); setWaiting(data.data.waiting); setNow(Date.now()) } })
+        .catch(() => {})
     }
 
+    // İlk yükleme
     load()
-    const i1 = setInterval(load, 15000)
-    const i2 = setInterval(() => setNow(Date.now()), 30000)
-    return () => { active = false; clearInterval(i1); clearInterval(i2) }
+
+    // 15 saniyede bir yenile
+    const interval = setInterval(load, 15000)
+
+    // Uygulama ön plana geldiğinde yenile (Capacitor background→foreground)
+    const onVisible = () => { if (document.visibilityState === 'visible') load() }
+    document.addEventListener('visibilitychange', onVisible)
+
+    // Capacitor resume event
+    const onResume = () => load()
+    document.addEventListener('resume', onResume)
+    window.addEventListener('focus', onResume)
+
+    return () => {
+      clearInterval(interval)
+      document.removeEventListener('visibilitychange', onVisible)
+      document.removeEventListener('resume', onResume)
+      window.removeEventListener('focus', onResume)
+    }
   }, [])
 
   const mins = (s: string) => s ? Math.floor((now - new Date(s).getTime()) / 60000) : 0
-
-  if (!loaded) return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: '#f9fafb', fontSize: 18, color: '#888' }}>Yükleniyor...</div>
 
   return (
     <div style={{ minHeight: '100vh', background: '#f9fafb', padding: 16, paddingTop: 'max(env(safe-area-inset-top, 0px), 16px)', fontFamily: 'system-ui, sans-serif' }}>
