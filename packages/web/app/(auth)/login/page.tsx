@@ -43,22 +43,14 @@ export default function LoginPage() {
     if (token && user) {
       try {
         const userData = JSON.parse(user)
-        // Verify token is still valid with a quick API call
-        authApi.me().then(() => {
-          if (userData.role === 'PILOT') {
-            router.replace('/pilot')
-          } else if (userData.role === 'KATLAMACI') {
-            window.location.href = '/katlamaci'
-          } else {
-            router.replace('/admin')
-          }
-        }).catch(() => {
-          // Token invalid, clear and show login
-          localStorage.removeItem('token')
-          localStorage.removeItem('user')
-          localStorage.removeItem('permissions')
-          setLoading(false)
-        })
+        // Token varsa direkt yönlendir — geçersizse hedef sayfa login'e atar
+        if (userData.role === 'PILOT') {
+          router.replace('/pilot')
+        } else if (userData.role === 'KATLAMACI') {
+          window.location.href = '/katlamaci'
+        } else {
+          router.replace('/admin')
+        }
         return
       } catch {
         localStorage.removeItem('token')
