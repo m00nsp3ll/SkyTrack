@@ -52,7 +52,7 @@ export default function KatlamaciPage() {
 
   const mins = (s: string) => s ? Math.floor((now - new Date(s).getTime()) / 60000) : 0
 
-  if (!authed) return null
+  if (!authed) return <div style={{ minHeight: '100vh', background: '#f9fafb' }} />
 
   return (
     <div style={{ minHeight: '100vh', background: '#f9fafb', padding: 16, paddingTop: 'max(env(safe-area-inset-top, 0px), 16px)', fontFamily: 'system-ui, sans-serif' }}>
