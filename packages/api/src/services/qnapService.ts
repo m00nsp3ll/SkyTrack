@@ -18,6 +18,7 @@ class QnapService {
     } else {
       config.password = process.env.QNAP_SSH_PASSWORD || '';
     }
+    config.readyTimeout = 20000;
     return config;
   }
 
@@ -32,7 +33,7 @@ class QnapService {
       const timeout = setTimeout(() => {
         conn.end();
         reject(new Error('SSH connection timeout'));
-      }, 10000);
+      }, 30000);
 
       conn.on('ready', () => {
         conn.exec(command, (err, stream) => {
