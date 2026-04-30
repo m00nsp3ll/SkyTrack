@@ -366,6 +366,13 @@ router.post('/', authenticate, requireRole('ADMIN', 'OFFICE_STAFF', 'KIOSK'), as
       customer: { displayId, firstName: customer.firstName, lastName: customer.lastName, weight: customer.weight },
       pilot: suggestedPilot ? { name: suggestedPilot.name } : null,
     });
+    // Print servise etiket bas — kayıt anında, onay beklemeden
+    io.to('admin').emit('print:label', {
+      customerId: customer.id,
+      displayId,
+      customerName: `${customer.firstName} ${customer.lastName}`,
+      pilotName: suggestedPilot?.name || '',
+    });
   }
 
   res.status(201).json({
@@ -488,17 +495,6 @@ router.post('/:id/confirm-pilot', authenticate, asyncHandler(async (req: AuthReq
       assignedPilot: { select: { id: true, name: true, dailyFlightCount: true } },
     },
   });
-
-  // Print servise etiket bas sinyali gönder
-  const printIo = req.app.get('io');
-  if (printIo) {
-    printIo.to('admin').emit('print:label', {
-      customerId: customer.id,
-      displayId: customer.displayId,
-      customerName: `${customer.firstName} ${customer.lastName}`,
-      pilotName: assignment.pilot.name,
-    });
-  }
 
   res.json({
     success: true,
