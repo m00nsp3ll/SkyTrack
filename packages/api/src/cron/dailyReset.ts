@@ -34,14 +34,14 @@ export const setupCronJobs = () => {
         where: { date: yesterday },
         select: { pilotId: true, roundCount: true },
       });
-      const yesterdayRoundMap = new Map(yesterdayStats.map(s => [s.pilotId, s.roundCount]));
+      const yesterdayRoundMap = new Map(yesterdayStats.map((s: { pilotId: string; roundCount: number }) => [s.pilotId, s.roundCount]));
 
       let saved = 0;
       for (const pilot of pilots) {
         const flights = flightMap.get(pilot.id) || 0;
         // Günlük feragat = bugünkü round artışı - bugünkü uçuş sayısı
-        const prevRound = yesterdayRoundMap.get(pilot.id) ?? (pilot.roundCount - flights);
-        const roundIncrease = pilot.roundCount - prevRound;
+        const prevRound = Number(yesterdayRoundMap.get(pilot.id) ?? (pilot.roundCount - flights));
+        const roundIncrease: number = pilot.roundCount - prevRound;
         const forfeits = Math.max(0, roundIncrease - flights);
 
         await prisma.dailyPilotStat.upsert({
