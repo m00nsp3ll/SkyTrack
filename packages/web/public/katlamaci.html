@@ -154,6 +154,22 @@ body{font-family:-apple-system,system-ui,'Segoe UI',Roboto,sans-serif;background
   document.addEventListener('visibilitychange', function() { if (document.visibilityState === 'visible') load(); });
   window.addEventListener('focus', load);
 
+  // FCM Token kaydet — native FCM token varsa veya gelirse
+  function registerFcmToken(fcmToken) {
+    if (!fcmToken || !token) return;
+    fetch(API + '/fcm/register', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: fcmToken, platform: 'android' })
+    }).then(function(r) { if (r.ok) console.log('[FCM] Token kaydedildi'); })
+      .catch(function() {});
+  }
+
+  // Native FCM token'ı dinle (Capacitor AppDelegate/MainActivity inject eder)
+  if (window._nativeFCMToken) registerFcmToken(window._nativeFCMToken);
+  window.addEventListener('fcmToken', function(e) { registerFcmToken(e.detail); });
+  window.addEventListener('nativeFCMToken', function(e) { registerFcmToken(e.detail); });
+
   // Socket.IO — anlık güncelleme
   var socket = io('https://api.skytrackyp.com', { transports: ['websocket','polling'], reconnection: true, reconnectionDelay: 2000 });
   socket.on('connect', function() { dot.className = 'conn-dot conn-on'; socket.emit('join:room', 'katlamaci'); });
