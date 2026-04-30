@@ -154,7 +154,7 @@ body{font-family:-apple-system,system-ui,'Segoe UI',Roboto,sans-serif;background
   document.addEventListener('visibilitychange', function() { if (document.visibilityState === 'visible') load(); });
   window.addEventListener('focus', load);
 
-  // FCM Token kaydet — native FCM token varsa veya gelirse
+  // FCM Push Notification — Capacitor native plugin veya web fallback
   function registerFcmToken(fcmToken) {
     if (!fcmToken || !token) return;
     fetch(API + '/fcm/register', {
@@ -165,10 +165,20 @@ body{font-family:-apple-system,system-ui,'Segoe UI',Roboto,sans-serif;background
       .catch(function() {});
   }
 
-  // Native FCM token'ı dinle (Capacitor AppDelegate/MainActivity inject eder)
+  // Native FCM token event'leri dinle
   if (window._nativeFCMToken) registerFcmToken(window._nativeFCMToken);
   window.addEventListener('fcmToken', function(e) { registerFcmToken(e.detail); });
   window.addEventListener('nativeFCMToken', function(e) { registerFcmToken(e.detail); });
+
+  // localStorage'da FCM token varsa kaydet (Capacitor tarafından daha önce kaydedilmiş olabilir)
+  var savedFcm = localStorage.getItem('skytrack_fcm_token');
+  if (savedFcm) registerFcmToken(savedFcm);
+
+  // Periyodik kontrol — Capacitor başka sayfada token almış olabilir
+  setInterval(function() {
+    var t = localStorage.getItem('skytrack_fcm_token');
+    if (t && t !== savedFcm) { savedFcm = t; registerFcmToken(t); }
+  }, 5000);
 
   // Socket.IO — anlık güncelleme
   var socket = io('https://api.skytrackyp.com', { transports: ['websocket','polling'], reconnection: true, reconnectionDelay: 2000 });

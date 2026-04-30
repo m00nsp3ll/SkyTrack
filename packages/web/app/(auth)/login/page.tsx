@@ -88,7 +88,10 @@ export default function LoginPage() {
       if (user.role === 'PILOT') {
         router.replace('/pilot')
       } else if (user.role === 'KATLAMACI') {
-        window.location.replace('/katlamaci.html')
+        // FCM push init — token'ı localStorage'a kaydet, katlamaci.html okuyacak
+        import('@/lib/nativePush').then(m => m.initNativePush(token)).catch(() => {})
+        setTimeout(() => window.location.replace('/katlamaci.html'), 1500)
+        return
       } else {
         router.replace('/admin')
       }
