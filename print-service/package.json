@@ -1,0 +1,12 @@
+{
+  "name": "skytrack-print-service",
+  "version": "1.0.0",
+  "description": "SkyTrack otomatik etiket yazdırma servisi",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "socket.io-client": "^4.7.0"
+  }
+}
