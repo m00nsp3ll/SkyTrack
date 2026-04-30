@@ -652,6 +652,13 @@ router.get('/:id/label', authenticate, asyncHandler(async (req: AuthRequest, res
   });
   if (!customer) throw new AppError('Müşteri bulunamadı', 404, 'CUSTOMER_NOT_FOUND');
 
+  // Pilot adı: assignedPilot veya suggestedPilot
+  let pilotName = customer.assignedPilot?.name || '';
+  if (!pilotName && (customer as any).suggestedPilotId) {
+    const suggested = await prisma.pilot.findUnique({ where: { id: (customer as any).suggestedPilotId } });
+    if (suggested) pilotName = suggested.name;
+  }
+
   const qrBuffer = await generateQRCodeBuffer(customer.displayId);
   const now = new Date();
   const dateStr = now.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' });
@@ -680,8 +687,8 @@ router.get('/:id/label', authenticate, asyncHandler(async (req: AuthRequest, res
   // Display ID + name
   const name = `${customer.firstName} ${customer.lastName}`;
   doc.fontSize(10).text(`${customer.displayId} - ${name}`, 0, mm(45), { align: 'center', width: mm(58) });
-  if (customer.assignedPilot) {
-    doc.fontSize(10).text(`Pilot: ${customer.assignedPilot.name}`, 0, mm(50), { align: 'center', width: mm(58) });
+  if (pilotName) {
+    doc.fontSize(10).text(`Pilot: ${pilotName}`, 0, mm(50), { align: 'center', width: mm(58) });
   }
 
   doc.end();
