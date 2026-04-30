@@ -65,11 +65,12 @@ export async function sendNativeNotification(fcmToken: string, payload: Notifica
       android: {
         priority: 'high',
         notification: {
-          channelId: 'skytrack_pilot',
-          priority: 'max',
+          sound: 'default',
+          priority: 'high',
           defaultSound: true,
           defaultVibrateTimings: true,
           visibility: 'public',
+          notificationCount: 1,
         },
       },
     });
