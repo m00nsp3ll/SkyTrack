@@ -11,8 +11,8 @@ interface QrScannerProps {
 }
 
 export default function QrScanner({
-  fps = 10,
-  qrbox = 250,
+  fps = 5,
+  qrbox = 200,
   disableFlip = false,
   qrCodeSuccessCallback,
 }: QrScannerProps) {
@@ -45,56 +45,11 @@ export default function QrScanner({
         setIsLoading(true)
         setError(null)
 
-        // Wait for DOM to be fully ready
-        await new Promise(resolve => setTimeout(resolve, 300))
-
         const element = document.getElementById(scannerId)
         if (!element) {
-          console.error('Container not found, retrying...')
-          await new Promise(resolve => setTimeout(resolve, 500))
-          const retryElement = document.getElementById(scannerId)
-          if (!retryElement) {
-            setError('Scanner container bulunamadı. Sayfayı yenileyin.')
-            setIsLoading(false)
-            return
-          }
-        }
-
-        // Check if we're on HTTPS or localhost
-        const isSecure = window.location.protocol === 'https:' ||
-                         window.location.hostname === 'localhost' ||
-                         window.location.hostname === '127.0.0.1'
-
-        if (!isSecure) {
-          console.warn('Camera access may be blocked on non-HTTPS connections')
-        }
-
-        // Try to get camera permission first
-        try {
-          const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
-          stream.getTracks().forEach(track => track.stop())
-        } catch (permErr: any) {
-          console.error('Camera permission error:', permErr)
-          if (permErr.name === 'NotAllowedError') {
-            setError('Kamera izni reddedildi. Lütfen tarayıcı ayarlarından kamera iznini verin.')
-            setIsLoading(false)
-            return
-          }
-          if (permErr.name === 'NotFoundError') {
-            setError('Kamera bulunamadı.')
-            setIsLoading(false)
-            return
-          }
-          // For HTTP sites - this is the most common error on mobile
-          if (permErr.name === 'NotSupportedError' ||
-              permErr.name === 'TypeError' ||
-              permErr.message?.includes('secure') ||
-              permErr.message?.includes('getUserMedia')) {
-            setError('HTTP üzerinden kamera erişimi engellendi.\n\nChrome ayarları:\n1. chrome://flags adresine gidin\n2. "Insecure origins treated as secure" arayın\n3. Enabled yapın\n4. Kutucuğa http://192.168.1.11:3000 yazın\n5. Relaunch butonuna basın')
-            setIsLoading(false)
-            return
-          }
-          // Continue anyway for other errors
+          setError('Scanner container bulunamadı.')
+          setIsLoading(false)
+          return
         }
 
         scannerRef.current = new Html5Qrcode(scannerId)
