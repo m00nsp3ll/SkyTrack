@@ -137,6 +137,7 @@ model Pilot {
   companyId        String?            @map("company_id")
   company          Company?           @relation(fields: [companyId], references: [id])
   payments         PilotPayment[]
+  dailyStats       DailyPilotStat[]
   user             User?
   customers          Customer[]       @relation("AssignedPilot")
   suggestedCustomers Customer[]       @relation("SuggestedPilot")
@@ -465,6 +466,22 @@ model PilotPayment {
   @@index([pilotId, createdAt])
   @@index([paidById])
   @@map("pilot_payments")
+}
+
+// Günlük pilot istatistikleri — her gece 21:00'da kaydedilir
+model DailyPilotStat {
+  id           String   @id @default(uuid())
+  pilotId      String   @map("pilot_id")
+  pilot        Pilot    @relation(fields: [pilotId], references: [id])
+  date         DateTime @db.Date
+  flights      Int      @default(0) // O günkü tamamlanan uçuş sayısı
+  forfeits     Int      @default(0) // O günkü feragat sayısı
+  roundCount   Int      @default(0) // Gün sonu roundCount
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@unique([pilotId, date])
+  @@index([date])
+  @@map("daily_pilot_stats")
 }
 
 // Pilot Swap Request — müşteri transferi için onay sistemi
