@@ -13,7 +13,10 @@ export default function Home() {
     if (token && user) {
       try {
         const userData = JSON.parse(user)
-        if (userData.role === 'PILOT') {
+        if (userData.role === 'KATLAMACI') {
+          window.location.replace('/katlamaci.html')
+          return
+        } else if (userData.role === 'PILOT') {
           router.replace('/pilot')
         } else {
           router.replace('/admin')
@@ -25,11 +28,5 @@ export default function Home() {
     router.replace('/login')
   }, [router])
 
-  return (
-    <div className="min-h-screen flex items-center justify-center">
-      <div className="animate-pulse text-xl text-muted-foreground">
-        Yükleniyor...
-      </div>
-    </div>
-  )
+  return <div className="min-h-screen" style={{ background: '#f1f5f9' }} />
 }

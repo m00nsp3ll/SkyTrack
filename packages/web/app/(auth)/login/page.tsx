@@ -47,7 +47,7 @@ export default function LoginPage() {
         if (userData.role === 'PILOT') {
           router.replace('/pilot')
         } else if (userData.role === 'KATLAMACI') {
-          window.location.href = '/katlamaci.html'
+          window.location.replace('/katlamaci.html')
         } else {
           router.replace('/admin')
         }
@@ -88,7 +88,7 @@ export default function LoginPage() {
       if (user.role === 'PILOT') {
         router.replace('/pilot')
       } else if (user.role === 'KATLAMACI') {
-        window.location.href = '/katlamaci.html'
+        window.location.replace('/katlamaci.html')
       } else {
         router.replace('/admin')
       }
