@@ -61,7 +61,7 @@ body{font-family:-apple-system,system-ui,'Segoe UI',Roboto,sans-serif;background
 .footer{text-align:center;padding:12px;font-size:11px;color:var(--gray-400)}
 
 /* Refresh FAB */
-.fab{position:fixed;bottom:24px;right:20px;width:44px;height:44px;border-radius:50%;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(14,165,233,0.4);font-size:18px;cursor:pointer;border:none;transition:transform 0.15s}
+.fab{position:fixed;bottom:calc(24px + env(safe-area-inset-bottom,0px));right:20px;width:44px;height:44px;border-radius:50%;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(14,165,233,0.4);font-size:18px;cursor:pointer;border:none;transition:transform 0.15s}
 .fab:active{transform:scale(0.9)}
 .fab.loading{animation:spin 0.8s linear infinite}
 @keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
@@ -100,9 +100,12 @@ body{font-family:-apple-system,system-ui,'Segoe UI',Roboto,sans-serif;background
 
   // Kullanıcı adını göster
   var nameEl = document.getElementById('user-name');
-  if (user.username) nameEl.textContent = user.username;
+  var displayName = user.name || user.username || 'Katlamacı';
+  nameEl.textContent = displayName;
+  document.querySelector('.role').innerHTML = '<span class="conn-dot conn-off" id="conn-dot"></span> SkyTrack Katlamacı Paneli';
+  dot = document.getElementById('conn-dot');
   var avatarEl = document.querySelector('.avatar');
-  if (user.username) avatarEl.textContent = user.username.charAt(0).toUpperCase();
+  avatarEl.textContent = displayName.charAt(0).toUpperCase();
 
   var API = 'https://api.skytrackyp.com/api';
   var app = document.getElementById('app');
