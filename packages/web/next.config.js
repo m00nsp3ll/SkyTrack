@@ -1,8 +1,10 @@
 const withPWA = require('@ducanh2912/next-pwa').default({
   dest: 'public',
-  disable: process.env.NODE_ENV === 'development', // Disable PWA caching in dev
+  disable: process.env.NODE_ENV === 'development',
   register: true,
   skipWaiting: true,
+  cacheOnFrontEndNav: false,
+  reloadOnOnline: false,
   customWorkerSrc: 'service-worker',
   runtimeCaching: [
     {
