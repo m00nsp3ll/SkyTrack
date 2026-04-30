@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0f172a">
+<title>SkyTrack Katlamacı</title>
+<script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
+<style>
+:root{--safe-top:env(safe-area-inset-top,0px)}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#f1f5f9;min-height:100vh;color:#1e293b}
+.header{background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%);color:#fff;padding:16px 20px;padding-top:calc(var(--safe-top) + 16px);display:flex;justify-content:space-between;align-items:center;box-shadow:0 2px 8px rgba(0,0,0,0.15)}
+.header-left{display:flex;align-items:center;gap:10px}
+.header-logo{width:32px;height:32px;background:rgba(255,255,255,0.15);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px}
+.header-title{font-size:18px;font-weight:700;letter-spacing:-0.3px}
+.header-sub{font-size:11px;opacity:0.6;margin-top:1px}
+.logout-btn{background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:#fff;padding:6px 14px;border-radius:6px;font-size:12px;cursor:pointer}
+.logout-btn:active{background:rgba(255,255,255,0.2)}
+.status-bar{display:flex;gap:8px;padding:12px 16px;background:#fff;border-bottom:1px solid #e2e8f0}
+.status-pill{flex:1;text-align:center;padding:8px 4px;border-radius:8px;font-weight:600;font-size:20px}
+.status-pill span{display:block;font-size:10px;font-weight:400;color:#64748b;margin-top:2px}
+.pill-blue{background:#eff6ff;color:#2563eb}
+.pill-amber{background:#fffbeb;color:#d97706}
+.pill-green{background:#f0fdf4;color:#16a34a}
+.conn-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:4px}
+.conn-on{background:#22c55e}
+.conn-off{background:#ef4444}
+.content{padding:16px}
+.section{margin-bottom:20px}
+.section-header{display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:15px;font-weight:700}
+.section-icon{width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px}
+.icon-blue{background:#dbeafe;color:#2563eb}
+.icon-amber{background:#fef3c7;color:#d97706}
+.badge{font-size:12px;font-weight:500;padding:2px 8px;border-radius:10px;margin-left:4px}
+.badge-blue{background:#dbeafe;color:#2563eb}
+.badge-amber{background:#fef3c7;color:#d97706}
+.card{background:#fff;border-radius:12px;padding:14px 16px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;box-shadow:0 1px 3px rgba(0,0,0,0.06);border:1px solid #e2e8f0}
+.card-blue{border-left:4px solid #3b82f6}
+.card-amber{border-left:4px solid #f59e0b}
+.pilot-name{font-weight:700;font-size:16px;color:#0f172a}
+.time-box{text-align:right}
+.time-value{font-weight:800;font-size:22px;line-height:1}
+.time-blue{color:#2563eb}
+.time-amber{color:#d97706}
+.time-label{font-size:10px;color:#94a3b8;margin-top:2px}
+.empty{background:#fff;border-radius:12px;padding:24px;text-align:center;color:#94a3b8;font-size:14px;border:1px dashed #e2e8f0}
+.refresh{position:fixed;bottom:20px;right:20px;width:40px;height:40px;border-radius:50%;background:#0f172a;color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,0.2);font-size:16px;cursor:pointer}
+.refresh:active{transform:scale(0.9)}
+.refresh.loading{animation:spin 1s linear infinite}
+@keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+.last-update{text-align:center;font-size:11px;color:#94a3b8;padding:8px;margin-top:8px}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <div class="header-logo">🪂</div>
+    <div>
+      <div class="header-title">SkyTrack</div>
+      <div class="header-sub"><span class="conn-dot conn-off" id="conn-dot"></span>Katlamacı Paneli</div>
+    </div>
+  </div>
+  <button class="logout-btn" onclick="localStorage.clear();location.href='/login'">Çıkış</button>
+</div>
+
+<div class="status-bar">
+  <div class="status-pill pill-blue" id="inf-count">0<span>Havada</span></div>
+  <div class="status-pill pill-amber" id="wait-count">0<span>Bekliyor</span></div>
+  <div class="status-pill pill-green" id="total-count">0<span>Toplam</span></div>
+</div>
+
+<div class="content" id="app"></div>
+<div class="last-update" id="last-update"></div>
+<div class="refresh" id="refresh-btn" onclick="load()">↻</div>
+
+<script>
+(function(){
+  var token = localStorage.getItem('token');
+  if (!token) { location.href = '/login'; return; }
+  var user;
+  try { user = JSON.parse(localStorage.getItem('user') || '{}'); } catch(e) {}
+  if (!user || !['KATLAMACI','ADMIN','SUPER_ADMIN'].includes(user.role)) { location.href = '/login'; return; }
+
+  var API = 'https://api.skytrackyp.com/api';
+  var SOCKET_URL = 'https://api.skytrackyp.com';
+  var app = document.getElementById('app');
+  var refreshBtn = document.getElementById('refresh-btn');
+  var connDot = document.getElementById('conn-dot');
+
+  function mins(d) { return d ? Math.floor((Date.now() - new Date(d).getTime()) / 60000) : 0; }
+  function now() { var n = new Date(); return n.getHours().toString().padStart(2,'0') + ':' + n.getMinutes().toString().padStart(2,'0') + ':' + n.getSeconds().toString().padStart(2,'0'); }
+
+  function render(data) {
+    var inf = data.inFlight || [];
+    var wait = data.waiting || [];
+
+    document.getElementById('inf-count').innerHTML = inf.length + '<span>Havada</span>';
+    document.getElementById('wait-count').innerHTML = wait.length + '<span>Bekliyor</span>';
+    document.getElementById('total-count').innerHTML = (inf.length + wait.length) + '<span>Toplam</span>';
+
+    var h = '<div class="section"><div class="section-header"><div class="section-icon icon-blue">✈</div>Havada<span class="badge badge-blue">' + inf.length + '</span></div>';
+    if (!inf.length) { h += '<div class="empty">Havada pilot yok</div>'; }
+    else { for (var i = 0; i < inf.length; i++) h += '<div class="card card-blue"><div class="pilot-name">' + inf[i].pilotName + '</div><div class="time-box"><div class="time-value time-blue">' + mins(inf[i].takeoffAt) + '<span style="font-size:14px;font-weight:400"> dk</span></div><div class="time-label">uçuş süresi</div></div></div>'; }
+    h += '</div><div class="section"><div class="section-header"><div class="section-icon icon-amber">⏳</div>Bekliyor<span class="badge badge-amber">' + wait.length + '</span></div>';
+    if (!wait.length) { h += '<div class="empty">Bekleyen pilot yok</div>'; }
+    else { for (var j = 0; j < wait.length; j++) h += '<div class="card card-amber"><div class="pilot-name">' + wait[j].pilotName + '</div><div class="time-box"><div class="time-value time-amber">' + mins(wait[j].assignedAt) + '<span style="font-size:14px;font-weight:400"> dk</span></div><div class="time-label">bekleme</div></div></div>'; }
+    h += '</div>';
+    app.innerHTML = h;
+    document.getElementById('last-update').textContent = 'Son güncelleme: ' + now();
+  }
+
+  var fetching = false;
+  function load() {
+    if (fetching) return;
+    fetching = true;
+    refreshBtn.classList.add('loading');
+    fetch(API + '/katlamaci/live', { headers: { Authorization: 'Bearer ' + token } })
+      .then(function(r) { if (r.status === 401) { localStorage.clear(); location.href = '/login'; return null; } return r.json(); })
+      .then(function(d) { if (d && d.data) render(d.data); })
+      .catch(function() {})
+      .finally(function() { fetching = false; refreshBtn.classList.remove('loading'); });
+  }
+  window.load = load;
+
+  // İlk yükleme
+  load();
+
+  // 15 saniyede bir yedek yenileme
+  setInterval(load, 15000);
+
+  // Süreleri güncelle (her 30 sn)
+  setInterval(function() { /* render tekrar çağrılacak load ile */ }, 30000);
+
+  // Ön plana gelince yenile
+  document.addEventListener('visibilitychange', function() { if (document.visibilityState === 'visible') load(); });
+  window.addEventListener('focus', load);
+
+  // Socket.IO — anlık güncelleme
+  var socket = io(SOCKET_URL, { transports: ['websocket', 'polling'], reconnection: true, reconnectionDelay: 2000 });
+  socket.on('connect', function() {
+    connDot.className = 'conn-dot conn-on';
+    socket.emit('join:room', 'katlamaci');
+  });
+  socket.on('disconnect', function() { connDot.className = 'conn-dot conn-off'; });
+
+  // Uçuş event'leri → anında güncelle
+  var events = ['flight:takeoff','flight:pickup','flight:assigned','flight:landed','flight:cancelled','flight:status'];
+  events.forEach(function(ev) { socket.on(ev, function() { load(); }); });
+})();
+</script>
+</body>
+</html>
