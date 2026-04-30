@@ -81,15 +81,23 @@ export default function PilotQueuePage() {
 
   // Excel'de olan tüm pilotlar (is_in_excel=true) ana listede, sıralama roundCount asc → forma asc
   // in_queue=false olanlar bile listede kalır ("Sırada Değil" rozeti + auto-forfeit)
+  const busyStatuses = ['PICKED_UP', 'ASSIGNED', 'IN_FLIGHT']
   const inQueuePilots = pilots
     .filter((p: any) => p.isInExcel === true)
     .sort((a, b) => {
+      // Müşteri almış/uçuşta olanlar en sona
+      const aBusy = busyStatuses.includes(a.status) ? 1 : 0
+      const bBusy = busyStatuses.includes(b.status) ? 1 : 0
+      if (aBusy !== bBusy) return aBusy - bBusy
+      // priorityOverride önce
       const ap = (a as any).priorityOverride ? 1 : 0
       const bp = (b as any).priorityOverride ? 1 : 0
       if (ap !== bp) return bp - ap
+      // roundCount ASC
       const ar = (a as any).roundCount ?? 0
       const br = (b as any).roundCount ?? 0
       if (ar !== br) return ar - br
+      // queuePosition ASC
       return a.queuePosition - b.queuePosition
     })
   // Excel'de olmayan pilotlar — "Sisteme Dahil Değil" alt bölümü
