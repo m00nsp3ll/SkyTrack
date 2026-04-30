@@ -104,12 +104,11 @@ export const pilotQueueService = {
         },
       });
 
-      // Müşteri almış pilotları (PICKED_UP/ASSIGNED/IN_FLIGHT) sıranın sonuna koy
-      // Müsait ve sırada olanlar önce, uçuşta olanlar en sonda
-      const available = pilots.filter(p => p.status === 'AVAILABLE' || p.status === 'OFF_DUTY' || p.status === 'ON_BREAK');
-      const busy = pilots.filter(p => p.status === 'PICKED_UP' || p.status === 'ASSIGNED' || p.status === 'IN_FLIGHT');
-      const unavailable = pilots.filter(p => p.status === 'UNAVAILABLE');
-      queue = [...available, ...unavailable, ...busy];
+      // Sıralama: müsait → mesai dışı/mola → müşteri almış/uçuşta
+      const available = pilots.filter(p => p.status === 'AVAILABLE');
+      const notAvailable = pilots.filter(p => ['OFF_DUTY', 'ON_BREAK', 'UNAVAILABLE'].includes(p.status));
+      const busy = pilots.filter(p => ['PICKED_UP', 'ASSIGNED', 'IN_FLIGHT'].includes(p.status));
+      queue = [...available, ...notAvailable, ...busy];
       await cache.pilotQueue.set(queue);
     }
 
