@@ -399,6 +399,48 @@ router.put('/:id', authenticate, asyncHandler(async (req: AuthRequest, res: any)
   const { id } = req.params;
   const { firstName, lastName, email, phone, emergencyContact, weight, waiverSigned, status } = req.body;
 
+  // İptal durumunda pilot atamasını ve uçuşu da temizle
+  if (status === 'CANCELLED') {
+    const existing = await prisma.customer.findUnique({
+      where: { id },
+      include: { flights: { where: { status: { in: ['ASSIGNED', 'PICKED_UP', 'IN_FLIGHT'] } } } },
+    });
+
+    if (existing) {
+      await prisma.$transaction(async (tx) => {
+        // Aktif uçuşları iptal et
+        for (const flight of existing.flights) {
+          await tx.flight.update({ where: { id: flight.id }, data: { status: 'CANCELLED', notes: 'Müşteri iptal edildi' } });
+
+          // Pilotun sırasını koru — roundCount ve dailyFlightCount geri al
+          const pilot = await tx.pilot.findUnique({ where: { id: flight.pilotId } });
+          if (pilot) {
+            await tx.pilot.update({
+              where: { id: flight.pilotId },
+              data: {
+                status: 'AVAILABLE',
+                dailyFlightCount: pilot.dailyFlightCount > 0 ? { decrement: 1 } : 0,
+                roundCount: pilot.roundCount > 0 ? { decrement: 1 } : 0,
+              },
+            });
+          }
+        }
+
+        // Müşteriyi iptal et ve pilot atamasını kaldır
+        await tx.customer.update({
+          where: { id },
+          data: { status: 'CANCELLED', assignedPilotId: null, suggestedPilotId: null as any },
+        });
+      });
+
+      await cache.customer.invalidate(id);
+      await cache.pilotQueue.invalidate();
+
+      const updated = await prisma.customer.findUnique({ where: { id }, include: { assignedPilot: { select: { id: true, name: true } } } });
+      return res.json({ success: true, data: updated });
+    }
+  }
+
   const customer = await prisma.customer.update({
     where: { id },
     data: {
@@ -417,7 +459,6 @@ router.put('/:id', authenticate, asyncHandler(async (req: AuthRequest, res: any)
     },
   });
 
-  // Invalidate cache
   await cache.customer.invalidate(id);
 
   res.json({

@@ -12,7 +12,7 @@ const path = require('path');
 const https = require('https');
 
 const API_URL = process.env.API_URL || 'https://api.skytrackyp.com/api';
-const SOCKET_URL = process.env.SOCKET_URL || 'https://skytrackyp.com';
+const SOCKET_URL = process.env.SOCKET_URL || 'https://api.skytrackyp.com';
 const PRINTER_NAME = process.env.PRINTER_NAME || 'Brother_QL_810W';
 const TOKEN = process.env.TOKEN || '';
 const tmpDir = path.join(__dirname, '.tmp');
@@ -66,7 +66,7 @@ async function printLabel(customerId, displayId, customerName, pilotName) {
 }
 
 // Socket.IO bağlantısı
-const socket = io(SOCKET_URL, { transports: ['websocket'], rejectUnauthorized: false });
+const socket = io(SOCKET_URL, { transports: ['websocket', 'polling'], rejectUnauthorized: false });
 
 socket.on('connect', () => {
   console.log('✅ Sunucuya bağlandı');
