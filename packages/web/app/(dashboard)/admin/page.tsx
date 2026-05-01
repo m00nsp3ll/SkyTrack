@@ -728,26 +728,6 @@ export default function AdminDashboard() {
         </CardContent>
       </Card>
 
-      {/* Etiket Yazıcı Test — Brother QL-810W 58x58mm */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Etiket Test (58x58mm)</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <button
-            onClick={() => {
-              const token = localStorage.getItem('token') || ''
-              window.open(`${process.env.NEXT_PUBLIC_API_URL}/customers/test-label?token=${token}`, '_blank')
-            }}
-            className="border-2 border-dashed border-blue-400 rounded-lg p-4 hover:bg-blue-50 transition-colors w-full max-w-sm mx-auto block"
-          >
-            <div className="text-sm font-bold mb-2 text-center">
-              Test Etiketi Yazdır
-            </div>
-            <div className="text-xs text-gray-500 mt-2 text-center">58x58mm — Brother QL-810W</div>
-          </button>
-        </CardContent>
-      </Card>
     </div>
   )
 }

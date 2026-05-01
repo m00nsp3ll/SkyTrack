@@ -1,4 +1,4 @@
-export type Language = 'tr' | 'en' | 'ru' | 'de' | 'ar' | 'pl' | 'uk' | 'zh' | 'fr' | 'fa' | 'nl'
+export type Language = 'tr' | 'en' | 'ru' | 'de' | 'ar' | 'pl' | 'uk' | 'zh' | 'fr' | 'fa' | 'nl' | 'fi'
 
 export const RTL_LANGUAGES: Language[] = ['ar', 'fa']
 
@@ -14,6 +14,7 @@ export const LANGUAGES: { code: Language; flag: string; name: string }[] = [
   { code: 'fr', flag: '🇫🇷', name: 'Français' },
   { code: 'fa', flag: '🇮🇷', name: 'فارسی' },
   { code: 'nl', flag: '🇳🇱', name: 'Nederlands' },
+  { code: 'fi', flag: '🇫🇮', name: 'Suomi' },
 ]
 
 export interface Translations {
@@ -686,8 +687,59 @@ const nl: Translations = {
   saving: 'Opslaan...',
 }
 
+const fi: Translations = {
+  formTitle: 'Asiakasrekisteröintilomake',
+  firstName: 'Etunimi',
+  lastName: 'Sukunimi',
+  phone: 'Puhelin',
+  email: 'Sähköposti',
+  emergencyContact: 'Hotellin nimi',
+  weight: 'Paino (kg)',
+  weightHelper: 'Vaaditaan lentoturvallisuutta varten (20-150 kg)',
+  next: 'Seuraava',
+  back: 'Takaisin',
+  submit: 'Viimeistele rekisteröinti ja luo QR',
+  required: 'Tämä kenttä on pakollinen',
+  personalInfo: 'Henkilötiedot',
+  waiverTitle: 'Riskin hyväksyminen ja vastuuvapautuslauseke',
+  waiverFullTitle: 'VARJOLIITOLENNON RISKIN HYVÄKSYMINEN JA VASTUUVAPAUTUSLAUSEKE',
+  waiverIntro: 'Tämä asiakirja on laadittu Alanyan varjoliito- ja urheilumatkailun kehittämisosuuskunnan alaisuudessa suoritettavaa tandem-varjoliitolentoa varten.',
+  waiverAccept: 'Allekirjoittamalla tämän asiakirjan hyväksyn ja vakuutan seuraavaa:',
+  waiverItem1: 'Varjoliito on luonteeltaan vaarallinen toiminta ja siihen liittyy onnettomuusriski.',
+  waiverItem2: 'Olen saanut tarvittavan lentoa edeltävän koulutuksen ja ohjeistuksen pilotiltani, minulla on täysi tietoisuus aiheesta ja olen valmis lentämään omasta vapaasta tahdostani hyväksyen kaikki riskit.',
+  waiverItem3: 'Olen tietoinen, että lennon aikana voi tapahtua onnettomuuksia sääolosuhteiden, laitevian tai muiden ennakoimattomien olosuhteiden vuoksi.',
+  waiverItem4: 'Minulla ei ole terveysongelmia (sydänsairaus, epilepsia, raskaus jne.), tai jos on, olen ilmoittanut siitä pilotille ja viranomaisille.',
+  waiverItem5: 'Sitoudun noudattamaan kaikkia ennen lentoa annettuja turvallisuusohjeita.',
+  waiverItem6: 'Tandemlento on vakuutettu RAY SİGORTA A.Ş.:n toimesta. Hyväksyn, että mahdollisen onnettomuuden sattuessa en esitä vaatimuksia osuuskunnalle, yritykselle/pilotille tai muille henkilöille.',
+  waiverItem7: 'Hyväksyn, että lennon aikana otettuja valokuvia ja videoita voidaan tallentaa osuuskunnan toimesta ja näitä visuaalisia/äänitallentamia voidaan käyttää palvelun tarjoamiseen.',
+  waiverItem8: 'Vakuutan olevani yli 18-vuotias tai saaneeni laillisen huoltajani suostumuksen.',
+  waiverKvkkLine: 'Allekirjoittamalla tämän lomakkeen suostun henkilötietojeni käsittelyyn {link} puitteissa.',
+  kvkkLinkText: 'Tietosuojaseloste (KVKK)',
+  kvkkModalTitle: 'Tietosuojaseloste',
+  signHere: 'Allekirjoita alle:',
+  signClear: 'Tyhjennä',
+  signHelper: 'Käytä sormeasi tai hiirtä allekirjoittaaksesi yllä olevaan alueeseen',
+  signConfirm: 'Vahvista allekirjoitus',
+  signCancel: 'Peruuta',
+  signViewAndSign: 'Näytä riskilomake ja allekirjoita',
+  signRequired: 'Allekirjoita riskilomake',
+  signed: 'Riskilomake allekirjoitettu',
+  resignLabel: 'Allekirjoita uudelleen',
+  kvkkText: tr.kvkkText,
+  kvkkClose: 'Sulje',
+  registrationSuccess: 'Rekisteröinti onnistui!',
+  printQR: 'Tulosta QR',
+  newRegistration: 'Uusi rekisteröinti',
+  countrySearchPlaceholder: 'Maan nimi tai koodi...',
+  noResults: 'Tuloksia ei löytynyt',
+  fillNamePhone: 'Täytä ensin etunimi, sukunimi ja puhelin',
+  invalidPhone: 'Virheellinen puhelinnumero',
+  registrationFailed: 'Rekisteröinti epäonnistui',
+  saving: 'Tallennetaan...',
+}
+
 export const translations: Record<Language, Translations> = {
-  tr, en, ru, de, ar, pl, uk, zh, fr, fa, nl,
+  tr, en, ru, de, ar, pl, uk, zh, fr, fa, nl, fi,
 }
 
 export function t(lang: Language): Translations {
