@@ -5,16 +5,16 @@ export const RTL_LANGUAGES: Language[] = ['ar', 'fa']
 export const LANGUAGES: { code: Language; flag: string; name: string }[] = [
   { code: 'tr', flag: '🇹🇷', name: 'Türkçe' },
   { code: 'en', flag: '🇬🇧', name: 'English' },
-  { code: 'ru', flag: '🇷🇺', name: 'Русский' },
   { code: 'de', flag: '🇩🇪', name: 'Deutsch' },
-  { code: 'ar', flag: '🇸🇦', name: 'العربية' },
   { code: 'pl', flag: '🇵🇱', name: 'Polski' },
   { code: 'uk', flag: '🇺🇦', name: 'Українська' },
-  { code: 'zh', flag: '🇨🇳', name: '中文' },
+  { code: 'ru', flag: '🇷🇺', name: 'Русский' },
   { code: 'fr', flag: '🇫🇷', name: 'Français' },
-  { code: 'fa', flag: '🇮🇷', name: 'فارسی' },
-  { code: 'nl', flag: '🇳🇱', name: 'Nederlands' },
   { code: 'fi', flag: '🇫🇮', name: 'Suomi' },
+  { code: 'nl', flag: '🇳🇱', name: 'Nederlands' },
+  { code: 'zh', flag: '🇨🇳', name: '中文' },
+  { code: 'fa', flag: '🇮🇷', name: 'فارسی' },
+  { code: 'ar', flag: '🇸🇦', name: 'العربية' },
 ]
 
 export interface Translations {
