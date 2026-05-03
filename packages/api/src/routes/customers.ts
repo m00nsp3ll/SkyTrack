@@ -372,6 +372,7 @@ router.post('/', authenticate, requireRole('ADMIN', 'OFFICE_STAFF', 'KIOSK'), as
       displayId,
       customerName: `${customer.firstName} ${customer.lastName}`,
       pilotName: suggestedPilot?.name || '',
+      createdAt: new Date().toISOString(),
     });
   }
 
