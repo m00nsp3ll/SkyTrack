@@ -285,12 +285,14 @@ router.get('/pilots', authenticate, asyncHandler(async (req: AuthRequest, res: a
       dailyFlights[day] = (dailyFlights[day] || 0) + 1;
     });
 
-    // Pilotaj ücreti — aylık: Nisan 1000 TL, Mayıs'tan itibaren 1250 TL
+    // Pilotaj ücreti — aylık: Nisan ve öncesi 1000 TL, Mayıs'tan itibaren 1250 TL
     const flightFee = pilot.flightFee ? Number(pilot.flightFee) : globalFlightFee;
     const mayisBasi = new Date('2026-05-01');
     const nisanUcus = completedFlights.filter(f => f.createdAt < mayisBasi).length;
     const mayisUcus = completedFlights.filter(f => f.createdAt >= mayisBasi).length;
-    const hakedis = (nisanUcus * 1000) + (mayisUcus * 1250); // Nisan 1000, Mayıs+ 1250
+    const hakedis = (nisanUcus * 1000) + (mayisUcus * 1250);
+    // Seçilen tarih aralığındaki ödemeler
+    // Cari (tüm zaman) ise tüm ödemeler, ay bazlı ise o aydaki ödemeler
     const totalPaid = pilot.payments.reduce((s, p) => s + Number(p.amount), 0);
     const kalan = hakedis - totalPaid;
 

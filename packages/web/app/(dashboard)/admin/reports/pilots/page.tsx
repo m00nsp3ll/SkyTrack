@@ -70,11 +70,20 @@ interface Company {
   color: string
 }
 
-type QuickFilter = 'today' | 'week' | 'month' | 'custom'
+type QuickFilter = 'cari' | 'nisan' | 'mayis' | 'today' | 'week' | 'month' | 'custom'
 
 function getQuickDates(filter: QuickFilter): { from: string; to: string } {
   const today = new Date()
   const to = today.toISOString().split('T')[0]
+  if (filter === 'cari') {
+    return { from: '2026-03-01', to }
+  }
+  if (filter === 'nisan') {
+    return { from: '2026-04-01', to: '2026-04-30' }
+  }
+  if (filter === 'mayis') {
+    return { from: '2026-05-01', to: '2026-05-31' }
+  }
   if (filter === 'today') {
     return { from: to, to }
   }
@@ -88,7 +97,6 @@ function getQuickDates(filter: QuickFilter): { from: string; to: string } {
     d.setDate(1)
     return { from: d.toISOString().split('T')[0], to }
   }
-  // custom — caller handles
   const d = new Date(today)
   d.setDate(d.getDate() - 30)
   return { from: d.toISOString().split('T')[0], to }
@@ -97,9 +105,9 @@ function getQuickDates(filter: QuickFilter): { from: string; to: string } {
 export default function PilotPerformanceReport() {
   const [data, setData] = useState<ReportData | null>(null)
   const [loading, setLoading] = useState(true)
-  const [quickFilter, setQuickFilter] = useState<QuickFilter>('month')
-  const [dateFrom, setDateFrom] = useState(() => getQuickDates('month').from)
-  const [dateTo, setDateTo] = useState(() => getQuickDates('month').to)
+  const [quickFilter, setQuickFilter] = useState<QuickFilter>('cari')
+  const [dateFrom, setDateFrom] = useState(() => getQuickDates('cari').from)
+  const [dateTo, setDateTo] = useState(() => getQuickDates('cari').to)
   const [isSuperAdmin, setIsSuperAdmin] = useState(false)
   const [isAdmin, setIsAdmin] = useState(false)
   const [editingPilotFee, setEditingPilotFee] = useState<{ id: string; name: string; fee: number } | null>(null)
@@ -252,8 +260,10 @@ export default function PilotPerformanceReport() {
   })) || []
 
   const quickButtons: { label: string; value: QuickFilter }[] = [
+    { label: 'Cari', value: 'cari' },
+    { label: 'Nisan', value: 'nisan' },
+    { label: 'Mayıs', value: 'mayis' },
     { label: 'Bugün', value: 'today' },
-    { label: 'Bu Hafta', value: 'week' },
     { label: 'Bu Ay', value: 'month' },
   ]
 
