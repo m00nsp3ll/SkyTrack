@@ -285,9 +285,12 @@ router.get('/pilots', authenticate, asyncHandler(async (req: AuthRequest, res: a
       dailyFlights[day] = (dailyFlights[day] || 0) + 1;
     });
 
-    // Pilotaj ücreti (pilota özel veya global)
+    // Pilotaj ücreti — aylık: Nisan 1000 TL, Mayıs'tan itibaren 1250 TL
     const flightFee = pilot.flightFee ? Number(pilot.flightFee) : globalFlightFee;
-    const hakedis = completedFlights.length * flightFee; // Toplam hakediş
+    const mayisBasi = new Date('2026-05-01');
+    const nisanUcus = completedFlights.filter(f => f.createdAt < mayisBasi).length;
+    const mayisUcus = completedFlights.filter(f => f.createdAt >= mayisBasi).length;
+    const hakedis = (nisanUcus * 1000) + (mayisUcus * 1250); // Nisan 1000, Mayıs+ 1250
     const totalPaid = pilot.payments.reduce((s, p) => s + Number(p.amount), 0);
     const kalan = hakedis - totalPaid;
 
@@ -1086,7 +1089,10 @@ router.get('/company', authenticate, asyncHandler(async (req: AuthRequest, res: 
       const allFlights = pilot.flights;
       const fee = pilot.flightFee ? Number(pilot.flightFee) : globalFlightFee;
       const totalPaid = pilot.payments.reduce((s, p) => s + Number(p.amount), 0);
-      const hakedis = allFlights.length * fee;
+      const mayisBasi = new Date('2026-05-01');
+      const nisanF = allFlights.filter(f => f.createdAt < mayisBasi).length;
+      const mayisF = allFlights.filter(f => f.createdAt >= mayisBasi).length;
+      const hakedis = (nisanF * 1000) + (mayisF * 1250);
 
       return {
         id: pilot.id,
