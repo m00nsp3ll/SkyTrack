@@ -347,7 +347,7 @@ export default function KioskPage() {
       setResult(regData)
       setStep('success')
       // UI render + AirPrint discovery için 2 saniye bekle
-      setTimeout(() => autoPrint(regData), 2000)
+      // Print service Mac'ten otomatik yazdırıyor — kiosk'tan yazdırma kapalı
     } catch (err: any) {
       setError(err.response?.data?.error?.message || tr.registrationFailed)
       setStep('form')
@@ -719,14 +719,6 @@ export default function KioskPage() {
 
             {/* Action Buttons */}
             <div className="px-8 pb-8 space-y-3">
-              <button
-                onClick={handlePrint}
-                className="w-full h-16 text-lg font-semibold rounded-xl bg-sky-600 hover:bg-sky-700 text-white flex items-center justify-center gap-3"
-              >
-                <Printer className="w-6 h-6" />
-                {tr.printQR}
-              </button>
-
               <button
                 onClick={resetAll}
                 className="w-full h-16 text-lg font-semibold rounded-xl border-2 border-gray-300 bg-white hover:bg-gray-50 flex items-center justify-center gap-3 text-gray-700"
