@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs';
 import { asyncHandler, AppError } from '../middleware/errorHandler.js';
 import { authenticate, requireRole, AuthRequest } from '../middleware/auth.js';
 import { cache } from '../services/cache.js';
+import { pilotQueueService } from '../services/pilotQueue.js';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -660,16 +661,56 @@ router.post('/:id/forfeit', authenticate, requireRole('ADMIN'), asyncHandler(asy
   const pilot = await prisma.pilot.findUnique({ where: { id } });
   if (!pilot) throw new AppError('Pilot bulunamadı', 404, 'PILOT_NOT_FOUND');
 
-  // Aktif bir uçuşu varsa feragat olmaz
+  // Aktif uçuş varsa: müşteriyi sonraki pilota taşı, roundCount zaten artmış sadece forfeitCount artır
   const activeFlight = await prisma.flight.findFirst({
-    where: { pilotId: id, status: { in: ['ASSIGNED', 'PICKED_UP', 'IN_FLIGHT'] } },
+    where: { pilotId: id, status: { in: ['ASSIGNED', 'PICKED_UP'] } },
+    include: { customer: true },
   });
-  if (activeFlight) {
-    throw new AppError('Aktif uçuşu olan pilot feragat edemez. Önce uçuşu iptal edin.', 400, 'PILOT_HAS_ACTIVE_FLIGHT');
-  }
 
-  const { forfeitPilot } = await import('../services/roundCounter.js');
-  await forfeitPilot(id);
+  if (activeFlight) {
+    // Müşteri var → roundCount zaten atamada artmıştı, tekrar artırma
+    // Sadece forfeitCount artır + müşteriyi sonraki pilota taşı
+    const io = req.app.get('io');
+    const nextPilot = await pilotQueueService.getNextPilot();
+
+    await prisma.$transaction(async (tx) => {
+      // Eski pilot: forfeitCount +1, status AVAILABLE (roundCount değişmez — zaten artmıştı)
+      await tx.pilot.update({
+        where: { id },
+        data: { forfeitCount: { increment: 1 }, status: 'AVAILABLE' },
+      });
+
+      if (nextPilot) {
+        // Uçuşu sonraki pilota taşı
+        await tx.flight.update({ where: { id: activeFlight.id }, data: { pilotId: nextPilot.id } });
+        await tx.customer.update({ where: { id: activeFlight.customerId }, data: { assignedPilotId: nextPilot.id } });
+        // Sonraki pilot: roundCount +1, dailyFlightCount +1, status ASSIGNED
+        await tx.pilot.update({
+          where: { id: nextPilot.id },
+          data: { roundCount: { increment: 1 }, dailyFlightCount: { increment: 1 }, status: 'ASSIGNED' },
+        });
+      } else {
+        // Sonraki pilot yok → uçuşu iptal et
+        await tx.flight.update({ where: { id: activeFlight.id }, data: { status: 'CANCELLED', notes: 'Pilot feragat — müsait pilot yok' } });
+        await tx.customer.update({ where: { id: activeFlight.customerId }, data: { assignedPilotId: null } });
+      }
+    });
+
+    await cache.pilotQueue.invalidate();
+    await cache.pilot.invalidate(id);
+    if (nextPilot) await cache.pilot.invalidate(nextPilot.id);
+
+    if (io) io.emit('pilot:queue-updated');
+    if (nextPilot && io) {
+      io.to(`pilot:${nextPilot.id}`).emit('customer:assigned', {
+        customer: { id: activeFlight.customerId, displayId: activeFlight.customer.displayId, firstName: activeFlight.customer.firstName, lastName: activeFlight.customer.lastName },
+      });
+    }
+  } else {
+    // Aktif uçuş yok → normal feragat
+    const { forfeitPilot } = await import('../services/roundCounter.js');
+    await forfeitPilot(id);
+  }
 
   await cache.pilotQueue.invalidate();
   await cache.pilot.invalidate(id);
