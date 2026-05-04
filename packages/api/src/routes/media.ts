@@ -1317,6 +1317,30 @@ router.get(
   })
 );
 
+// GET /api/media/:customerId/prepare-zip - ZIP oluştur, path döndür (LAN indirme için)
+router.get(
+  '/:customerId/prepare-zip',
+  asyncHandler(async (req: any, res: any) => {
+    const { customerId } = req.params;
+    const customer = await prisma.customer.findFirst({
+      where: { OR: [{ id: customerId }, { displayId: customerId }] },
+      include: { flights: { orderBy: { createdAt: 'desc' }, take: 1, include: { mediaFolder: true } } },
+    });
+    if (!customer) throw new AppError('Müşteri bulunamadı', 404, 'CUSTOMER_NOT_FOUND');
+    const mediaFolder = customer.flights[0]?.mediaFolder;
+    if (!mediaFolder) throw new AppError('Medya klasörü bulunamadı', 404, 'MEDIA_FOLDER_NOT_FOUND');
+    if (mediaFolder.paymentStatus !== 'PAID') throw new AppError('Ödeme yapılmadan indirilemez', 403, 'PAYMENT_REQUIRED');
+
+    const relPath = mediaFolder.folderPath.replace(/^media\//, '');
+    const result = await qnap.createCustomerZip(customer.displayId, relPath);
+    if (!result) throw new AppError('ZIP oluşturulamadı', 500, 'ZIP_CREATE_FAILED');
+
+    await prisma.mediaFolder.update({ where: { id: mediaFolder.id }, data: { deliveryStatus: 'DELIVERED' } });
+
+    res.json({ success: true, data: { zipRelPath: result.zipRelPath, size: result.size } });
+  })
+);
+
 // GET /api/media/:customerId/download/:filename - Download single file
 router.get(
   '/:customerId/download/:filename',

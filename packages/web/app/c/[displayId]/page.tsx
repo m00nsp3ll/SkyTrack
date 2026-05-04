@@ -493,6 +493,19 @@ export default function CustomerDownloadPage() {
   }, [fetchData, apiUrl])
 
   const handleDownload = async () => {
+    if (isLan) {
+      // LAN'da → NAS'tan direkt HTTP indir (SSL yok, gigabit hız)
+      // Önce ZIP oluştur (API üzerinden), sonra NAS HTTP'den indir
+      try {
+        const res = await fetch(`${apiUrl}/media/${displayId}/prepare-zip`)
+        const json = await res.json()
+        if (json.success && json.data?.zipRelPath) {
+          window.open(`http://192.168.1.105:9090/${json.data.zipRelPath}`, '_blank')
+          return
+        }
+      } catch {}
+    }
+    // LAN değilse veya hata → eski yöntem
     window.location.href = getDownloadUrl(displayId)
   }
 
