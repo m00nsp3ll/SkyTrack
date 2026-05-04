@@ -262,7 +262,7 @@ router.get('/pilots', authenticate, asyncHandler(async (req: AuthRequest, res: a
         },
       },
       payments: {
-        where: { deletedAt: null },
+        where: { deletedAt: null, createdAt: { gte: fromDate, lte: toDate } },
         select: { amount: true, createdAt: true },
       },
     },
