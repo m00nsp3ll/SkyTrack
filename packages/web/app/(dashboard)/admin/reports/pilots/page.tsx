@@ -261,10 +261,8 @@ export default function PilotPerformanceReport() {
 
   const quickButtons: { label: string; value: QuickFilter }[] = [
     { label: 'Cari', value: 'cari' },
-    { label: 'Nisan', value: 'nisan' },
     { label: 'Mayıs', value: 'mayis' },
-    { label: 'Bugün', value: 'today' },
-    { label: 'Bu Ay', value: 'month' },
+    { label: 'Nisan', value: 'nisan' },
   ]
 
   return (
