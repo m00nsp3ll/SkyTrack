@@ -127,6 +127,7 @@ model Pilot {
   teamId           String?            @map("team_id")
   team             Team?              @relation(fields: [teamId], references: [id])
   isTeamLeader     Boolean            @default(false) @map("is_team_leader")
+  isFemale         Boolean            @default(false) @map("is_female")
   // Pilotaj ücreti (null ise global ayar kullanılır)
   flightFee        Decimal?           @db.Decimal(10, 2) @map("flight_fee")
   // Per-pilot TUR sayacı (uçtukça veya feragat ettikçe artar)

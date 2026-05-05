@@ -101,6 +101,7 @@ export default function PilotDetailPage() {
     email: '',
     maxDailyFlights: 7,
     isActive: true,
+    isFemale: false,
   })
 
   // Date filter state
@@ -124,6 +125,7 @@ export default function PilotDetailPage() {
         email: data.email || '',
         maxDailyFlights: data.maxDailyFlights,
         isActive: data.isActive,
+        isFemale: data.isFemale || false,
       })
     } catch (err) {
       console.error('Failed to fetch pilot:', err)
@@ -469,17 +471,31 @@ export default function PilotDetailPage() {
                   }
                 />
               </div>
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="isActive"
-                  checked={formData.isActive}
-                  onChange={(e) =>
-                    setFormData({ ...formData, isActive: e.target.checked })
-                  }
-                  className="h-4 w-4"
-                />
-                <Label htmlFor="isActive">Aktif</Label>
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="isActive"
+                    checked={formData.isActive}
+                    onChange={(e) =>
+                      setFormData({ ...formData, isActive: e.target.checked })
+                    }
+                    className="h-4 w-4"
+                  />
+                  <Label htmlFor="isActive">Aktif</Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="isFemale"
+                    checked={formData.isFemale}
+                    onChange={(e) =>
+                      setFormData({ ...formData, isFemale: e.target.checked })
+                    }
+                    className="h-4 w-4 accent-pink-500"
+                  />
+                  <Label htmlFor="isFemale">Kadın Pilot</Label>
+                </div>
               </div>
             </div>
           ) : (

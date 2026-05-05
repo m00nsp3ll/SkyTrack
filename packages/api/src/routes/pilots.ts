@@ -534,7 +534,7 @@ router.post('/', authenticate, requireRole('ADMIN'), asyncHandler(async (req: Au
 // PUT /api/pilots/:id - Update pilot (admin only)
 router.put('/:id', authenticate, requireRole('ADMIN'), asyncHandler(async (req: AuthRequest, res: any) => {
   const { id } = req.params;
-  const { name, phone, email, isActive, maxDailyFlights, queuePosition } = req.body;
+  const { name, phone, email, isActive, maxDailyFlights, queuePosition, isFemale } = req.body;
 
   const pilot = await prisma.pilot.update({
     where: { id },
@@ -543,6 +543,7 @@ router.put('/:id', authenticate, requireRole('ADMIN'), asyncHandler(async (req: 
       phone,
       email,
       isActive,
+      isFemale: isFemale ?? undefined,
       maxDailyFlights,
       queuePosition,
     },

@@ -737,6 +737,109 @@ router.get('/:id/qr', authenticate, asyncHandler(async (req: AuthRequest, res: a
   res.send(buffer);
 }));
 
+// POST /api/customers/:id/female-pilot - Kadın pilot ata
+// 1. Mevcut müşteri → sıradaki müsait kadın pilota
+// 2. Son müşteri atanan pilotun müşterisi → boşta kalan pilota
+// 3. O pilot sıra başı olur
+router.post('/:id/female-pilot', authenticate, requireRole('ADMIN', 'OFFICE_STAFF'), asyncHandler(async (req: AuthRequest, res: any) => {
+  const { id } = req.params;
+
+  const customer = await prisma.customer.findUnique({
+    where: { id },
+    include: { flights: { where: { status: { in: ['ASSIGNED', 'PICKED_UP'] } }, orderBy: { createdAt: 'desc' }, take: 1, include: { mediaFolder: true } } },
+  });
+  if (!customer) throw new AppError('Müşteri bulunamadı', 404, 'CUSTOMER_NOT_FOUND');
+  if (!customer.assignedPilotId) throw new AppError('Müşteriye pilot atanmamış', 400, 'NO_PILOT');
+
+  const currentPilotId = customer.assignedPilotId;
+  const currentPilot = await prisma.pilot.findUnique({ where: { id: currentPilotId } });
+
+  // Sıradaki müsait kadın pilot bul
+  const femalePilot = await prisma.pilot.findFirst({
+    where: {
+      isFemale: true, isActive: true, isInExcel: true, status: 'AVAILABLE',
+      dailyFlightCount: { lt: prisma.pilot.fields.maxDailyFlights },
+      id: { not: currentPilotId },
+    },
+    orderBy: [{ roundCount: 'asc' }, { queuePosition: 'asc' }],
+  });
+  if (!femalePilot) throw new AppError('Müsait kadın pilot bulunamadı', 400, 'NO_FEMALE_PILOT');
+
+  // En son müşteri atanan pilotu bul (sıranın en sonunda müşteri alan)
+  const lastAssignedFlight = await prisma.flight.findFirst({
+    where: { status: { in: ['ASSIGNED', 'PICKED_UP'] }, pilotId: { not: currentPilotId } },
+    orderBy: { createdAt: 'desc' },
+    include: { customer: true, pilot: true, mediaFolder: true },
+  });
+
+  const io = req.app.get('io');
+  const { qnap } = await import('../services/qnapService.js');
+  const dateStr = new Date().toISOString().split('T')[0];
+
+  await prisma.$transaction(async (tx) => {
+    // 1. Mevcut müşteri → kadın pilota
+    if (customer.flights[0]) {
+      await tx.flight.update({ where: { id: customer.flights[0].id }, data: { pilotId: femalePilot.id } });
+    }
+    await tx.customer.update({ where: { id }, data: { assignedPilotId: femalePilot.id } });
+    await tx.pilot.update({ where: { id: femalePilot.id }, data: {
+      roundCount: { increment: 1 }, dailyFlightCount: { increment: 1 }, status: 'PICKED_UP',
+    }});
+
+    // 2. Son atanan pilotun müşterisi → boşta kalan pilota (currentPilot)
+    if (lastAssignedFlight && lastAssignedFlight.pilotId !== currentPilotId) {
+      await tx.flight.update({ where: { id: lastAssignedFlight.id }, data: { pilotId: currentPilotId } });
+      await tx.customer.update({ where: { id: lastAssignedFlight.customerId }, data: { assignedPilotId: currentPilotId } });
+
+      // Son atanan pilot boşta → sıra başı (roundCount değişmez, müşterisi gitti)
+      const lastPilot = lastAssignedFlight.pilot;
+      await tx.pilot.update({ where: { id: lastPilot.id }, data: {
+        status: 'AVAILABLE',
+        dailyFlightCount: lastPilot.dailyFlightCount > 0 ? { decrement: 1 } : 0,
+        roundCount: lastPilot.roundCount > 0 ? { decrement: 1 } : 0,
+      }});
+
+      // NAS klasör taşı — son pilotun müşterisi → currentPilot klasörüne
+      if (lastAssignedFlight.mediaFolder?.folderPath) {
+        try {
+          const oldPath = lastAssignedFlight.mediaFolder.folderPath.replace(/^media\//, '');
+          const safeName = currentPilot!.name.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_çÇğĞıİöÖşŞüÜ-]/g, '').trim();
+          const newPath = `${dateStr}/${safeName}/${lastAssignedFlight.customer.displayId}`;
+          await qnap.moveFolder(oldPath, newPath);
+          await tx.mediaFolder.update({ where: { id: lastAssignedFlight.mediaFolder.id }, data: { folderPath: `media/${newPath}`, pilotId: currentPilotId } });
+        } catch {}
+      }
+    }
+
+    // NAS klasör taşı — mevcut müşteri → kadın pilot klasörüne
+    if (customer.flights[0]?.mediaFolder?.folderPath) {
+      try {
+        const oldPath = customer.flights[0].mediaFolder.folderPath.replace(/^media\//, '');
+        const safeName = femalePilot.name.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_çÇğĞıİöÖşŞüÜ-]/g, '').trim();
+        const newPath = `${dateStr}/${safeName}/${customer.displayId}`;
+        await qnap.moveFolder(oldPath, newPath);
+        await tx.mediaFolder.update({ where: { id: customer.flights[0].mediaFolder.id }, data: { folderPath: `media/${newPath}`, pilotId: femalePilot.id } });
+      } catch {}
+    }
+  });
+
+  await cache.pilotQueue.invalidate();
+
+  if (io) {
+    io.to('admin').emit('customer:updated', { customerId: id });
+    io.emit('pilot:queue-updated');
+  }
+
+  res.json({
+    success: true,
+    data: {
+      femalePilot: { id: femalePilot.id, name: femalePilot.name },
+      customerMovedTo: lastAssignedFlight ? { pilotId: currentPilotId, pilotName: currentPilot?.name } : null,
+      message: `Kadın pilot atandı: ${femalePilot.name}`,
+    },
+  });
+}));
+
 // POST /api/customers/:id/reassign-pilot - Reassign pilot
 router.post('/:id/reassign-pilot', authenticate, requireRole('ADMIN', 'OFFICE_STAFF'), asyncHandler(async (req: AuthRequest, res: any) => {
   const { id } = req.params;
