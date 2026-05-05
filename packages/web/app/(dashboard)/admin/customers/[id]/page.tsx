@@ -673,6 +673,38 @@ Bu belgeyi imzalayarak asagidaki hususlari kabul ve beyan ederim:
     }
   }
 
+  const handleFemalePilot = async () => {
+    if (!customer) return
+    if (!confirm('Müşteriyi kadın pilota atamak istediğinize emin misiniz?')) return
+    setReassigning(true)
+    try {
+      const res = await api.post(`/customers/${customer.id}/female-pilot`)
+      const data = res.data.data
+      if (data.femalePilot) {
+        alert(`Kadın pilot atandı: ${data.femalePilot.name}`)
+      } else {
+        alert('Müsait kadın pilot bulunamadı — müşteri boşa düşürüldü')
+      }
+      fetchCustomer()
+    } catch (err: any) {
+      const msg = err.response?.data?.error?.message || 'Kadın pilot atama hatası'
+      if (msg.includes('kadın pilot')) {
+        // Müsait kadın pilot yok — müşteriyi boşa düşür
+        if (confirm('Müsait kadın pilot yok. Müşteriyi boşa düşürüp pilotu serbest bırakmak ister misiniz?')) {
+          try {
+            await api.put(`/customers/${customer.id}`, { status: 'CANCELLED' })
+            alert('Müşteri boşa düşürüldü — kadın pilot müsait olduğunda tekrar atayın')
+            fetchCustomer()
+          } catch { alert('Hata oluştu') }
+        }
+      } else {
+        alert(msg)
+      }
+    } finally {
+      setReassigning(false)
+    }
+  }
+
   const handleReassignPilot = async () => {
     if (!customer) return
     setShowPilotModal(true)
@@ -1168,6 +1200,9 @@ Bu belgeyi imzalayarak asagidaki hususlari kabul ve beyan ederim:
               <Button size="sm" variant="outline" onClick={handleReassignPilot} disabled={reassigning}>
                 <RefreshCw className={`w-4 h-4 mr-1 ${reassigning ? 'animate-spin' : ''}`} />
                 Pilot Değiştir
+              </Button>
+              <Button size="sm" variant="outline" className="border-pink-300 text-pink-600 hover:bg-pink-50" onClick={handleFemalePilot} disabled={reassigning}>
+                Kadın Pilot
               </Button>
               <Button size="sm" variant="destructive" onClick={handleCancel}>
                 <X className="w-4 h-4 mr-1" />
