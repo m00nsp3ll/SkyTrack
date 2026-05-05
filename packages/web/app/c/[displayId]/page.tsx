@@ -500,7 +500,7 @@ export default function CustomerDownloadPage() {
         const res = await fetch(`${apiUrl}/media/${displayId}/prepare-zip`)
         const json = await res.json()
         if (json.success && json.data?.zipRelPath) {
-          window.open(`http://192.168.1.105:9090/${json.data.zipRelPath}`, '_blank')
+          window.open(`http://192.168.1.105/skytrack-media/${json.data.zipRelPath}`, '_blank')
           return
         }
       } catch {}
