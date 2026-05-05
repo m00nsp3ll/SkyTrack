@@ -366,6 +366,15 @@ router.post('/', authenticate, requireRole('ADMIN', 'OFFICE_STAFF', 'KIOSK'), as
       customer: { displayId, firstName: customer.firstName, lastName: customer.lastName, weight: customer.weight },
       pilot: suggestedPilot ? { name: suggestedPilot.name } : null,
     });
+    // Admin'e FCM bildirimi
+    import('../services/firebaseNotification.js').then(({ sendNativeToRole }) => {
+      sendNativeToRole('ADMIN', {
+        title: 'Yeni Müşteri Kaydı',
+        body: `${customer.firstName} ${customer.lastName} (${displayId})${suggestedPilot ? ' → ' + suggestedPilot.name : ''}`,
+        data: { type: 'customer_created', customerId: customer.id, displayId },
+      }).catch(() => {});
+    });
+
     // Print servise etiket bas — kayıt anında, onay beklemeden
     io.to('admin').emit('print:label', {
       customerId: customer.id,
