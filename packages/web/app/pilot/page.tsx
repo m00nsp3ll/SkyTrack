@@ -802,44 +802,59 @@ export default function PilotPanel() {
                                 </>
                               )}
                             </Button>
-                            <div className="grid grid-cols-2 gap-2">
-                              <Button
-                                size="lg"
-                                variant="outline"
-                                className="h-12 text-sm border-purple-300 text-purple-700 hover:bg-purple-50"
-                                onClick={() => openSwapModal(flight.id, `${customer.firstName} ${customer.lastName}`)}
-                              >
-                                🔄 Pilot Değiştir
-                              </Button>
-                              <Button
-                                size="lg"
-                                variant="outline"
-                                className="h-12 text-sm border-red-300 text-red-700 hover:bg-red-50"
-                                onClick={() => setCancelModal({ flightId: flight.id, customerName: `${customer.firstName} ${customer.lastName}` })}
-                              >
-                                <X className="h-4 w-4 mr-1" />
-                                Uçuş İptal
-                              </Button>
-                            </div>
+                            <Button
+                              size="lg"
+                              variant="outline"
+                              className="w-full h-12 text-sm border-purple-300 text-purple-700 hover:bg-purple-50"
+                              onClick={() => openSwapModal(flight.id, `${customer.firstName} ${customer.lastName}`)}
+                            >
+                              🔄 Pilot Değiştir
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="w-full h-8 text-xs text-red-400 hover:text-red-600 hover:bg-red-50"
+                              onClick={() => setCancelModal({ flightId: flight.id, customerName: `${customer.firstName} ${customer.lastName}` })}
+                            >
+                              <X className="h-3 w-3 mr-1" />
+                              Uçuş İptal
+                            </Button>
                           </>
                         )}
 
                         {flight.status === 'IN_FLIGHT' && (
-                          <Button
-                            size="lg"
-                            className="w-full h-14 text-lg bg-green-500 hover:bg-green-600"
-                            onClick={() => handleFlightAction(flight.id, 'COMPLETED')}
-                            disabled={updating === flight.id}
-                          >
-                            {updating === flight.id ? (
-                              <RefreshCw className="h-5 w-5 animate-spin" />
-                            ) : (
-                              <>
-                                <CheckCircle className="h-5 w-5 mr-2" />
-                                Güvenli İniş
-                              </>
-                            )}
-                          </Button>
+                          <div className="space-y-2">
+                            <div className="flex gap-2">
+                              <Button
+                                size="lg"
+                                className="flex-1 h-14 text-lg bg-green-500 hover:bg-green-600"
+                                onClick={() => handleFlightAction(flight.id, 'COMPLETED')}
+                                disabled={updating === flight.id}
+                              >
+                                {updating === flight.id ? (
+                                  <RefreshCw className="h-5 w-5 animate-spin" />
+                                ) : (
+                                  <>
+                                    <CheckCircle className="h-5 w-5 mr-2" />
+                                    Güvenli İniş
+                                  </>
+                                )}
+                              </Button>
+                              <Button
+                                size="lg"
+                                variant="outline"
+                                className="h-14 px-3 border-orange-300 text-orange-600 hover:bg-orange-50"
+                                onClick={() => {
+                                  if (confirm('Uçuşu geri almak istediğinize emin misiniz? Müşteri Alındı durumuna döner.')) {
+                                    handleFlightAction(flight.id, 'PICKED_UP')
+                                  }
+                                }}
+                                disabled={updating === flight.id}
+                              >
+                                ↩
+                              </Button>
+                            </div>
+                          </div>
                         )}
                       </div>
                     )}
@@ -944,7 +959,7 @@ export default function PilotPanel() {
               <div className="mb-6">
                 <h3 className="text-sm font-medium text-muted-foreground mb-3">Durumunuz</h3>
                 <div className="space-y-2">
-                  {(['AVAILABLE', 'ON_BREAK', 'OFF_DUTY'] as const).map((status) => {
+                  {(['AVAILABLE', 'OFF_DUTY'] as const).map((status) => {
                     const cfg = statusConfig[status]
                     const Icon = cfg.icon
                     const isActive = pilot?.status === status
