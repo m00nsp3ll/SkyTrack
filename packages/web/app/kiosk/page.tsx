@@ -8,8 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { api } from '@/lib/api'
-import { AirPrint } from '@/lib/airprint'
-import { Check, X, PenLine, Eraser, Printer, UserPlus } from 'lucide-react'
+import { Check, X, PenLine, Eraser, UserPlus } from 'lucide-react'
 import { type Language, LANGUAGES, t, isRtl } from '@/lib/translations'
 
 const KIOSK_EXIT_PIN = process.env.NEXT_PUBLIC_KIOSK_EXIT_PIN || '1903'
@@ -356,93 +355,7 @@ export default function KioskPage() {
     }
   }
 
-  const buildPrintHtml = (res: RegistrationResult) => {
-    const now = new Date()
-    const dateStr = now.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' })
-    const timeStr = now.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-    return '<!DOCTYPE html><html><head><style>@page{size:58mm 58mm;margin:0}*{margin:0;padding:0;box-sizing:border-box}html,body{width:58mm;height:58mm;overflow:hidden}body{display:flex;align-items:center;justify-content:center;font-family:Arial,sans-serif}</style></head><body><div style="width:54mm;display:flex;flex-direction:column;align-items:center;text-align:center;gap:1mm"><div style="font-size:11pt;font-weight:bold">' + dateStr + ' - ' + timeStr + '</div><img src="' + res.qrCode + '" style="width:32mm;height:32mm;display:block;image-rendering:pixelated"><div style="font-size:10pt;font-weight:bold">' + res.customer.displayId + ' - ' + res.customer.firstName + ' ' + res.customer.lastName + '</div>' + (res.pilot?.name ? '<div style="font-size:10pt;font-weight:bold">Pilot: ' + res.pilot.name + '</div>' : '') + '</div></body></html>'
-  }
-
-  // Native AirPrint
-  const nativeAirPrint = async (res: RegistrationResult) => {
-    try {
-      const html = buildPrintHtml(res)
-      if (typeof window._nativeAirPrint !== 'function') {
-        await new Promise(resolve => setTimeout(resolve, 3000))
-      }
-      await AirPrint.print({
-        html,
-        jobName: `SkyTrack-${res.customer.displayId}`,
-      })
-    } catch (err) {
-      console.error('[Kiosk] AirPrint hatası:', err)
-    }
-  }
-
-  // Browser fallback — iframe ile print
-  const browserPrint = (res: RegistrationResult) => {
-    const html = buildPrintHtml(res)
-
-    const existing = document.getElementById('print-frame')
-    if (existing) existing.remove()
-
-    const iframe = document.createElement('iframe')
-    iframe.id = 'print-frame'
-    iframe.setAttribute('aria-hidden', 'true')
-    iframe.style.position = 'fixed'
-    iframe.style.right = '0'
-    iframe.style.bottom = '0'
-    iframe.style.width = '0'
-    iframe.style.height = '0'
-    iframe.style.border = '0'
-    iframe.style.visibility = 'hidden'
-    document.body.appendChild(iframe)
-
-    const doc = iframe.contentDocument || iframe.contentWindow?.document
-    if (!doc) return
-    doc.open()
-    doc.write(html)
-    doc.close()
-
-    const triggerPrint = () => {
-      try {
-        iframe.contentWindow?.focus()
-        iframe.contentWindow?.print()
-      } catch (err) {
-        console.error('[Kiosk] Browser print hatası:', err)
-      }
-      setTimeout(() => {
-        try { iframe.remove() } catch {}
-      }, 3000)
-    }
-
-    const img = doc.querySelector('img')
-    if (img && !img.complete) {
-      img.addEventListener('load', () => setTimeout(triggerPrint, 150))
-      img.addEventListener('error', () => setTimeout(triggerPrint, 150))
-    } else {
-      setTimeout(triggerPrint, 300)
-    }
-  }
-
-  const printBothCopies = (res: RegistrationResult) => {
-    if (typeof window._nativeAirPrint === 'function') {
-      void nativeAirPrint(res)
-    } else if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios') {
-      setTimeout(() => void nativeAirPrint(res), 3000)
-    } else {
-      browserPrint(res)
-    }
-  }
-
-  const handlePrint = () => {
-    if (!result) return
-    printBothCopies(result)
-  }
-
-  const autoPrint = (res: RegistrationResult) => {
-    printBothCopies(res)
-  }
+  // Print service Mac'ten otomatik yazdırıyor — kiosk'tan yazdırma tamamen kaldırıldı
 
   const getWaiverText = () => {
     return `${tr.waiverFullTitle}\n\n${tr.waiverIntro}\n\n${tr.waiverAccept}\n\n1. ${tr.waiverItem1}\n2. ${tr.waiverItem2}\n3. ${tr.waiverItem3}\n4. ${tr.waiverItem4}\n5. ${tr.waiverItem5}\n6. ${tr.waiverItem6}\n7. ${tr.waiverItem7}\n8. ${tr.waiverItem8}`
@@ -521,39 +434,6 @@ export default function KioskPage() {
           ))}
         </div>
 
-        {/* AirPrint Test Butonu */}
-        <button
-          onClick={async () => {
-            try {
-              const ds = new Date().toLocaleDateString('tr-TR')
-              const ts = new Date().toLocaleTimeString('tr-TR')
-              const testHtml = '<html><body style="margin:0;padding:0;font-family:Arial;text-align:center;font-size:10px"><p style="margin:0"><b>' + ds + ' - ' + ts + '</b></p><table border="1" cellpadding="0" cellspacing="0" style="width:80px;height:80px;margin:4px auto;border-collapse:collapse"><tr><td style="background:#000"></td></tr></table><p style="margin:2px 0 0;font-size:12px"><b>TEST - SkyTrack</b></p><p style="margin:1px 0 0;font-size:11px"><b>Pilot: Test</b></p></body></html>'
-              if (typeof window._nativeAirPrint === 'function' || (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios')) {
-                await AirPrint.print({ html: testHtml, jobName: 'SkyTrack-Test' })
-              } else {
-                const existing = document.getElementById('print-frame')
-                if (existing) existing.remove()
-                const iframe = document.createElement('iframe')
-                iframe.id = 'print-frame'
-                iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden'
-                document.body.appendChild(iframe)
-                const doc = iframe.contentDocument || iframe.contentWindow?.document
-                if (doc) { doc.open(); doc.write(testHtml); doc.close() }
-                setTimeout(() => {
-                  try { iframe.contentWindow?.focus(); iframe.contentWindow?.print() } catch {}
-                  setTimeout(() => { try { iframe.remove() } catch {} }, 3000)
-                }, 300)
-              }
-            } catch (err) {
-              const isNative = Capacitor.isNativePlatform()
-              const hasBridge = typeof window._nativeAirPrint === 'function'
-              alert('Hata: ' + (err instanceof Error ? err.message : String(err)) + '\nNative: ' + isNative + '\nBridge: ' + hasBridge)
-            }
-          }}
-          className="mt-4 px-6 py-3 bg-orange-100 border-2 border-orange-300 rounded-xl text-orange-700 font-bold text-sm"
-        >
-          Test Yazdir
-        </button>
       </div>
     )
   }
