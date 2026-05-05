@@ -25,15 +25,13 @@ function safePilotName(name: string): string {
     .trim();
 }
 
-// Helper: Create media folder for completed flight — format: YYYY-MM-DD/PILOT_ADI/N_sorti/DISPLAYID
+// Helper: Create media folder for completed flight — format: YYYY-MM-DD/PILOT_ADI/DISPLAYID
 async function createMediaFolder(flight: any, customer: any, pilot: any): Promise<string | null> {
   try {
     const { qnap } = await import('../services/qnapService.js');
-    const dateStr = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+    const dateStr = new Date().toISOString().split('T')[0];
     const safeName = safePilotName(pilot.name);
-    // Pilorun o günkü uçuş sayısı = sorti numarası
-    const sortiNo = Math.max(1, (pilot.dailyFlightCount ?? 0) + 1);
-    const relPath = `${dateStr}/${safeName}/${sortiNo}_sorti/${customer.displayId}`;
+    const relPath = `${dateStr}/${safeName}/${customer.displayId}`;
 
     await qnap.createFolder(relPath);
 
@@ -745,9 +743,7 @@ router.post('/:id/reassign', authenticate, requireRole('ADMIN'), asyncHandler(as
       if (dateMatch) {
         const dateStr = dateMatch[1];
         const safeName = safePilotName(newPilot.name);
-        // Yeni pilotun güncel sorti numarası: tamamlanan uçuş sayısı + 1 (en az 1)
-        const sortiNo = Math.max(1, (newPilot.dailyFlightCount ?? 0) + 1);
-        const newRelPath = `${dateStr}/${safeName}/${sortiNo}_sorti/${updatedFlight.customer.displayId}`;
+        const newRelPath = `${dateStr}/${safeName}/${updatedFlight.customer.displayId}`;
         const { qnap } = await import('../services/qnapService.js');
         // Eski klasörü yeni konuma taşı (içinde dosya varsa koru)
         const moved = await qnap.moveFolder(oldPath, newRelPath);

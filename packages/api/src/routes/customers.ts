@@ -520,8 +520,7 @@ router.post('/:id/confirm-pilot', authenticate, asyncHandler(async (req: AuthReq
     const today = new Date().toISOString().split('T')[0];
     const pilot = assignment.pilot;
     const safeName = pilot.name.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_çÇğĞıİöÖşŞüÜ-]/g, '').trim();
-    const sortiNo = Math.max(1, (pilot.dailyFlightCount ?? 0) + 1);
-    const relPath = `${today}/${safeName}/${sortiNo}_sorti/${customer.displayId}`;
+    const relPath = `${today}/${safeName}/${customer.displayId}`;
     await qnap.createFolder(relPath);
     await prisma.customer.update({
       where: { id: customer.id },

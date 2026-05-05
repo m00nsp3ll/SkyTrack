@@ -154,13 +154,11 @@ export const pilotQueueService = {
         createdAt: { gte: todayStart },
       },
     });
-    const sortiNumber = pilotFlightsToday + 1;
     const safePilotName = sanitizePilotName(pilot.name);
     const mediaFolderPath = path.join(
       MEDIA_STORAGE_PATH,
       today,
       safePilotName,
-      `${sortiNumber}_sorti`,
       customerDisplayId
     );
 

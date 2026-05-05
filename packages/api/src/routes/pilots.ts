@@ -689,6 +689,25 @@ router.post('/:id/forfeit', authenticate, requireRole('ADMIN'), asyncHandler(asy
           where: { id: nextPilot.id },
           data: { roundCount: { increment: 1 }, dailyFlightCount: { increment: 1 }, status: 'ASSIGNED' },
         });
+
+        // NAS klasörü taşı — eski pilot → yeni pilot
+        try {
+          const mediaFolder = await tx.flight.findUnique({ where: { id: activeFlight.id }, select: { mediaFolder: true } }).then(f => f?.mediaFolder);
+          if (mediaFolder?.folderPath) {
+            const { qnap } = await import('../services/qnapService.js');
+            const oldPath = mediaFolder.folderPath.replace(/^media\//, '');
+            const dateStr = new Date().toISOString().split('T')[0];
+            const safeName = nextPilot.name.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_çÇğĞıİöÖşŞüÜ-]/g, '').trim();
+            const newRelPath = `${dateStr}/${safeName}/${activeFlight.customer.displayId}`;
+            const moved = await qnap.moveFolder(oldPath, newRelPath);
+            if (moved) {
+              await tx.mediaFolder.update({ where: { id: mediaFolder.id }, data: { folderPath: `media/${newRelPath}`, pilotId: nextPilot.id } });
+            } else {
+              await qnap.createFolder(newRelPath);
+              await tx.mediaFolder.update({ where: { id: mediaFolder.id }, data: { folderPath: `media/${newRelPath}`, pilotId: nextPilot.id } });
+            }
+          }
+        } catch (err: any) { console.error('[Forfeit] NAS klasör taşıma hatası:', err?.message); }
       } else {
         // Sonraki pilot yok → uçuşu iptal et
         await tx.flight.update({ where: { id: activeFlight.id }, data: { status: 'CANCELLED', notes: 'Pilot feragat — müsait pilot yok' } });

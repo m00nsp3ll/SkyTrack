@@ -127,13 +127,9 @@ export async function approveSwap(swapRequestId: string, approvingPilotId: strin
   const reqPilotSafe = sanitizePilotName(reqFlight.pilot.name);
   const tgtPilotSafe = sanitizePilotName(tgtFlight.pilot.name);
 
-  // Sorti numaralarını hedef pilotların günlük uçuş sayısına göre hesapla
-  const reqSortiNo = reqFlight.pilot.dailyFlightCount + 1;
-  const tgtSortiNo = tgtFlight.pilot.dailyFlightCount + 1;
-
   // Yeni path'ler: requester'ın flight'ı artık target'a gidecek ve vice versa
-  const newReqFlightPath = `${today}/${tgtPilotSafe}/${tgtSortiNo}_sorti/${reqFlight.customer.displayId}`;
-  const newTgtFlightPath = `${today}/${reqPilotSafe}/${reqSortiNo}_sorti/${tgtFlight.customer.displayId}`;
+  const newReqFlightPath = `${today}/${tgtPilotSafe}/${reqFlight.customer.displayId}`;
+  const newTgtFlightPath = `${today}/${reqPilotSafe}/${tgtFlight.customer.displayId}`;
 
   // DB transaction
   const result = await prisma.$transaction(async (tx) => {
