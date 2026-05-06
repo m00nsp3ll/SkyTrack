@@ -125,18 +125,19 @@ export default function LiveFlightsPage() {
 
   const fetchData = async () => {
     try {
-      const [liveRes, histRes] = await Promise.all([
-        flightsApi.getLive(),
-        api.get('/flights/queue-history'),
-      ])
+      const liveRes = await flightsApi.getLive()
       setData(liveRes.data.data)
-      setQueueHistory(histRes.data.data?.history || [])
       setLastUpdate(new Date())
     } catch (error) {
       console.error('Failed to fetch live data:', error)
     } finally {
       setLoading(false)
     }
+    // Sıra geçmişi ayrı — hata verse de ana veriyi etkilemesin
+    try {
+      const histRes = await api.get('/flights/queue-history')
+      setQueueHistory(histRes.data.data?.history || [])
+    } catch {}
   }
 
   useEffect(() => {
