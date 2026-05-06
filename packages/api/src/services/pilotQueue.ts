@@ -211,30 +211,30 @@ export const pilotQueueService = {
         },
       });
 
-      // ATLANAN PİLOT FERAGATİ: Aynı turda sırası gelmiş ama mesai dışı olan pilotlar feragat yer.
-      // Sadece AYNI roundCount + önde olan queuePosition → çift feragat lastForfeitRound ile engellenir.
+      // ATLANAN PİLOT FERAGATİ: Sırası geçmiş ama mesai dışı/mola olan pilotlar feragat yer.
+      // roundCount <= oldRound → geride kalan pilotları da yakalar (birden fazla round geride olabilir).
       const oldRound = pilot.roundCount; // atama öncesi round
       const skipped = await tx.pilot.findMany({
         where: {
           isActive: true,
           isInExcel: true,
           id: { not: pilot.id },
-          roundCount: oldRound,
-          queuePosition: { lt: pilot.queuePosition },
-          lastForfeitRound: { not: oldRound },
+          roundCount: { lte: oldRound },
           OR: [
             { inQueue: false },
             { status: { in: ['OFF_DUTY', 'ON_BREAK'] } },
           ],
         },
-        select: { id: true },
+        select: { id: true, roundCount: true },
       });
       for (const sp of skipped) {
+        // Geride kalan pilotun roundCount'unu atanan pilotla aynı seviyeye çek
+        const diff = (oldRound + 1) - sp.roundCount;
         await tx.pilot.update({
           where: { id: sp.id },
           data: {
-            roundCount: { increment: 1 },
-            forfeitCount: { increment: 1 },
+            roundCount: oldRound + 1,
+            forfeitCount: { increment: diff },
             lastForfeitRound: oldRound,
           },
         });
