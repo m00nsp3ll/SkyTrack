@@ -823,35 +823,69 @@ router.post('/:id/reassign', authenticate, requireRole('ADMIN'), asyncHandler(as
   });
 }));
 
-// GET /api/flights/queue-history - Bugünkü sıra geçmişi (uçuş + feragat)
+// GET /api/flights/queue-history - Bugünkü sıra geçmişi (uçuş + feragat karışık)
 router.get('/queue-history', authenticate, asyncHandler(async (req: AuthRequest, res: any) => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const tomorrow = new Date(today);
   tomorrow.setDate(tomorrow.getDate() + 1);
 
-  // Bugünkü tüm uçuşlar (completed + aktif + iptal/feragat)
+  // Bugünkü uçuşlar (iptal hariç, feragat hariç)
   const flights = await prisma.flight.findMany({
-    where: { createdAt: { gte: today, lt: tomorrow } },
+    where: { createdAt: { gte: today, lt: tomorrow }, status: { in: ['COMPLETED', 'ASSIGNED', 'PICKED_UP', 'IN_FLIGHT'] } },
     include: {
-      pilot: { select: { id: true, name: true, queuePosition: true } },
+      pilot: { select: { name: true, queuePosition: true } },
       customer: { select: { displayId: true, firstName: true, lastName: true } },
     },
     orderBy: { createdAt: 'asc' },
   });
 
-  const history = flights.map(f => ({
-    id: f.id,
-    type: f.cancellationReason === 'FORFEIT' ? 'FERAGAT' : f.status === 'CANCELLED' ? 'İPTAL' : 'UÇUŞ',
-    pilotName: f.pilot.name,
-    pilotQueuePosition: f.pilot.queuePosition,
-    customerDisplayId: f.customer.displayId,
-    customerName: `${f.customer.firstName} ${f.customer.lastName}`,
-    status: f.status,
-    cancellationReason: f.cancellationReason,
-    notes: f.notes,
-    time: f.createdAt,
-  }));
+  // Bugünkü feragatlar — CANCELLED + FORFEIT reason veya 'Admin feragat' notu
+  const forfeits = await prisma.flight.findMany({
+    where: { createdAt: { gte: today, lt: tomorrow }, status: 'CANCELLED', OR: [{ cancellationReason: 'FORFEIT' }, { notes: { contains: 'feragat' } }, { notes: { contains: 'Feragat' } }] },
+    include: {
+      pilot: { select: { name: true, queuePosition: true } },
+      customer: { select: { displayId: true, firstName: true, lastName: true } },
+    },
+    orderBy: { createdAt: 'asc' },
+  });
+
+  // Mesai dışı feragatlar — bugün roundCount artmış ama uçuş yapmamış pilotlar
+  // Bu bilgiyi DailyPilotStat veya doğrudan pilot tablosundan alabiliriz
+  // Şimdilik sadece flight kayıtlarından feragat gösterelim
+
+  const history: any[] = [];
+
+  flights.forEach(f => {
+    history.push({
+      id: f.id,
+      type: 'UÇUŞ',
+      pilotName: f.pilot.name,
+      pilotQueuePosition: f.pilot.queuePosition,
+      customerDisplayId: f.customer.displayId,
+      customerName: `${f.customer.firstName} ${f.customer.lastName}`,
+      status: f.status,
+      time: f.createdAt,
+      notes: null,
+    });
+  });
+
+  forfeits.forEach(f => {
+    history.push({
+      id: f.id + '-fer',
+      type: 'FERAGAT',
+      pilotName: f.pilot.name,
+      pilotQueuePosition: f.pilot.queuePosition,
+      customerDisplayId: f.customer.displayId,
+      customerName: `${f.customer.firstName} ${f.customer.lastName}`,
+      status: 'CANCELLED',
+      time: f.createdAt,
+      notes: f.notes || 'Admin feragat',
+    });
+  });
+
+  // Zamana göre sırala
+  history.sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime());
 
   res.json({ success: true, data: { history, total: history.length } });
 }));

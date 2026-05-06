@@ -572,13 +572,13 @@ export default function LiveFlightsPage() {
         </Card>
       )}
 
-      {/* Sıra Geçmişi — uçuşlar + feragatler sıralı */}
+      {/* Uçuş + Feragat Geçmişi */}
       {queueHistory.length > 0 && (
         <Card>
-          <CardHeader className="bg-gray-50 border-b">
-            <CardTitle className="flex items-center gap-2 text-gray-700">
+          <CardHeader className="bg-blue-50 border-b border-blue-200">
+            <CardTitle className="flex items-center gap-2 text-blue-700">
               <List className="h-5 w-5" />
-              Sıra Geçmişi ({queueHistory.length})
+              Uçuş + Feragat ({queueHistory.length})
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
