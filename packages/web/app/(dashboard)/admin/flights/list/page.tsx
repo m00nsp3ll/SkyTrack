@@ -207,15 +207,13 @@ export default function FlightsListPage() {
           <p className="text-muted-foreground">Tüm uçuşları görüntüle ve filtrele</p>
         </div>
         <div className="flex gap-2">
-          {queueHistory.length > 0 && (
-            <Button
-              variant={showQueueHistory ? 'default' : 'outline'}
-              onClick={() => setShowQueueHistory(!showQueueHistory)}
-            >
-              <Clock className="h-4 w-4 mr-2" />
-              Uçuş + Feragat ({queueHistory.length})
-            </Button>
-          )}
+          <Button
+            variant={showQueueHistory ? 'default' : 'outline'}
+            onClick={() => setShowQueueHistory(!showQueueHistory)}
+          >
+            <Clock className="h-4 w-4 mr-2" />
+            Uçuş + Feragat {queueHistory.length > 0 ? `(${queueHistory.length})` : ''}
+          </Button>
           <Link href="/admin/flights">
             <Button variant="outline">
               <Plane className="h-4 w-4 mr-2" />
@@ -226,7 +224,7 @@ export default function FlightsListPage() {
       </div>
 
       {/* Uçuş + Feragat Geçmişi */}
-      {showQueueHistory && queueHistory.length > 0 && (
+      {showQueueHistory && (
         <Card>
           <CardHeader className="bg-blue-50 border-b border-blue-200">
             <CardTitle className="flex items-center gap-2 text-blue-700 text-base">
@@ -235,6 +233,9 @@ export default function FlightsListPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
+            {queueHistory.length === 0 ? (
+              <div className="p-8 text-center text-muted-foreground">Bugün henüz uçuş veya feragat yok</div>
+            ) : (
             <div className="divide-y max-h-96 overflow-y-auto">
               {queueHistory.map((item: any, i: number) => (
                 <div key={item.id} className={`flex items-center gap-3 px-4 py-2 text-sm ${item.type === 'FERAGAT' ? 'bg-red-50' : item.type === 'İPTAL' ? 'bg-gray-50' : ''}`}>
@@ -256,6 +257,7 @@ export default function FlightsListPage() {
                 </div>
               ))}
             </div>
+            )}
           </CardContent>
         </Card>
       )}
