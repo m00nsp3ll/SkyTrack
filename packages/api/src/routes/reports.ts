@@ -31,7 +31,7 @@ router.get('/dashboard', authenticate, asyncHandler(async (req: AuthRequest, res
     // Flights today
     prisma.flight.findMany({
       where: { createdAt: { gte: today, lt: tomorrow } },
-      select: { status: true, durationMinutes: true },
+      select: { status: true, durationMinutes: true, cancellationReason: true },
     }),
     // Active flights (in air)
     prisma.flight.count({
@@ -84,7 +84,7 @@ router.get('/dashboard', authenticate, asyncHandler(async (req: AuthRequest, res
     data: {
       cards: {
         totalCustomers: customersToday,
-        totalFlights: flightsToday.length,
+        totalFlights: flightsToday.filter(f => f.cancellationReason !== 'FORFEIT').length,
         completedFlights: completedFlights.length,
         activeFlights,
         waitingCustomers: waitingFlights,
