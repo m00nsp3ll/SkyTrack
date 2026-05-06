@@ -31,7 +31,8 @@ export const pilotQueueService = {
       const availablePilot = cached.find(
         (p: QueuedPilot) =>
           p.status === 'AVAILABLE' &&
-          p.dailyFlightCount < p.maxDailyFlights
+          p.dailyFlightCount < p.maxDailyFlights &&
+          (p as any).isInExcel === true
       );
 
       if (availablePilot) {
@@ -51,6 +52,7 @@ export const pilotQueueService = {
       where: {
         isActive: true,
         inQueue: true,
+        isInExcel: true,
         status: 'AVAILABLE',
         dailyFlightCount: { lt: prisma.pilot.fields.maxDailyFlights },
         OR: [
