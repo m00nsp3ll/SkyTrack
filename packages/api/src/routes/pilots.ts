@@ -634,21 +634,64 @@ router.post('/me/forfeit', authenticate, asyncHandler(async (req: AuthRequest, r
   }
   const pilotId = req.user.pilotId;
 
-  // Aktif uçuş kontrolü
+  // Aktif uçuş varsa: müşteriyi sonraki pilota taşı (admin feragat mantığı)
   const activeFlight = await prisma.flight.findFirst({
-    where: { pilotId, status: { in: ['ASSIGNED', 'PICKED_UP', 'IN_FLIGHT'] } },
+    where: { pilotId, status: { in: ['ASSIGNED', 'PICKED_UP'] } },
+    include: { customer: true },
   });
-  if (activeFlight) {
-    throw new AppError('Aktif uçuşu olan pilot feragat edemez', 400, 'PILOT_HAS_ACTIVE_FLIGHT');
-  }
 
-  const { forfeitPilot } = await import('../services/roundCounter.js');
-  await forfeitPilot(pilotId);
+  const io = req.app.get('io');
+
+  if (activeFlight) {
+    const nextPilot = await pilotQueueService.getNextPilot();
+
+    await prisma.$transaction(async (tx) => {
+      // Pilot: forfeitCount +1, status AVAILABLE (roundCount zaten atamada artmıştı)
+      await tx.pilot.update({
+        where: { id: pilotId },
+        data: { forfeitCount: { increment: 1 }, status: 'AVAILABLE' },
+      });
+
+      if (nextPilot) {
+        await tx.flight.update({ where: { id: activeFlight.id }, data: { pilotId: nextPilot.id } });
+        await tx.customer.update({ where: { id: activeFlight.customerId }, data: { assignedPilotId: nextPilot.id } });
+        await tx.pilot.update({
+          where: { id: nextPilot.id },
+          data: { roundCount: { increment: 1 }, dailyFlightCount: { increment: 1 }, status: 'ASSIGNED' },
+        });
+
+        // NAS klasörü taşı
+        try {
+          const mediaFolder = await tx.flight.findUnique({ where: { id: activeFlight.id }, select: { mediaFolder: true } }).then(f => f?.mediaFolder);
+          if (mediaFolder?.folderPath) {
+            const { qnap } = await import('../services/qnapService.js');
+            const oldPath = mediaFolder.folderPath.replace(/^media\//, '');
+            const dateStr = new Date().toISOString().split('T')[0];
+            const safeName = nextPilot.name.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_çÇğĞıİöÖşŞüÜ-]/g, '').trim();
+            const newRelPath = `${dateStr}/${safeName}/${activeFlight.customer.displayId}`;
+            const moved = await qnap.moveFolder(oldPath, newRelPath);
+            if (moved) {
+              await tx.mediaFolder.update({ where: { id: mediaFolder.id }, data: { folderPath: `media/${newRelPath}`, pilotId: nextPilot.id } });
+            } else {
+              await qnap.createFolder(newRelPath);
+              await tx.mediaFolder.update({ where: { id: mediaFolder.id }, data: { folderPath: `media/${newRelPath}`, pilotId: nextPilot.id } });
+            }
+          }
+        } catch (err: any) { console.error('[Self-Forfeit] NAS klasör taşıma hatası:', err?.message); }
+      } else {
+        await tx.flight.update({ where: { id: activeFlight.id }, data: { status: 'CANCELLED', cancellationReason: 'FORFEIT', notes: 'Pilot feragat — müsait pilot yok' } });
+        await tx.customer.update({ where: { id: activeFlight.customerId }, data: { assignedPilotId: null } });
+      }
+    });
+  } else {
+    // Aktif uçuş yok — normal feragat
+    const { forfeitPilot } = await import('../services/roundCounter.js');
+    await forfeitPilot(pilotId);
+  }
 
   await cache.pilotQueue.invalidate();
   await cache.pilot.invalidate(pilotId);
 
-  const io = req.app.get('io');
   if (io) io.emit('pilot:queue-updated');
 
   res.json({ success: true, message: 'Feragat ettiniz' });
