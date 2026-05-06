@@ -241,6 +241,16 @@ export const pilotQueueService = {
             lastForfeitRound: oldRound,
           },
         });
+        // Feragat kaydı oluştur — queue-history'de görünsün
+        await tx.flight.create({
+          data: {
+            customerId,
+            pilotId: sp.id,
+            status: 'CANCELLED',
+            cancellationReason: 'FORFEIT',
+            notes: 'Mesai dışı - otomatik feragat',
+          },
+        });
       }
 
       return flight;
