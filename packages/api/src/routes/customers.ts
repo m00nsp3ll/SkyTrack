@@ -739,8 +739,7 @@ router.get('/:id/qr', authenticate, asyncHandler(async (req: AuthRequest, res: a
 
 // POST /api/customers/:id/female-pilot - Kadın pilot ata
 // 1. Mevcut müşteri → sıradaki müsait kadın pilota
-// 2. Eski pilot serbest, son atanan pilotun müşterisini alır
-// 3. Son atanan pilot sıra başı olur
+// 2. Eski pilot tamamen serbest (AVAILABLE, roundCount/dailyFlightCount geri alınır)
 router.post('/:id/female-pilot', authenticate, requireRole('ADMIN', 'OFFICE_STAFF'), asyncHandler(async (req: AuthRequest, res: any) => {
   const { id } = req.params;
 
@@ -765,13 +764,6 @@ router.post('/:id/female-pilot', authenticate, requireRole('ADMIN', 'OFFICE_STAF
   });
   if (!femalePilot) throw new AppError('Müsait kadın pilot bulunamadı', 400, 'NO_FEMALE_PILOT');
 
-  // En son müşteri atanan pilotu bul (currentPilot ve femalePilot hariç)
-  const lastAssignedFlight = await prisma.flight.findFirst({
-    where: { status: { in: ['ASSIGNED', 'PICKED_UP'] }, pilotId: { notIn: [currentPilotId, femalePilot.id] } },
-    orderBy: { createdAt: 'desc' },
-    include: { customer: true, pilot: true, mediaFolder: true },
-  });
-
   const io = req.app.get('io');
   const { qnap } = await import('../services/qnapService.js');
   const dateStr = new Date().toISOString().split('T')[0];
@@ -786,38 +778,12 @@ router.post('/:id/female-pilot', authenticate, requireRole('ADMIN', 'OFFICE_STAF
       roundCount: { increment: 1 }, dailyFlightCount: { increment: 1 }, status: 'PICKED_UP',
     }});
 
-    // 2. Eski pilotu (currentPilot) serbest bırak — roundCount değişmez (zaten artmıştı)
-    if (lastAssignedFlight && lastAssignedFlight.pilotId !== currentPilotId) {
-      // Son atanan pilotun müşterisini eski pilota ver
-      await tx.flight.update({ where: { id: lastAssignedFlight.id }, data: { pilotId: currentPilotId } });
-      await tx.customer.update({ where: { id: lastAssignedFlight.customerId }, data: { assignedPilotId: currentPilotId } });
-
-      // Son atanan pilot boşta → sıra başı
-      const lastPilot = lastAssignedFlight.pilot;
-      await tx.pilot.update({ where: { id: lastPilot.id }, data: {
-        status: 'AVAILABLE',
-        dailyFlightCount: lastPilot.dailyFlightCount > 0 ? { decrement: 1 } : 0,
-        roundCount: lastPilot.roundCount > 0 ? { decrement: 1 } : 0,
-      }});
-
-      // NAS klasör taşı — son pilotun müşterisi → eski pilot klasörüne
-      if (lastAssignedFlight.mediaFolder?.folderPath) {
-        try {
-          const oldPath = lastAssignedFlight.mediaFolder.folderPath.replace(/^media\//, '');
-          const safeName = currentPilot!.name.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_çÇğĞıİöÖşŞüÜ-]/g, '').trim();
-          const newPath = `${dateStr}/${safeName}/${lastAssignedFlight.customer.displayId}`;
-          await qnap.moveFolder(oldPath, newPath);
-          await tx.mediaFolder.update({ where: { id: lastAssignedFlight.mediaFolder.id }, data: { folderPath: `media/${newPath}`, pilotId: currentPilotId } });
-        } catch {}
-      }
-    } else {
-      // Son atanan uçuş yok → eski pilot tamamen serbest
-      await tx.pilot.update({ where: { id: currentPilotId }, data: {
-        status: 'AVAILABLE',
-        dailyFlightCount: currentPilot!.dailyFlightCount > 0 ? { decrement: 1 } : 0,
-        roundCount: currentPilot!.roundCount > 0 ? { decrement: 1 } : 0,
-      }});
-    }
+    // 2. Eski pilotu (currentPilot) tamamen serbest bırak — roundCount geri al, sıra başına geçsin
+    await tx.pilot.update({ where: { id: currentPilotId }, data: {
+      status: 'AVAILABLE',
+      dailyFlightCount: currentPilot!.dailyFlightCount > 0 ? { decrement: 1 } : 0,
+      roundCount: currentPilot!.roundCount > 0 ? { decrement: 1 } : 0,
+    }});
 
     // NAS klasör taşı — mevcut müşteri → kadın pilot klasörüne
     if (customer.flights[0]?.mediaFolder?.folderPath) {
