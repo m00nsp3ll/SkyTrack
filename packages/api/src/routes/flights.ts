@@ -316,7 +316,7 @@ router.get('/live', authenticate, asyncHandler(async (req: AuthRequest, res: any
   const inFlight = activeFlights.filter(f => f.status === 'IN_FLIGHT');
   const waiting = activeFlights.filter(f => ['ASSIGNED', 'PICKED_UP'].includes(f.status));
   const completed = activeFlights.filter(f => f.status === 'COMPLETED');
-  const cancelled = todayFlights.filter(f => f.status === 'CANCELLED');
+  const cancelled = todayFlights.filter(f => f.status === 'CANCELLED' && f.cancellationReason !== 'FORFEIT');
 
   // Calculate average duration
   const avgDuration = completed.length > 0
