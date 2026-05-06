@@ -710,8 +710,8 @@ router.post('/:id/forfeit', authenticate, requireRole('ADMIN'), asyncHandler(asy
           }
         } catch (err: any) { console.error('[Forfeit] NAS klasör taşıma hatası:', err?.message); }
       } else {
-        // Sonraki pilot yok → uçuşu iptal et
-        await tx.flight.update({ where: { id: activeFlight.id }, data: { status: 'CANCELLED', notes: 'Pilot feragat — müsait pilot yok' } });
+        // Sonraki pilot yok → uçuşu feragat olarak işaretle
+        await tx.flight.update({ where: { id: activeFlight.id }, data: { status: 'CANCELLED', cancellationReason: 'FORFEIT', notes: 'Admin feragat — müsait pilot yok' } });
         await tx.customer.update({ where: { id: activeFlight.customerId }, data: { assignedPilotId: null } });
       }
     });

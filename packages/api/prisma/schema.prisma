@@ -38,6 +38,7 @@ enum CancelReason {
   WEATHER
   CUSTOMER_CANCEL
   OTHER
+  FORFEIT
 }
 
 enum SwapStatus {

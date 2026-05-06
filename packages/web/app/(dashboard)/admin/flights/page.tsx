@@ -96,6 +96,7 @@ export default function LiveFlightsPage() {
   const [data, setData] = useState<LiveData | null>(null)
   const [loading, setLoading] = useState(true)
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date())
+  const [queueHistory, setQueueHistory] = useState<any[]>([])
   const [showBulkCancel, setShowBulkCancel] = useState(false)
   const [cancelling, setCancelling] = useState(false)
   const [updatingId, setUpdatingId] = useState<string | null>(null)
@@ -124,8 +125,12 @@ export default function LiveFlightsPage() {
 
   const fetchData = async () => {
     try {
-      const response = await flightsApi.getLive()
-      setData(response.data.data)
+      const [liveRes, histRes] = await Promise.all([
+        flightsApi.getLive(),
+        api.get('/flights/queue-history'),
+      ])
+      setData(liveRes.data.data)
+      setQueueHistory(histRes.data.data?.history || [])
       setLastUpdate(new Date())
     } catch (error) {
       console.error('Failed to fetch live data:', error)
@@ -561,6 +566,42 @@ export default function LiveFlightsPage() {
                   </div>
                 )
               })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Sıra Geçmişi — uçuşlar + feragatler sıralı */}
+      {queueHistory.length > 0 && (
+        <Card>
+          <CardHeader className="bg-gray-50 border-b">
+            <CardTitle className="flex items-center gap-2 text-gray-700">
+              <List className="h-5 w-5" />
+              Sıra Geçmişi ({queueHistory.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="divide-y max-h-96 overflow-y-auto">
+              {queueHistory.map((item: any, i: number) => (
+                <div key={item.id} className={`flex items-center gap-3 px-4 py-2 text-sm ${item.type === 'FERAGAT' ? 'bg-red-50' : item.type === 'İPTAL' ? 'bg-gray-50' : ''}`}>
+                  <span className="text-xs text-gray-400 w-6 text-right">{i + 1}</span>
+                  <span className={`w-16 text-xs font-semibold px-2 py-0.5 rounded text-center ${
+                    item.type === 'UÇUŞ' ? 'bg-green-100 text-green-700' :
+                    item.type === 'FERAGAT' ? 'bg-red-100 text-red-700' :
+                    'bg-gray-100 text-gray-600'
+                  }`}>
+                    {item.type}
+                  </span>
+                  <span className="font-semibold w-40 truncate">{item.pilotName}</span>
+                  <span className="text-gray-500 text-xs flex-1 truncate">
+                    {item.customerDisplayId} — {item.customerName}
+                  </span>
+                  <span className="text-xs text-gray-400">
+                    {new Date(item.time).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                  {item.notes && <span className="text-xs text-gray-400 italic truncate max-w-32">💬 {item.notes}</span>}
+                </div>
+              ))}
             </div>
           </CardContent>
         </Card>

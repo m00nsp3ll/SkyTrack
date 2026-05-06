@@ -823,6 +823,39 @@ router.post('/:id/reassign', authenticate, requireRole('ADMIN'), asyncHandler(as
   });
 }));
 
+// GET /api/flights/queue-history - Bugünkü sıra geçmişi (uçuş + feragat)
+router.get('/queue-history', authenticate, asyncHandler(async (req: AuthRequest, res: any) => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+
+  // Bugünkü tüm uçuşlar (completed + aktif + iptal/feragat)
+  const flights = await prisma.flight.findMany({
+    where: { createdAt: { gte: today, lt: tomorrow } },
+    include: {
+      pilot: { select: { id: true, name: true, queuePosition: true } },
+      customer: { select: { displayId: true, firstName: true, lastName: true } },
+    },
+    orderBy: { createdAt: 'asc' },
+  });
+
+  const history = flights.map(f => ({
+    id: f.id,
+    type: f.cancellationReason === 'FORFEIT' ? 'FERAGAT' : f.status === 'CANCELLED' ? 'İPTAL' : 'UÇUŞ',
+    pilotName: f.pilot.name,
+    pilotQueuePosition: f.pilot.queuePosition,
+    customerDisplayId: f.customer.displayId,
+    customerName: `${f.customer.firstName} ${f.customer.lastName}`,
+    status: f.status,
+    cancellationReason: f.cancellationReason,
+    notes: f.notes,
+    time: f.createdAt,
+  }));
+
+  res.json({ success: true, data: { history, total: history.length } });
+}));
+
 // PATCH /api/flights/:id/status - Update flight status (pilot action buttons)
 router.patch('/:id/status', authenticate, asyncHandler(async (req: AuthRequest, res: any) => {
   const { id } = req.params;
