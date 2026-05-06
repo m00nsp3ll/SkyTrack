@@ -193,6 +193,7 @@ export default function CustomerDetailPage() {
   const [processingPayment, setProcessingPayment] = useState(false)
   const [uploadingFiles, setUploadingFiles] = useState(false)
   const [showPilotModal, setShowPilotModal] = useState(false)
+  const [pilotModalMode, setPilotModalMode] = useState<'reassign' | 'request'>('reassign')
   const [availablePilots, setAvailablePilots] = useState<{ id: string; name: string; dailyFlightCount: number; maxDailyFlights: number; queuePosition: number }[]>([])
   const [loadingPilots, setLoadingPilots] = useState(false)
   const [pilotSearch, setPilotSearch] = useState('')
@@ -705,17 +706,16 @@ Bu belgeyi imzalayarak asagidaki hususlari kabul ve beyan ederim:
     }
   }
 
-  const handleReassignPilot = async () => {
+  const openPilotModal = async (mode: 'reassign' | 'request') => {
     if (!customer) return
+    setPilotModalMode(mode)
     setShowPilotModal(true)
     setLoadingPilots(true)
     setPilotSearch('')
     setSelectedPilot(null)
     try {
-      // Fetch queue and available pilots
       const response = await api.get('/pilots/queue')
       const queueData = response.data.data
-      // Get all available pilots (exclude current pilot and limit-reached ones)
       const allPilots = (queueData?.queue || []).filter(
         (p: any) =>
           p.status === 'AVAILABLE' &&
@@ -731,6 +731,9 @@ Bu belgeyi imzalayarak asagidaki hususlari kabul ve beyan ederim:
     }
   }
 
+  const handleReassignPilot = () => openPilotModal('reassign')
+  const handleRequestPilot = () => openPilotModal('request')
+
   const handleSelectPilot = (pilot: { id: string; name: string }) => {
     setSelectedPilot(pilot)
     setShowPilotConfirmDialog(true)
@@ -742,7 +745,12 @@ Bu belgeyi imzalayarak asagidaki hususlari kabul ve beyan ederim:
     setShowPilotConfirmDialog(false)
     setShowPilotModal(false)
     try {
-      await api.post(`/customers/${customer.id}/reassign-pilot`, { pilotId: selectedPilot.id })
+      const endpoint = pilotModalMode === 'request' ? 'request-pilot' : 'reassign-pilot'
+      const res = await api.post(`/customers/${customer.id}/${endpoint}`, { pilotId: selectedPilot.id })
+      if (pilotModalMode === 'request') {
+        const data = res.data.data
+        alert(`Request: ${data.requestedPilot?.name} atandı${data.swappedPilot ? ` — ${data.swappedPilot.name} sıra başına döndü` : ''}`)
+      }
       await fetchCustomer()
     } catch (error: any) {
       alert(error.response?.data?.error?.message || 'Pilot atanamadı')
@@ -1200,6 +1208,9 @@ Bu belgeyi imzalayarak asagidaki hususlari kabul ve beyan ederim:
               <Button size="sm" variant="outline" onClick={handleReassignPilot} disabled={reassigning}>
                 <RefreshCw className={`w-4 h-4 mr-1 ${reassigning ? 'animate-spin' : ''}`} />
                 Pilot Değiştir
+              </Button>
+              <Button size="sm" variant="outline" className="border-blue-300 text-blue-600 hover:bg-blue-50" onClick={handleRequestPilot} disabled={reassigning}>
+                Request
               </Button>
               <Button size="sm" variant="outline" className="border-pink-300 text-pink-600 hover:bg-pink-50" onClick={handleFemalePilot} disabled={reassigning}>
                 Kadın Pilot
@@ -1791,7 +1802,7 @@ Bu belgeyi imzalayarak asagidaki hususlari kabul ve beyan ederim:
               <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <User className="w-8 h-8 text-blue-600" />
               </div>
-              <h3 className="text-xl font-bold mb-2">Pilot Değiştir</h3>
+              <h3 className="text-xl font-bold mb-2">{pilotModalMode === 'request' ? 'Pilot Request' : 'Pilot Değiştir'}</h3>
               <p className="text-sm text-muted-foreground">
                 Mevcut pilot: <span className="font-semibold text-foreground">{customer.assignedPilot?.name}</span>
               </p>
