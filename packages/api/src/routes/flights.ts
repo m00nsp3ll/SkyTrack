@@ -368,6 +368,74 @@ router.get('/live', authenticate, asyncHandler(async (req: AuthRequest, res: any
   });
 }));
 
+// GET /api/flights/queue-history - Bugünkü sıra geçmişi (uçuş + feragat)
+router.get('/queue-history', authenticate, asyncHandler(async (req: AuthRequest, res: any) => {
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
+
+  const flights = await prisma.flight.findMany({
+    where: { createdAt: { gte: today, lt: tomorrow }, status: { in: ['COMPLETED', 'ASSIGNED', 'PICKED_UP', 'IN_FLIGHT'] } },
+    include: { pilot: { select: { name: true, queuePosition: true } }, customer: { select: { displayId: true, firstName: true, lastName: true } } },
+    orderBy: { createdAt: 'asc' },
+  });
+
+  const forfeits = await prisma.flight.findMany({
+    where: { createdAt: { gte: today, lt: tomorrow }, status: 'CANCELLED',
+      OR: [{ cancellationReason: 'FORFEIT' }, { notes: { contains: 'feragat' } }, { notes: { contains: 'Feragat' } }, { notes: { contains: 'Admin feragat' } }] },
+    include: { pilot: { select: { name: true, queuePosition: true } }, customer: { select: { displayId: true, firstName: true, lastName: true } } },
+    orderBy: { createdAt: 'asc' },
+  });
+
+  const history: any[] = [];
+  flights.forEach(f => history.push({ id: f.id, type: 'UÇUŞ', pilotName: f.pilot.name, pilotQueuePosition: f.pilot.queuePosition, customerDisplayId: f.customer.displayId, customerName: `${f.customer.firstName} ${f.customer.lastName}`, status: f.status, time: f.createdAt, notes: null }));
+  forfeits.forEach(f => history.push({ id: f.id + '-f', type: 'FERAGAT', pilotName: f.pilot.name, pilotQueuePosition: f.pilot.queuePosition, customerDisplayId: f.customer?.displayId || '-', customerName: f.customer ? `${f.customer.firstName} ${f.customer.lastName}` : '-', status: 'CANCELLED', time: f.createdAt, notes: f.notes || 'Feragat' }));
+  history.sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime());
+
+  // Excel görünümü: her pilot için bugünkü sortileri (7 kutu)
+  const allPilots = await prisma.pilot.findMany({
+    where: { isActive: true, isInExcel: true },
+    orderBy: [{ roundCount: 'asc' }, { queuePosition: 'asc' }],
+    select: { id: true, name: true, queuePosition: true, roundCount: true, dailyFlightCount: true, status: true },
+  });
+
+  // Pilot bazlı sorti listesi (zaman sırasına göre)
+  const pilotSorties: Record<string, { type: 'flight' | 'forfeit'; time: Date }[]> = {};
+  for (const f of flights) {
+    const pid = f.pilotId;
+    if (!pilotSorties[pid]) pilotSorties[pid] = [];
+    pilotSorties[pid].push({ type: 'flight', time: f.createdAt });
+  }
+  for (const f of forfeits) {
+    const pid = f.pilotId;
+    if (!pilotSorties[pid]) pilotSorties[pid] = [];
+    pilotSorties[pid].push({ type: 'forfeit', time: f.createdAt });
+  }
+  // Sort each pilot's sorties by time
+  for (const pid of Object.keys(pilotSorties)) {
+    pilotSorties[pid].sort((a, b) => a.time.getTime() - b.time.getTime());
+  }
+
+  const excelView = allPilots.map(p => {
+    const sorties = pilotSorties[p.id] || [];
+    const boxes: ('flight' | 'forfeit' | null)[] = [];
+    for (let i = 0; i < 7; i++) {
+      boxes.push(sorties[i]?.type || null);
+    }
+    return {
+      pilotId: p.id,
+      name: p.name,
+      queuePosition: p.queuePosition,
+      roundCount: p.roundCount,
+      status: p.status,
+      todayFlights: sorties.filter(s => s.type === 'flight').length,
+      todayForfeits: sorties.filter(s => s.type === 'forfeit').length,
+      boxes,
+    };
+  });
+
+  res.json({ success: true, data: { history, excelView, total: history.length } });
+}));
+
 // GET /api/flights/:id - Get flight by ID with full details
 router.get('/:id', authenticate, asyncHandler(async (req: AuthRequest, res: any) => {
   const { id } = req.params;
@@ -823,72 +891,7 @@ router.post('/:id/reassign', authenticate, requireRole('ADMIN'), asyncHandler(as
   });
 }));
 
-// GET /api/flights/queue-history - Bugünkü sıra geçmişi (uçuş + feragat karışık)
-router.get('/queue-history', authenticate, asyncHandler(async (req: AuthRequest, res: any) => {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-
-  // Bugünkü uçuşlar (iptal hariç, feragat hariç)
-  const flights = await prisma.flight.findMany({
-    where: { createdAt: { gte: today, lt: tomorrow }, status: { in: ['COMPLETED', 'ASSIGNED', 'PICKED_UP', 'IN_FLIGHT'] } },
-    include: {
-      pilot: { select: { name: true, queuePosition: true } },
-      customer: { select: { displayId: true, firstName: true, lastName: true } },
-    },
-    orderBy: { createdAt: 'asc' },
-  });
-
-  // Bugünkü feragatlar — CANCELLED + FORFEIT reason veya 'Admin feragat' notu
-  const forfeits = await prisma.flight.findMany({
-    where: { createdAt: { gte: today, lt: tomorrow }, status: 'CANCELLED', OR: [{ cancellationReason: 'FORFEIT' }, { notes: { contains: 'feragat' } }, { notes: { contains: 'Feragat' } }] },
-    include: {
-      pilot: { select: { name: true, queuePosition: true } },
-      customer: { select: { displayId: true, firstName: true, lastName: true } },
-    },
-    orderBy: { createdAt: 'asc' },
-  });
-
-  // Mesai dışı feragatlar — bugün roundCount artmış ama uçuş yapmamış pilotlar
-  // Bu bilgiyi DailyPilotStat veya doğrudan pilot tablosundan alabiliriz
-  // Şimdilik sadece flight kayıtlarından feragat gösterelim
-
-  const history: any[] = [];
-
-  flights.forEach(f => {
-    history.push({
-      id: f.id,
-      type: 'UÇUŞ',
-      pilotName: f.pilot.name,
-      pilotQueuePosition: f.pilot.queuePosition,
-      customerDisplayId: f.customer.displayId,
-      customerName: `${f.customer.firstName} ${f.customer.lastName}`,
-      status: f.status,
-      time: f.createdAt,
-      notes: null,
-    });
-  });
-
-  forfeits.forEach(f => {
-    history.push({
-      id: f.id + '-fer',
-      type: 'FERAGAT',
-      pilotName: f.pilot.name,
-      pilotQueuePosition: f.pilot.queuePosition,
-      customerDisplayId: f.customer.displayId,
-      customerName: `${f.customer.firstName} ${f.customer.lastName}`,
-      status: 'CANCELLED',
-      time: f.createdAt,
-      notes: f.notes || 'Admin feragat',
-    });
-  });
-
-  // Zamana göre sırala
-  history.sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime());
-
-  res.json({ success: true, data: { history, total: history.length } });
-}));
+// queue-history /:id'den önce tanımlanmalı — aşağıda, /live'dan sonra
 
 // PATCH /api/flights/:id/status - Update flight status (pilot action buttons)
 router.patch('/:id/status', authenticate, asyncHandler(async (req: AuthRequest, res: any) => {

@@ -73,7 +73,9 @@ export default function FlightsListPage() {
   const [hasMore, setHasMore] = useState(false)
   const [nextCursor, setNextCursor] = useState<string | null>(null)
   const [queueHistory, setQueueHistory] = useState<any[]>([])
+  const [excelView, setExcelView] = useState<any[]>([])
   const [showQueueHistory, setShowQueueHistory] = useState(false)
+  const [viewMode, setViewMode] = useState<'list' | 'excel'>('list')
 
   // Filters (URL'den status'u al)
   const [search, setSearch] = useState('')
@@ -165,6 +167,7 @@ export default function FlightsListPage() {
     try {
       const histRes = await api.get('/flights/queue-history')
       setQueueHistory(histRes.data.data?.history || [])
+      setExcelView(histRes.data.data?.excelView || [])
     } catch {}
   }
 
@@ -208,11 +211,17 @@ export default function FlightsListPage() {
         </div>
         <div className="flex gap-2">
           <Button
-            variant={showQueueHistory ? 'default' : 'outline'}
-            onClick={() => setShowQueueHistory(!showQueueHistory)}
+            variant={showQueueHistory && viewMode === 'list' ? 'default' : 'outline'}
+            onClick={() => { setShowQueueHistory(true); setViewMode('list'); }}
           >
             <Clock className="h-4 w-4 mr-2" />
             Uçuş + Feragat {queueHistory.length > 0 ? `(${queueHistory.length})` : ''}
+          </Button>
+          <Button
+            variant={showQueueHistory && viewMode === 'excel' ? 'default' : 'outline'}
+            onClick={() => { setShowQueueHistory(true); setViewMode('excel'); }}
+          >
+            Excel Görünümü
           </Button>
           <Link href="/admin/flights">
             <Button variant="outline">
@@ -224,7 +233,7 @@ export default function FlightsListPage() {
       </div>
 
       {/* Uçuş + Feragat Geçmişi */}
-      {showQueueHistory && (
+      {showQueueHistory && viewMode === 'list' && (
         <Card>
           <CardHeader className="bg-blue-50 border-b border-blue-200">
             <CardTitle className="flex items-center gap-2 text-blue-700 text-base">
@@ -236,7 +245,7 @@ export default function FlightsListPage() {
             {queueHistory.length === 0 ? (
               <div className="p-8 text-center text-muted-foreground">Bugün henüz uçuş veya feragat yok</div>
             ) : (
-            <div className="divide-y max-h-96 overflow-y-auto">
+            <div className="divide-y max-h-[600px] overflow-y-auto">
               {queueHistory.map((item: any, i: number) => (
                 <div key={item.id} className={`flex items-center gap-3 px-4 py-2 text-sm ${item.type === 'FERAGAT' ? 'bg-red-50' : item.type === 'İPTAL' ? 'bg-gray-50' : ''}`}>
                   <span className="text-xs text-gray-400 w-6 text-right">{i + 1}</span>
@@ -256,6 +265,57 @@ export default function FlightsListPage() {
                   </span>
                 </div>
               ))}
+            </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Excel Görünümü */}
+      {showQueueHistory && viewMode === 'excel' && (
+        <Card>
+          <CardHeader className="bg-emerald-50 border-b border-emerald-200 py-3">
+            <CardTitle className="text-emerald-700 text-base">
+              Excel Görünümü — Bugünkü Sortiler
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            {excelView.length === 0 ? (
+              <div className="p-8 text-center text-muted-foreground">Veri yükleniyor...</div>
+            ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-100 border-b">
+                    <th className="px-2 py-2 text-left w-8 text-xs">#</th>
+                    <th className="px-2 py-2 text-left text-xs">Pilot</th>
+                    <th className="px-2 py-2 text-center text-xs w-8">T</th>
+                    {[1,2,3,4,5,6,7].map(n => (
+                      <th key={n} className="px-1 py-2 text-center text-xs w-8">{n}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {excelView.map((p: any, idx: number) => (
+                    <tr key={p.pilotId} className={`border-b ${p.status === 'OFF_DUTY' ? 'bg-gray-50 text-gray-400' : ''}`}>
+                      <td className="px-2 py-1.5 text-xs text-gray-400">{p.queuePosition}</td>
+                      <td className="px-2 py-1.5 font-medium text-xs truncate max-w-[140px]">{p.name}</td>
+                      <td className="px-2 py-1.5 text-center text-xs font-bold">{p.roundCount}</td>
+                      {p.boxes.map((box: string | null, i: number) => (
+                        <td key={i} className="px-1 py-1.5 text-center">
+                          {box === 'flight' ? (
+                            <span className="inline-block w-6 h-6 leading-6 rounded text-xs font-bold bg-gray-900 text-white">1</span>
+                          ) : box === 'forfeit' ? (
+                            <span className="inline-block w-6 h-6 leading-6 rounded text-xs font-bold bg-red-500 text-white">1</span>
+                          ) : (
+                            <span className="inline-block w-6 h-6 leading-6 rounded text-xs border border-gray-200 text-gray-300">-</span>
+                          )}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
             )}
           </CardContent>
