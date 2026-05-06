@@ -223,7 +223,6 @@ export const pilotQueueService = {
           isInExcel: true,
           id: { not: pilot.id },
           roundCount: { lte: oldRound },
-          lastForfeitRound: { not: oldRound },
           OR: [
             { inQueue: false },
             { status: { in: ['OFF_DUTY', 'ON_BREAK'] } },
