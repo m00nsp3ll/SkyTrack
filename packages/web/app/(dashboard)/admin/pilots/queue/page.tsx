@@ -81,7 +81,7 @@ export default function PilotQueuePage() {
 
   // Excel'de olan tüm pilotlar (is_in_excel=true) ana listede, sıralama roundCount asc → forma asc
   // in_queue=false olanlar bile listede kalır ("Sırada Değil" rozeti + auto-forfeit)
-  const busyStatuses = ['PICKED_UP', 'ASSIGNED', 'IN_FLIGHT']
+  const busyStatuses = ['PICKED_UP', 'ASSIGNED', 'IN_FLIGHT', 'OFF_DUTY']
   const inQueuePilots = pilots
     .filter((p: any) => p.isInExcel === true)
     .sort((a, b) => {
