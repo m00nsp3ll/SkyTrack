@@ -6,7 +6,7 @@ import { useSearchParams } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { flightsApi, pilotsApi } from '@/lib/api'
+import { flightsApi, pilotsApi, api } from '@/lib/api'
 import {
   Search,
   RefreshCw,
@@ -72,6 +72,8 @@ export default function FlightsListPage() {
   const [loading, setLoading] = useState(true)
   const [hasMore, setHasMore] = useState(false)
   const [nextCursor, setNextCursor] = useState<string | null>(null)
+  const [queueHistory, setQueueHistory] = useState<any[]>([])
+  const [showQueueHistory, setShowQueueHistory] = useState(false)
 
   // Filters (URL'den status'u al)
   const [search, setSearch] = useState('')
@@ -159,8 +161,16 @@ export default function FlightsListPage() {
     }
   }
 
+  const fetchQueueHistory = async () => {
+    try {
+      const histRes = await api.get('/flights/queue-history')
+      setQueueHistory(histRes.data.data?.history || [])
+    } catch {}
+  }
+
   useEffect(() => {
     fetchPilots()
+    fetchQueueHistory()
   }, [])
 
   useEffect(() => {
@@ -197,6 +207,15 @@ export default function FlightsListPage() {
           <p className="text-muted-foreground">Tüm uçuşları görüntüle ve filtrele</p>
         </div>
         <div className="flex gap-2">
+          {queueHistory.length > 0 && (
+            <Button
+              variant={showQueueHistory ? 'default' : 'outline'}
+              onClick={() => setShowQueueHistory(!showQueueHistory)}
+            >
+              <Clock className="h-4 w-4 mr-2" />
+              Uçuş + Feragat ({queueHistory.length})
+            </Button>
+          )}
           <Link href="/admin/flights">
             <Button variant="outline">
               <Plane className="h-4 w-4 mr-2" />
@@ -205,6 +224,41 @@ export default function FlightsListPage() {
           </Link>
         </div>
       </div>
+
+      {/* Uçuş + Feragat Geçmişi */}
+      {showQueueHistory && queueHistory.length > 0 && (
+        <Card>
+          <CardHeader className="bg-blue-50 border-b border-blue-200">
+            <CardTitle className="flex items-center gap-2 text-blue-700 text-base">
+              <Clock className="h-5 w-5" />
+              Uçuş + Feragat ({queueHistory.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="divide-y max-h-96 overflow-y-auto">
+              {queueHistory.map((item: any, i: number) => (
+                <div key={item.id} className={`flex items-center gap-3 px-4 py-2 text-sm ${item.type === 'FERAGAT' ? 'bg-red-50' : item.type === 'İPTAL' ? 'bg-gray-50' : ''}`}>
+                  <span className="text-xs text-gray-400 w-6 text-right">{i + 1}</span>
+                  <span className={`w-16 text-xs font-semibold px-2 py-0.5 rounded text-center ${
+                    item.type === 'UÇUŞ' ? 'bg-green-100 text-green-700' :
+                    item.type === 'FERAGAT' ? 'bg-red-100 text-red-700' :
+                    'bg-gray-100 text-gray-600'
+                  }`}>
+                    {item.type}
+                  </span>
+                  <span className="font-semibold w-40 truncate">{item.pilotName}</span>
+                  <span className="text-gray-500 text-xs flex-1 truncate">
+                    {item.customerDisplayId} — {item.customerName}
+                  </span>
+                  <span className="text-xs text-gray-400">
+                    {item.time && formatTime(item.time)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Hızlı Tarih Filtreleri */}
       <Card>
