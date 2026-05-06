@@ -212,7 +212,8 @@ export const pilotQueueService = {
       });
 
       // ATLANAN PİLOT FERAGATİ: Sırası geçmiş ama mesai dışı/mola olan pilotlar feragat yer.
-      // roundCount <= oldRound → geride kalan pilotları da yakalar (birden fazla round geride olabilir).
+      // Aynı roundda olup queuePosition'u daha önce olan OFF_DUTY/ON_BREAK/inQueue:false → roundCount +1
+      // Geride kalan pilotlar da +1 artırılır (her atamada 1 round ilerler, birden fazla atlamazlar)
       const oldRound = pilot.roundCount; // atama öncesi round
       const skipped = await tx.pilot.findMany({
         where: {
@@ -220,21 +221,23 @@ export const pilotQueueService = {
           isInExcel: true,
           id: { not: pilot.id },
           roundCount: { lte: oldRound },
+          lastForfeitRound: { not: oldRound },
           OR: [
             { inQueue: false },
             { status: { in: ['OFF_DUTY', 'ON_BREAK'] } },
           ],
         },
-        select: { id: true, roundCount: true },
+        select: { id: true, roundCount: true, queuePosition: true },
       });
       for (const sp of skipped) {
-        // Geride kalan pilotun roundCount'unu atanan pilotla aynı seviyeye çek
-        const diff = (oldRound + 1) - sp.roundCount;
+        // Aynı rounddaki pilot: sadece sırası öndeyse (queuePosition < atanan pilot) feragat yer
+        // Gerideki pilot (roundCount < oldRound): her zaman feragat yer (+1)
+        if (sp.roundCount === oldRound && sp.queuePosition >= pilot.queuePosition) continue;
         await tx.pilot.update({
           where: { id: sp.id },
           data: {
-            roundCount: oldRound + 1,
-            forfeitCount: { increment: diff },
+            roundCount: { increment: 1 },
+            forfeitCount: { increment: 1 },
             lastForfeitRound: oldRound,
           },
         });
