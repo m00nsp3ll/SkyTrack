@@ -79,6 +79,9 @@ router.get('/', authenticate, asyncHandler(async (req: AuthRequest, res: any) =>
     where.status = status;
   }
 
+  // Feragat kayıtlarını hariç tut (FORFEIT uçuş değildir)
+  where.NOT = { cancellationReason: 'FORFEIT' };
+
   // Pilot filter
   if (pilotId) {
     where.pilotId = pilotId;
