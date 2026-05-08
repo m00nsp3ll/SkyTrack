@@ -53,6 +53,8 @@ const TTL = {
   CUSTOMER: 60,         // 1 minute
 };
 
+export const getRedis = () => redis;
+
 export const cache = {
   // Check if Redis is available
   isAvailable: () => redisAvailable && redis !== null,

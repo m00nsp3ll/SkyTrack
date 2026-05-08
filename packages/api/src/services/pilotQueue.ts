@@ -1,5 +1,5 @@
 import { PrismaClient, Pilot, PilotStatus } from '@prisma/client';
-import { cache } from './cache.js';
+import { cache, getRedis } from './cache.js';
 import { sendNativeToPilot, getNotificationConfig } from './firebaseNotification.js';
 import { sanitizePilotName } from './media.js';
 import fs from 'fs';
@@ -135,10 +135,33 @@ export const pilotQueueService = {
     io?: any,
     specificPilotId?: string
   ): Promise<{ pilot: Pilot; flightId: string; mediaFolderPath: string } | null> {
+    // Redis lock — aynı anda iki müşterinin aynı pilota atanmasını engelle
+    const redis = getRedis();
+    const lockKey = 'lock:pilot-assignment';
+    const lockValue = `${customerId}:${Date.now()}`;
+    let lockAcquired = false;
+
+    if (redis) {
+      // SET NX EX — 10 saniye timeout ile lock al
+      const result = await redis.set(lockKey, lockValue, 'EX', 10, 'NX');
+      if (!result) {
+        // Lock alınamadı — başka atama devam ediyor, 2 saniye bekle ve tekrar dene
+        await new Promise(r => setTimeout(r, 2000));
+        const retry = await redis.set(lockKey, lockValue, 'EX', 10, 'NX');
+        if (!retry) {
+          // Hala alınamıyorsa force — eski lock 10sn sonra zaten düşer
+          await redis.set(lockKey, lockValue, 'EX', 10);
+        }
+      }
+      lockAcquired = true;
+    }
+
+    try {
     let pilot: Pilot | null;
     if (specificPilotId) {
       pilot = await prisma.pilot.findUnique({ where: { id: specificPilotId } });
     } else {
+      // Lock sayesinde cache'i atla, direkt DB'den oku
       pilot = await this.getNextPilot();
     }
 
@@ -349,6 +372,13 @@ export const pilotQueueService = {
       flightId: result.id,
       mediaFolderPath,
     };
+    } finally {
+      // Lock release
+      if (lockAcquired && redis) {
+        const currentVal = await redis.get(lockKey);
+        if (currentVal === lockValue) await redis.del(lockKey);
+      }
+    }
   },
 
   /**
