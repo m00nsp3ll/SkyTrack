@@ -767,9 +767,13 @@ router.post('/:id/female-pilot', authenticate, requireRole('ADMIN', 'OFFICE_STAF
   });
   if (!femalePilot) throw new AppError('Müsait kadın pilot bulunamadı', 400, 'NO_FEMALE_PILOT');
 
-  // En son müşteri atanan pilotu bul (currentPilot ve femalePilot hariç)
+  // Mevcut müşteriden SONRA atanan pilotu bul (swap — hak yemesin)
   const lastAssignedFlight = await prisma.flight.findFirst({
-    where: { status: { in: ['ASSIGNED', 'PICKED_UP'] }, pilotId: { notIn: [currentPilotId, femalePilot.id] } },
+    where: {
+      status: { in: ['ASSIGNED', 'PICKED_UP'] },
+      pilotId: { notIn: [currentPilotId, femalePilot.id] },
+      createdAt: { gt: customer.flights[0]?.createdAt || new Date(0) },
+    },
     orderBy: { createdAt: 'desc' },
     include: { customer: true, pilot: true, mediaFolder: true },
   });
