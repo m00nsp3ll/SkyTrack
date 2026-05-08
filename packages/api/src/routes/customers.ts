@@ -933,17 +933,9 @@ router.post('/:id/request-pilot', authenticate, requireRole('ADMIN', 'OFFICE_STA
   if (!requestedPilot.isActive) throw new AppError('Pilot aktif değil', 400, 'PILOT_INACTIVE');
   if (requestedPilot.status !== 'AVAILABLE') throw new AppError('Pilot müsait değil', 400, 'PILOT_NOT_AVAILABLE');
 
-  // Son atanan pilotu bul (current ve requested hariç)
-  const lastAssignedFlight = await prisma.flight.findFirst({
-    where: { status: { in: ['ASSIGNED', 'PICKED_UP'] }, pilotId: { notIn: [currentPilotId, requestedPilotId] } },
-    orderBy: { createdAt: 'desc' },
-    include: { customer: true, pilot: true, mediaFolder: true },
-  });
-
   const io = req.app.get('io');
   const { qnap } = await import('../services/qnapService.js');
   const dateStr = new Date().toISOString().split('T')[0];
-  let swappedPilot: any = null;
 
   await prisma.$transaction(async (tx) => {
     // 1. Müşteri → istenen pilota
@@ -966,67 +958,33 @@ router.post('/:id/request-pilot', authenticate, requireRole('ADMIN', 'OFFICE_STA
       } catch {}
     }
 
-    // 2. Swap: son atanan pilotun müşterisini eski pilota ver
-    if (lastAssignedFlight && lastAssignedFlight.pilotId !== currentPilotId) {
-      swappedPilot = lastAssignedFlight.pilot;
-      await tx.flight.update({ where: { id: lastAssignedFlight.id }, data: { pilotId: currentPilotId } });
-      await tx.customer.update({ where: { id: lastAssignedFlight.customerId }, data: { assignedPilotId: currentPilotId } });
-      await tx.pilot.update({ where: { id: currentPilotId }, data: {
-        status: lastAssignedFlight.status === 'PICKED_UP' ? 'PICKED_UP' : 'ASSIGNED',
-      }});
-      await tx.pilot.update({ where: { id: lastAssignedFlight.pilotId }, data: {
-        status: 'AVAILABLE',
-        dailyFlightCount: swappedPilot.dailyFlightCount > 0 ? { decrement: 1 } : 0,
-        roundCount: swappedPilot.roundCount > 0 ? { decrement: 1 } : 0,
-      }});
-      if (lastAssignedFlight.mediaFolder?.folderPath) {
-        try {
-          const oldPath = lastAssignedFlight.mediaFolder.folderPath.replace(/^media\//, '');
-          const safeName = currentPilot!.name.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_çÇğĞıİöÖşŞüÜ-]/g, '').trim();
-          const newPath = `${dateStr}/${safeName}/${lastAssignedFlight.customer.displayId}`;
-          await qnap.moveFolder(oldPath, newPath);
-          await tx.mediaFolder.update({ where: { id: lastAssignedFlight.mediaFolder.id }, data: { folderPath: `media/${newPath}`, pilotId: currentPilotId } });
-        } catch {}
-      }
-    } else {
-      // Swap yok → eski pilot serbest
-      await tx.pilot.update({ where: { id: currentPilotId }, data: {
-        status: 'AVAILABLE',
-        dailyFlightCount: currentPilot!.dailyFlightCount > 0 ? { decrement: 1 } : 0,
-        roundCount: currentPilot!.roundCount > 0 ? { decrement: 1 } : 0,
-      }});
-    }
+    // 2. Eski pilot tamamen serbest — roundCount geri al, sıra başına dönsün
+    await tx.pilot.update({ where: { id: currentPilotId }, data: {
+      status: 'AVAILABLE',
+      dailyFlightCount: currentPilot!.dailyFlightCount > 0 ? { decrement: 1 } : 0,
+      roundCount: currentPilot!.roundCount > 0 ? { decrement: 1 } : 0,
+    }});
   });
 
   await cache.pilotQueue.invalidate();
   await cache.pilot.invalidate(currentPilotId);
   await cache.pilot.invalidate(requestedPilotId);
-  if (swappedPilot) await cache.pilot.invalidate(swappedPilot.id);
 
   if (io) {
     io.to('admin').emit('customer:updated', { customerId: id });
     io.emit('pilot:queue-updated');
     io.to(`pilot:${currentPilotId}`).emit('customer:reassigned', {
-      message: swappedPilot
-        ? `Müşteri ${requestedPilot.name} pilotunu istedi. Yeni müşteriniz: ${lastAssignedFlight!.customer.firstName} ${lastAssignedFlight!.customer.lastName}`
-        : `Müşteri ${requestedPilot.name} pilotunu istedi. Sıranıza geri döndünüz.`,
+      message: `Müşteri ${requestedPilot.name} pilotunu istedi. Sıranıza geri döndünüz.`,
     });
     io.to(`pilot:${requestedPilotId}`).emit('customer:assigned', {
       customer: { id, displayId: customer.displayId, firstName: customer.firstName, lastName: customer.lastName },
     });
-    if (swappedPilot) {
-      io.to(`pilot:${swappedPilot.id}`).emit('customer:reassigned', {
-        message: `Müşteri request: müşteriniz (${lastAssignedFlight!.customer.displayId}) → ${currentPilot!.name}'e aktarıldı. Sıra başına döndünüz.`,
-      });
-    }
   }
 
   import('../services/firebaseNotification.js').then(({ sendNativeToPilot }) => {
     sendNativeToPilot(currentPilotId, {
       title: '🔄 Müşteri Request',
-      body: swappedPilot
-        ? `${customer.displayId} → ${requestedPilot.name}. Yeni müşteriniz: ${lastAssignedFlight!.customer.displayId}`
-        : `${customer.displayId} → ${requestedPilot.name}. Sıranıza geri döndünüz.`,
+      body: `${customer.displayId} → ${requestedPilot.name}. Sıranıza geri döndünüz.`,
       data: { type: 'pilot_request', customerId: id },
     }).catch(() => {});
     sendNativeToPilot(requestedPilotId, {
@@ -1034,13 +992,6 @@ router.post('/:id/request-pilot', authenticate, requireRole('ADMIN', 'OFFICE_STA
       body: `${customer.firstName} ${customer.lastName} (${customer.displayId}) sizi istedi!`,
       data: { type: 'pilot_requested', customerId: id },
     }).catch(() => {});
-    if (swappedPilot) {
-      sendNativeToPilot(swappedPilot.id, {
-        title: '🔄 Müşteri Değişikliği',
-        body: `Request: ${lastAssignedFlight!.customer.displayId} → ${currentPilot!.name}. Sıra başına döndünüz.`,
-        data: { type: 'pilot_request_swap' },
-      }).catch(() => {});
-    }
   });
 
   res.json({
@@ -1048,7 +999,6 @@ router.post('/:id/request-pilot', authenticate, requireRole('ADMIN', 'OFFICE_STA
     data: {
       requestedPilot: { id: requestedPilot.id, name: requestedPilot.name },
       oldPilot: { id: currentPilotId, name: currentPilot?.name },
-      swappedPilot: swappedPilot ? { id: swappedPilot.id, name: swappedPilot.name } : null,
       message: `Pilot request: ${requestedPilot.name}`,
     },
   });
