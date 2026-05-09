@@ -22,6 +22,12 @@ export default function QrScanner({
   const [isLoading, setIsLoading] = useState(true)
   const [isReady, setIsReady] = useState(false)
   const initRef = useRef(false)
+  const [facingMode, setFacingMode] = useState<'environment' | 'user'>(() => {
+    if (typeof window !== 'undefined') {
+      return (localStorage.getItem('skytrack-camera') as 'environment' | 'user') || 'environment'
+    }
+    return 'environment'
+  })
 
   // Keep callback ref updated
   useEffect(() => {
@@ -33,84 +39,74 @@ export default function QrScanner({
     setIsReady(true)
   }, [])
 
+  const startWithMode = async (mode: 'environment' | 'user') => {
+    const scannerId = 'qr-scanner-container'
+    try {
+      setIsLoading(true)
+      setError(null)
+
+      const element = document.getElementById(scannerId)
+      if (!element) {
+        setError('Scanner container bulunamadı.')
+        setIsLoading(false)
+        return
+      }
+
+      if (scannerRef.current) {
+        try { await scannerRef.current.stop() } catch {}
+        scannerRef.current = null
+      }
+
+      scannerRef.current = new Html5Qrcode(scannerId)
+
+      await scannerRef.current.start(
+        { facingMode: mode },
+        { fps, qrbox: { width: qrbox, height: qrbox } },
+        (decodedText) => { callbackRef.current(decodedText) },
+        () => {}
+      )
+      setIsLoading(false)
+    } catch (err: any) {
+      console.error('QR Scanner error:', err)
+
+      // Fallback: diğer kamerayı dene
+      const fallback = mode === 'environment' ? 'user' : 'environment'
+      try {
+        if (!scannerRef.current) scannerRef.current = new Html5Qrcode(scannerId)
+        await scannerRef.current.start(
+          { facingMode: fallback },
+          { fps, qrbox: { width: qrbox, height: qrbox } },
+          (decodedText) => { callbackRef.current(decodedText) },
+          () => {}
+        )
+        setFacingMode(fallback)
+        localStorage.setItem('skytrack-camera', fallback)
+        setIsLoading(false)
+        return
+      } catch (fallbackErr) {
+        console.error('QR Scanner fallback error:', fallbackErr)
+      }
+
+      if (err?.name === 'NotAllowedError' || err?.message?.includes('Permission')) {
+        setError('Kamera izni reddedildi. Lütfen tarayıcı ayarlarından izin verin.')
+      } else if (err?.name === 'NotFoundError') {
+        setError('Kamera bulunamadı.')
+      } else if (err?.name === 'NotSupportedError' || err?.message?.includes('secure') || err?.message?.includes('HTTPS')) {
+        setError('HTTP üzerinden kamera erişimi engellendi.\n\nChrome: chrome://flags → "Insecure origins treated as secure" → Enabled')
+      } else if (err?.name === 'NotReadableError') {
+        setError('Kamera başka bir uygulama tarafından kullanılıyor.')
+      } else {
+        setError(`Kamera açılamadı: ${err?.message || 'Bilinmeyen hata'}`)
+      }
+      setIsLoading(false)
+    }
+  }
+
   // Start scanner after container is ready
   useEffect(() => {
     if (!isReady || initRef.current) return
     initRef.current = true
-
-    const scannerId = 'qr-scanner-container'
-
-    const startScanner = async () => {
-      try {
-        setIsLoading(true)
-        setError(null)
-
-        const element = document.getElementById(scannerId)
-        if (!element) {
-          setError('Scanner container bulunamadı.')
-          setIsLoading(false)
-          return
-        }
-
-        scannerRef.current = new Html5Qrcode(scannerId)
-
-        await scannerRef.current.start(
-          { facingMode: 'environment' },
-          {
-            fps,
-            qrbox: { width: qrbox, height: qrbox },
-          },
-          (decodedText) => {
-            callbackRef.current(decodedText)
-          },
-          () => {
-            // QR code not found - ignore
-          }
-        )
-        setIsLoading(false)
-      } catch (err: any) {
-        console.error('QR Scanner error:', err)
-
-        // Try with user facing camera if environment fails
-        if (err?.name === 'NotFoundError' || err?.message?.includes('NotFoundError')) {
-          try {
-            if (scannerRef.current) {
-              await scannerRef.current.start(
-                { facingMode: 'user' },
-                {
-                  fps,
-                  qrbox: { width: qrbox, height: qrbox },
-                },
-                (decodedText) => {
-                  callbackRef.current(decodedText)
-                },
-                () => {}
-              )
-              setIsLoading(false)
-              return
-            }
-          } catch (fallbackErr) {
-            console.error('QR Scanner fallback error:', fallbackErr)
-          }
-        }
-
-        // Set user-friendly error message
-        if (err?.name === 'NotAllowedError' || err?.message?.includes('Permission')) {
-          setError('Kamera izni reddedildi. Lütfen tarayıcı ayarlarından izin verin.')
-        } else if (err?.name === 'NotFoundError') {
-          setError('Kamera bulunamadı.')
-        } else if (err?.name === 'NotSupportedError' || err?.message?.includes('secure') || err?.message?.includes('HTTPS')) {
-          setError('HTTP üzerinden kamera erişimi engellendi.\n\nChrome: chrome://flags → "Insecure origins treated as secure" → Enabled')
-        } else if (err?.name === 'NotReadableError') {
-          setError('Kamera başka bir uygulama tarafından kullanılıyor.')
-        } else {
-          setError(`Kamera açılamadı: ${err?.message || 'Bilinmeyen hata'}`)
-        }
-        setIsLoading(false)
-      }
-    }
-
-    startScanner()
+    startWithMode(facingMode)
 
     return () => {
       if (scannerRef.current) {
@@ -118,16 +114,40 @@ export default function QrScanner({
         scannerRef.current = null
       }
     }
-  }, [isReady, fps, qrbox])
+  }, [isReady])
+
+  const toggleCamera = async () => {
+    const newMode = facingMode === 'environment' ? 'user' : 'environment'
+    setFacingMode(newMode)
+    localStorage.setItem('skytrack-camera', newMode)
+    await startWithMode(newMode)
+  }
 
   return (
     <div className="w-full h-full relative" style={{ minHeight: '300px' }}>
-      {/* Scanner container - always rendered */}
+      {/* Scanner container */}
       <div
         id="qr-scanner-container"
         className="w-full h-full absolute inset-0"
         style={{ minHeight: '300px' }}
       />
+
+      {/* Camera toggle button */}
+      {!error && !isLoading && (
+        <button
+          onClick={toggleCamera}
+          className="absolute top-2 right-2 z-20 bg-black/60 text-white rounded-full p-2 hover:bg-black/80 transition"
+          title={facingMode === 'environment' ? 'Ön Kameraya Geç' : 'Arka Kameraya Geç'}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M11 19H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h5" />
+            <path d="M13 5h7a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-5" />
+            <circle cx="12" cy="12" r="3" />
+            <path d="m18 22-3-3 3-3" />
+            <path d="m6 2 3 3-3 3" />
+          </svg>
+        </button>
+      )}
 
       {/* Loading overlay */}
       {isLoading && !error && (
