@@ -266,6 +266,8 @@ export const pilotQueueService = {
           },
         });
         // Feragat kaydı oluştur — queue-history'de görünsün
+        // createdAt'ı flight'tan 1sn önce yap ki sıralama doğru olsun (feragat → uçuş)
+        const forfeitTime = new Date(Date.now() - 1000);
         await tx.flight.create({
           data: {
             customerId,
@@ -273,6 +275,7 @@ export const pilotQueueService = {
             status: 'CANCELLED',
             cancellationReason: 'FORFEIT',
             notes: 'Mesai dışı - otomatik feragat',
+            createdAt: forfeitTime,
           },
         });
       }
