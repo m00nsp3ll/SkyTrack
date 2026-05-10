@@ -378,7 +378,10 @@ router.get('/queue-history', authenticate, asyncHandler(async (req: AuthRequest,
   const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
 
   const flights = await prisma.flight.findMany({
-    where: { createdAt: { gte: today, lt: tomorrow }, status: { in: ['COMPLETED', 'ASSIGNED', 'PICKED_UP', 'IN_FLIGHT'] } },
+    where: { createdAt: { gte: today, lt: tomorrow }, OR: [
+      { status: { in: ['COMPLETED', 'ASSIGNED', 'PICKED_UP', 'IN_FLIGHT'] } },
+      { status: 'CANCELLED', cancellationReason: 'CUSTOMER_CANCEL' },
+    ] },
     include: { pilot: { select: { name: true, queuePosition: true } }, customer: { select: { displayId: true, firstName: true, lastName: true } } },
     orderBy: { createdAt: 'asc' },
   });
@@ -391,7 +394,7 @@ router.get('/queue-history', authenticate, asyncHandler(async (req: AuthRequest,
   });
 
   const history: any[] = [];
-  flights.forEach(f => history.push({ id: f.id, type: 'UÇUŞ', pilotName: f.pilot.name, pilotQueuePosition: f.pilot.queuePosition, customerDisplayId: f.customer.displayId, customerName: `${f.customer.firstName} ${f.customer.lastName}`, status: f.status, time: f.createdAt, notes: null }));
+  flights.forEach(f => history.push({ id: f.id, type: 'UÇUŞ', pilotName: f.pilot.name, pilotQueuePosition: f.pilot.queuePosition, customerDisplayId: f.customer.displayId, customerName: `${f.customer.firstName} ${f.customer.lastName}`, status: f.status, time: f.createdAt, notes: f.cancellationReason === 'CUSTOMER_CANCEL' ? 'Müşteri İptal' : null }));
   forfeits.forEach(f => history.push({ id: f.id + '-f', type: 'FERAGAT', pilotName: f.pilot.name, pilotQueuePosition: f.pilot.queuePosition, customerDisplayId: f.customer?.displayId || '-', customerName: f.customer ? `${f.customer.firstName} ${f.customer.lastName}` : '-', status: 'CANCELLED', time: f.createdAt, notes: f.notes || 'Feragat' }));
   history.sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime());
 

@@ -259,6 +259,7 @@ export default function FlightsListPage() {
                   <span className="font-semibold w-40 truncate">{item.pilotName}</span>
                   <span className="text-gray-500 text-xs flex-1 truncate">
                     {item.customerDisplayId} — {item.customerName}
+                    {item.notes && <span className="ml-1 text-orange-500 font-semibold">({item.notes})</span>}
                   </span>
                   <span className="text-xs text-gray-400">
                     {item.time && formatTime(item.time)}
