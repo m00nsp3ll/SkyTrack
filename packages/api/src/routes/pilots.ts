@@ -584,7 +584,7 @@ router.patch('/:id/queue-toggle', authenticate, requireRole('ADMIN'), asyncHandl
 // PATCH /api/pilots/:id/status - Update pilot status
 router.patch('/:id/status', authenticate, asyncHandler(async (req: AuthRequest, res: any) => {
   const { id } = req.params;
-  const { status } = req.body;
+  const { status, priorityOverride } = req.body;
 
   // Pilots can only update their own status
   if (req.user!.role === 'PILOT' && req.user!.pilotId !== id) {
@@ -604,9 +604,11 @@ router.patch('/:id/status', authenticate, asyncHandler(async (req: AuthRequest, 
 
   // OFF_DUTY/ON_BREAK → AVAILABLE: sadece status değiştir, konum aynı kalsın
   // Mesai dışındayken sıra geçerse, müşteri geldiğinde otomatik feragat alır (pilotQueue.ts)
+  const updateData: any = { status };
+  if (priorityOverride !== undefined) updateData.priorityOverride = priorityOverride;
   const pilot = await prisma.pilot.update({
     where: { id },
-    data: { status },
+    data: updateData,
   });
 
   // Invalidate caches

@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { pilotsApi } from '@/lib/api'
+import { pilotsApi, api } from '@/lib/api'
 import {
   UserPlus,
   User,
@@ -46,7 +46,7 @@ const statusConfig = {
   IN_FLIGHT: { label: 'Uçuşta', color: 'bg-blue-500', icon: Plane },
   ON_BREAK: { label: 'Molada', color: 'bg-yellow-500', icon: Coffee },
   OFF_DUTY: { label: 'Mesai Dışı', color: 'bg-gray-500', icon: Moon },
-  UNAVAILABLE: { label: 'Müsait Değil', color: 'bg-orange-500', icon: Moon },
+  UNAVAILABLE: { label: 'Bekletiliyor', color: 'bg-indigo-500', icon: Moon },
 }
 
 export default function PilotsPage() {
@@ -56,6 +56,7 @@ export default function PilotsPage() {
   const [filter, setFilter] = useState<string>('all')
   const [forfeitConfirm, setForfeitConfirm] = useState<{ id: string; name: string } | null>(null)
   const [forfeiting, setForfeiting] = useState(false)
+  const [holdLoading, setHoldLoading] = useState<string | null>(null)
 
   const handleForfeit = async () => {
     if (!forfeitConfirm) return
@@ -68,6 +69,30 @@ export default function PilotsPage() {
       alert(e.response?.data?.error?.message || 'Feragat başarısız')
     } finally {
       setForfeiting(false)
+    }
+  }
+
+  const handleHold = async (pilotId: string) => {
+    setHoldLoading(pilotId)
+    try {
+      await api.patch(`/pilots/${pilotId}/status`, { status: 'UNAVAILABLE' })
+      fetchPilots()
+    } catch (e: any) {
+      alert(e.response?.data?.error?.message || 'Bekletme başarısız')
+    } finally {
+      setHoldLoading(null)
+    }
+  }
+
+  const handleUnhold = async (pilotId: string) => {
+    setHoldLoading(pilotId)
+    try {
+      await api.patch(`/pilots/${pilotId}/status`, { status: 'AVAILABLE', priorityOverride: true })
+      fetchPilots()
+    } catch (e: any) {
+      alert(e.response?.data?.error?.message || 'Geldi işlemi başarısız')
+    } finally {
+      setHoldLoading(null)
     }
   }
 
@@ -307,6 +332,27 @@ export default function PilotsPage() {
                             <SkipForward className="h-4 w-4 mr-1" />
                             Feragat
                           </Button>
+                          {pilot.status === 'UNAVAILABLE' ? (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="border-green-400 text-green-700 hover:bg-green-50"
+                              onClick={() => handleUnhold(pilot.id)}
+                              disabled={holdLoading === pilot.id}
+                            >
+                              {holdLoading === pilot.id ? '...' : 'Geldi'}
+                            </Button>
+                          ) : (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="border-blue-300 text-blue-700 hover:bg-blue-50"
+                              onClick={() => handleHold(pilot.id)}
+                              disabled={holdLoading === pilot.id}
+                            >
+                              {holdLoading === pilot.id ? '...' : 'Beklet'}
+                            </Button>
+                          )}
                           <Link href={`/admin/pilots/${pilot.id}`}>
                             <Button variant="outline" size="sm">
                               <Edit className="h-4 w-4 mr-1" />
