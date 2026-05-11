@@ -435,13 +435,14 @@ router.get('/:id/panel', authenticate, asyncHandler(async (req: AuthRequest, res
       isActive: true,
       inQueue: true,
     },
-    orderBy: { queuePosition: 'asc' },
+    orderBy: [{ roundCount: 'asc' }, { queuePosition: 'asc' }],
     select: {
       id: true,
       dailyFlightCount: true,
       maxDailyFlights: true,
       status: true,
       lockedUntilRound: true,
+      roundCount: true,
     },
   });
 
