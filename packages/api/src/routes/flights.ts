@@ -1263,73 +1263,62 @@ async function proagentLogin(): Promise<string> {
 
 interface ProAgentTicket {
   no: string;
-  biletId: string;
+  durum: string;
   saat: string;
-  tarih: string;
-  rehber: string;
+  otel: string;
+  bolge: string;
+  yolcu: number;
+  cocuk: number;
   acente: string;
   tedarikci: string;
-  turAdi: string;
-  biletNo: string;
-  yolcu: number;
-  cikmis: number;
-  i: string;
-  m: string;
-  otel: string;
+  tur: string;
   irtibat: string;
-  dil: string;
-  aciklama: string;
-  rowColor: string;
+  telefon: string;
+  rest: string;
 }
 
-function parseProAgentHtml(html: string, todayStr: string): ProAgentTicket[] {
+function parseBolgeHareketHtml(html: string): ProAgentTicket[] {
   const tickets: ProAgentTicket[] = [];
 
-  // Match each <tr ...> ... </tr> block
-  const trRegex = /<tr[^>]*(?:style="background-color:\s*([^"]*)")?[^>]*>([\s\S]*?)<\/tr>/gi;
+  const trRegex = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
   let trMatch;
 
   while ((trMatch = trRegex.exec(html)) !== null) {
-    const rowColor = trMatch[1] || '';
-    const rowHtml = trMatch[2];
+    const rowHtml = trMatch[1];
 
-    // Extract all <td> contents
+    // Extract all <td> contents (raw HTML preserved for select parsing)
     const tdRegex = /<td[^>]*>([\s\S]*?)<\/td>/gi;
-    const cells: string[] = [];
+    const cellsRaw: string[] = [];
     let tdMatch;
     while ((tdMatch = tdRegex.exec(rowHtml)) !== null) {
-      // Strip HTML tags and trim
-      cells.push(tdMatch[1].replace(/<[^>]*>/g, '').trim());
+      cellsRaw.push(tdMatch[1]);
     }
 
-    // Need at least 19 columns (No through Rest)
-    if (cells.length < 15) continue;
-    // Skip header row
-    if (cells[0] === 'No' || cells[0] === '') continue;
+    if (cellsRaw.length < 10) continue;
 
-    const tarih = cells[3] || '';
-    // Filter for today only
-    if (tarih !== todayStr) continue;
+    const clean = (s: string) => s.replace(/<[^>]*>/g, '').trim();
+    const no = clean(cellsRaw[0]);
+    if (!no || isNaN(parseInt(no))) continue;
+
+    // Col1 has <select> with status — find selected option
+    let durum = '-';
+    const selectedMatch = cellsRaw[1]?.match(/selected[^>]*>(.*?)<\/option/i);
+    if (selectedMatch) durum = selectedMatch[1].trim();
 
     tickets.push({
-      no: cells[0],
-      biletId: cells[1],
-      saat: cells[2],
-      tarih,
-      rehber: cells[4],
-      acente: cells[5],
-      tedarikci: cells[6],
-      turAdi: cells[7],
-      biletNo: cells[8],
-      yolcu: parseInt(cells[9]) || 0,
-      cikmis: parseInt(cells[10]) || 0,
-      i: cells[11],
-      m: cells[12],
-      otel: cells[13],
-      irtibat: cells[14],
-      dil: cells[15] || '',
-      aciklama: cells[17] || '',
-      rowColor: rowColor.toLowerCase(),
+      no,
+      durum,
+      saat: clean(cellsRaw[2]),
+      otel: clean(cellsRaw[3]),
+      bolge: clean(cellsRaw[4]),
+      yolcu: parseInt(clean(cellsRaw[5])) || 0,
+      cocuk: parseInt(clean(cellsRaw[6])) || 0,
+      acente: clean(cellsRaw[9]),
+      tedarikci: clean(cellsRaw[10]),
+      tur: clean(cellsRaw[11]),
+      irtibat: clean(cellsRaw[12]),
+      telefon: clean(cellsRaw[13]),
+      rest: clean(cellsRaw[17] || ''),
     });
   }
 
@@ -1339,16 +1328,6 @@ function parseProAgentHtml(html: string, todayStr: string): ProAgentTicket[] {
 router.get('/operations/proagent', authenticate, requireRole('ADMIN', 'SUPER_ADMIN'), asyncHandler(async (req: AuthRequest, res: any) => {
   const cookie = await proagentLogin();
 
-  const response = await fetch('https://proagent.tr/proagentData/ada/bilet/biletList.php', {
-    method: 'POST',
-    headers: {
-      Cookie: cookie,
-      Referer: 'https://proagent.tr/ulusky/',
-    },
-  });
-
-  const html = await response.text();
-
   // Today in DD-MM-YYYY format
   const now = new Date();
   const dd = String(now.getDate()).padStart(2, '0');
@@ -1356,24 +1335,38 @@ router.get('/operations/proagent', authenticate, requireRole('ADMIN', 'SUPER_ADM
   const yyyy = now.getFullYear();
   const todayStr = `${dd}-${mm}-${yyyy}`;
 
-  const tickets = parseProAgentHtml(html, todayStr);
+  // bolgeHareketList — contains status dropdown per ticket
+  const response = await fetch('https://proagent.tr/proagentData/ada/reports/bolgesel_liste/bolgeHareketList.php', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      Cookie: cookie,
+      Referer: 'https://proagent.tr/ulusky/',
+    },
+    body: `tarih1=${todayStr}&tarih2=${todayStr}&BolgeUstBolgeFiltre=ust_Bolge&siralaFiltre=Saat`,
+  });
+
+  const html = await response.text();
+  const tickets = parseBolgeHareketHtml(html);
 
   // Summary stats
-  const totalPax = tickets.reduce((sum, t) => sum + t.yolcu, 0);
-  const turBitti = tickets.reduce((sum, t) => sum + t.cikmis, 0);
-  const kalan = totalPax - turBitti;
+  const totalPax = tickets.reduce((sum, t) => sum + t.yolcu + t.cocuk, 0);
+  const turBitti = tickets.filter(t => t.durum === 'Tur Bitti').reduce((s, t) => s + t.yolcu + t.cocuk, 0);
+  const ofiste = tickets.filter(t => t.durum === 'Ofiste').reduce((s, t) => s + t.yolcu + t.cocuk, 0);
+  const transferde = tickets.filter(t => t.durum === 'Transfer Sürecinde').reduce((s, t) => s + t.yolcu + t.cocuk, 0);
+  const ucusta = tickets.filter(t => t.durum === 'Uçusta').reduce((s, t) => s + t.yolcu + t.cocuk, 0);
+  const bekleyen = tickets.filter(t => t.durum === '-' || t.durum === '').reduce((s, t) => s + t.yolcu + t.cocuk, 0);
+  const ulasilamadi = tickets.filter(t => t.durum === 'Ulaşılamadı').reduce((s, t) => s + t.yolcu + t.cocuk, 0);
 
   // Group by time slot
-  const byTime: Record<string, { saat: string; kisi: number; cikmis: number; tickets: ProAgentTicket[] }> = {};
+  const byTime: Record<string, { saat: string; kisi: number; tickets: ProAgentTicket[] }> = {};
   for (const t of tickets) {
     if (!byTime[t.saat]) {
-      byTime[t.saat] = { saat: t.saat, kisi: 0, cikmis: 0, tickets: [] };
+      byTime[t.saat] = { saat: t.saat, kisi: 0, tickets: [] };
     }
-    byTime[t.saat].kisi += t.yolcu;
-    byTime[t.saat].cikmis += t.cikmis;
+    byTime[t.saat].kisi += t.yolcu + t.cocuk;
     byTime[t.saat].tickets.push(t);
   }
-
   const timeSlots = Object.values(byTime).sort((a, b) => a.saat.localeCompare(b.saat));
 
   res.json({
@@ -1381,7 +1374,7 @@ router.get('/operations/proagent', authenticate, requireRole('ADMIN', 'SUPER_ADM
     data: {
       date: todayStr,
       tickets,
-      summary: { totalPax, turBitti, kalan },
+      summary: { totalPax, turBitti, ofiste, transferde, ucusta, bekleyen, ulasilamadi },
       timeSlots,
     },
   });
