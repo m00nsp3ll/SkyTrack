@@ -100,8 +100,6 @@ export default function LiveFlightsPage() {
   const [showBulkCancel, setShowBulkCancel] = useState(false)
   const [cancelling, setCancelling] = useState(false)
   const [updatingId, setUpdatingId] = useState<string | null>(null)
-  const [proagentData, setProagentData] = useState<any>(null)
-  const [proagentLoading, setProagentLoading] = useState(false)
 
   // Manuel admin status değiştirme — uygulaması olmayan pilotlar için
   const adminUpdateStatus = async (flightId: string, newStatus: string) => {
@@ -142,18 +140,6 @@ export default function LiveFlightsPage() {
     } catch {}
   }
 
-  const fetchProagent = async () => {
-    setProagentLoading(true)
-    try {
-      const res = await api.get('/flights/operations/proagent')
-      setProagentData(res.data.data)
-    } catch (e: any) {
-      console.error('ProAgent fetch failed:', e)
-      alert('ProAgent verisi alınamadı')
-    } finally {
-      setProagentLoading(false)
-    }
-  }
 
   useEffect(() => {
     fetchData()
@@ -623,104 +609,6 @@ export default function LiveFlightsPage() {
         </Card>
       )}
 
-      {/* Operasyon — ProAgent */}
-      <Card>
-        <CardHeader className="bg-orange-50 border-b border-orange-200">
-          <CardTitle className="flex items-center justify-between">
-            <span className="flex items-center gap-2 text-orange-700">
-              <Users className="h-5 w-5" />
-              Operasyon (ProAgent)
-            </span>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={fetchProagent}
-              disabled={proagentLoading}
-              className="text-orange-700 border-orange-300 hover:bg-orange-100"
-            >
-              <RefreshCw className={`h-4 w-4 mr-1 ${proagentLoading ? 'animate-spin' : ''}`} />
-              Güncelle
-            </Button>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-4">
-          {!proagentData ? (
-            <p className="text-sm text-gray-500 text-center py-4">
-              Veri yok — &quot;Güncelle&quot; butonuna tıklayın
-            </p>
-          ) : (
-            <>
-              {/* Summary */}
-              <div className="grid grid-cols-3 gap-3 mb-4">
-                <div className="bg-blue-50 rounded-lg p-3 text-center">
-                  <p className="text-2xl font-bold text-blue-700">{proagentData.summary.totalPax}</p>
-                  <p className="text-xs text-blue-600">Toplam Kişi</p>
-                </div>
-                <div className="bg-green-50 rounded-lg p-3 text-center">
-                  <p className="text-2xl font-bold text-green-700">{proagentData.summary.turBitti}</p>
-                  <p className="text-xs text-green-600">Tur Bitti</p>
-                </div>
-                <div className="bg-amber-50 rounded-lg p-3 text-center">
-                  <p className="text-2xl font-bold text-amber-700">{proagentData.summary.kalan}</p>
-                  <p className="text-xs text-amber-600">Kalan Kişi</p>
-                </div>
-              </div>
-
-              {/* Time slot table */}
-              <div className="border rounded-lg overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead className="bg-gray-100">
-                    <tr>
-                      <th className="text-left px-3 py-2 font-medium">Saat</th>
-                      <th className="text-center px-3 py-2 font-medium">Kişi</th>
-                      <th className="text-center px-3 py-2 font-medium">Çıkmış</th>
-                      <th className="text-left px-3 py-2 font-medium">Durum</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y">
-                    {proagentData.timeSlots.map((slot: any) => {
-                      const allDone = slot.cikmis >= slot.kisi && slot.kisi > 0
-                      const someDone = slot.cikmis > 0 && slot.cikmis < slot.kisi
-                      const bgClass = allDone
-                        ? 'bg-green-50'
-                        : someDone
-                        ? 'bg-yellow-50'
-                        : ''
-                      const statusText = allDone
-                        ? 'Tur Bitti'
-                        : someDone
-                        ? 'Devam Ediyor'
-                        : 'Bekliyor'
-                      const statusColor = allDone
-                        ? 'text-green-700 bg-green-100'
-                        : someDone
-                        ? 'text-yellow-700 bg-yellow-100'
-                        : 'text-gray-700 bg-gray-100'
-
-                      return (
-                        <tr key={slot.saat} className={bgClass}>
-                          <td className="px-3 py-2 font-semibold">{slot.saat}</td>
-                          <td className="px-3 py-2 text-center">{slot.kisi}</td>
-                          <td className="px-3 py-2 text-center">{slot.cikmis}</td>
-                          <td className="px-3 py-2">
-                            <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${statusColor}`}>
-                              {statusText}
-                            </span>
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-
-              <p className="text-xs text-gray-400 mt-2 text-right">
-                Tarih: {proagentData.date}
-              </p>
-            </>
-          )}
-        </CardContent>
-      </Card>
 
       {/* Pilot Status Grid */}
       <Card>

@@ -30,6 +30,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Bell,
+  Radio,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cleanupFcmToken } from '@/lib/nativePush'
@@ -70,6 +71,8 @@ const menuGroups: MenuGroup[] = [
       { href: '/admin/customers', label: 'Müşteri Listesi', icon: Users,
         color: 'text-green-600', activeBg: 'bg-green-600', activeText: 'text-white', hoverBg: 'hover:bg-green-50' },
       { href: '/admin/flights', label: 'Uçuş Takibi', icon: Plane,
+        color: 'text-green-600', activeBg: 'bg-green-600', activeText: 'text-white', hoverBg: 'hover:bg-green-50' },
+      { href: '/admin/operations', label: 'Operasyon', icon: Radio,
         color: 'text-green-600', activeBg: 'bg-green-600', activeText: 'text-white', hoverBg: 'hover:bg-green-50' },
     ],
   },

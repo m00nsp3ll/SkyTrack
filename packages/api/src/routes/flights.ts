@@ -1243,20 +1243,19 @@ async function proagentLogin(): Promise<string> {
     }
   );
 
+  // Cookie adı PHPSESSID değil, proagent_tr_26_ulusky olabiliyor
   const setCookie = res.headers.getSetCookie?.() || [];
-  const phpSession = setCookie
+  let sessionCookie = setCookie
     .map((c: string) => c.split(';')[0])
-    .find((c: string) => c.startsWith('PHPSESSID='));
+    .find((c: string) => c.includes('='));
 
-  if (!phpSession) {
-    // Try to extract from headers if getSetCookie is not available
+  if (!sessionCookie) {
     const raw = res.headers.get('set-cookie') || '';
-    const match = raw.match(/PHPSESSID=[^;]+/);
+    const match = raw.match(/[^;,\s]+=[^;,\s]+/);
     if (!match) throw new Error('ProAgent login failed — no session cookie');
-    proagentCookie = match[0];
-  } else {
-    proagentCookie = phpSession;
+    sessionCookie = match[0];
   }
+  proagentCookie = sessionCookie;
 
   proagentCookieExpiry = Date.now() + 30 * 60 * 1000; // 30 min
   return proagentCookie!;
