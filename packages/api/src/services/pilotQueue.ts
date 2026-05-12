@@ -24,22 +24,24 @@ export const pilotQueueService = {
    * Get the next available pilot for assignment
    * Uses Redis cache for performance, falls back to DB
    */
-  async getNextPilot(): Promise<Pilot | null> {
-    // Try cache first
-    const cached = await cache.pilotQueue.get();
-    if (cached && Array.isArray(cached) && cached.length > 0) {
-      const availablePilot = cached.find(
-        (p: QueuedPilot) =>
-          p.status === 'AVAILABLE' &&
-          p.dailyFlightCount < p.maxDailyFlights &&
-          (p as any).isInExcel === true
-      );
+  async getNextPilot(excludeIds?: string[]): Promise<Pilot | null> {
+    // Try cache first (skip if excludeIds provided — need fresh DB query)
+    if (!excludeIds?.length) {
+      const cached = await cache.pilotQueue.get();
+      if (cached && Array.isArray(cached) && cached.length > 0) {
+        const availablePilot = cached.find(
+          (p: QueuedPilot) =>
+            p.status === 'AVAILABLE' &&
+            p.dailyFlightCount < p.maxDailyFlights &&
+            (p as any).isInExcel === true
+        );
 
-      if (availablePilot) {
-        // Get fresh data from DB to ensure accuracy
-        return prisma.pilot.findUnique({
-          where: { id: availablePilot.id },
-        });
+        if (availablePilot) {
+          // Get fresh data from DB to ensure accuracy
+          return prisma.pilot.findUnique({
+            where: { id: availablePilot.id },
+          });
+        }
       }
     }
 
@@ -55,6 +57,7 @@ export const pilotQueueService = {
         isInExcel: true,
         status: 'AVAILABLE',
         dailyFlightCount: { lt: prisma.pilot.fields.maxDailyFlights },
+        ...(excludeIds?.length ? { id: { notIn: excludeIds } } : {}),
         OR: [
           { lockedUntilRound: null },
           { lockedUntilRound: { lte: currentRound } },

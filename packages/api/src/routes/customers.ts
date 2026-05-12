@@ -344,7 +344,20 @@ router.post('/', authenticate, requireRole('ADMIN', 'OFFICE_STAFF', 'KIOSK'), as
   }
 
   // Sıradaki pilotu ÖNERİ olarak kaydet (flight oluşturma, round_count artırma)
-  const suggestedPilot = await pilotQueueService.getNextPilot();
+  // Zaten başka müşteriye önerilmiş pilotları atla (aynı pilot tekrar önerilmesin)
+  const pendingSuggestions = await prisma.customer.findMany({
+    where: {
+      status: 'REGISTERED',
+      suggestedPilotId: { not: null },
+      assignedPilotId: null,
+    },
+    select: { suggestedPilotId: true },
+  });
+  const excludePilotIds = pendingSuggestions
+    .map((c: any) => c.suggestedPilotId)
+    .filter((id: string | null): id is string => id !== null);
+
+  const suggestedPilot = await pilotQueueService.getNextPilot(excludePilotIds);
 
   if (suggestedPilot) {
     await prisma.customer.update({
