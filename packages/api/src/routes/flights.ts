@@ -397,20 +397,35 @@ router.get('/queue-history', authenticate, asyncHandler(async (req: AuthRequest,
   flights.forEach(f => history.push({ id: f.id, type: 'UÇUŞ', pilotName: f.pilot.name, pilotQueuePosition: f.pilot.queuePosition, customerDisplayId: f.customer.displayId, customerName: `${f.customer.firstName} ${f.customer.lastName}`, status: f.status, time: f.createdAt, notes: f.cancellationReason === 'CUSTOMER_CANCEL' ? 'Müşteri İptal' : null }));
   forfeits.forEach(f => history.push({ id: f.id + '-f', type: 'FERAGAT', pilotName: f.pilot.name, pilotQueuePosition: f.pilot.queuePosition, customerDisplayId: f.customer?.displayId || '-', customerName: f.customer ? `${f.customer.firstName} ${f.customer.lastName}` : '-', status: 'CANCELLED', time: f.createdAt, notes: f.notes || 'Feragat' }));
   // Sıra pozisyonuna göre sırala (Excel sırası)
-  // Her pilotun başlangıç round'u = güncel roundCount - bugünkü aktivite sayısı
-  const activityCount: Record<number, number> = {};
-  for (const h of history) {
-    activityCount[h.pilotQueuePosition] = (activityCount[h.pilotQueuePosition] || 0) + 1;
-  }
+  // Her pilotun başlangıç round'u ve tur numarası hesapla
   const allPilotsForSort = await prisma.pilot.findMany({
     where: { isActive: true, isInExcel: true },
     select: { queuePosition: true, roundCount: true },
   });
+  const currentRounds: Record<number, number> = {};
+  for (const p of allPilotsForSort) {
+    currentRounds[p.queuePosition] = p.roundCount;
+  }
+
+  // Her pilotun kaçıncı aktivitesi olduğunu zaman sırasına göre belirle
+  // Önce zamana göre sırala, sonra her pilota tur numarası ver
+  history.sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime());
+  const pilotTurnCounter: Record<number, number> = {};
+  for (const h of history) {
+    const pos = h.pilotQueuePosition;
+    pilotTurnCounter[pos] = (pilotTurnCounter[pos] || 0) + 1;
+    h.turnNumber = pilotTurnCounter[pos]; // 1. tur, 2. tur, ...
+  }
+
+  // Başlangıç round = güncel round - toplam aktivite sayısı
   const startRounds: Record<number, number> = {};
   for (const p of allPilotsForSort) {
-    startRounds[p.queuePosition] = p.roundCount - (activityCount[p.queuePosition] || 0);
+    startRounds[p.queuePosition] = p.roundCount - (pilotTurnCounter[p.queuePosition] || 0);
   }
+
+  // Sırala: tur numarası ASC → başlangıç round ASC → queuePosition ASC
   history.sort((a, b) => {
+    if (a.turnNumber !== b.turnNumber) return a.turnNumber - b.turnNumber;
     const aStart = startRounds[a.pilotQueuePosition] ?? 999;
     const bStart = startRounds[b.pilotQueuePosition] ?? 999;
     if (aStart !== bStart) return aStart - bStart;
