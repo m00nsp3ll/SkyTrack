@@ -1280,11 +1280,15 @@ interface ProAgentTicket {
 function parseBolgeHareketHtml(html: string): ProAgentTicket[] {
   const tickets: ProAgentTicket[] = [];
 
-  const trRegex = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
+  const trRegex = /<tr([^>]*)>([\s\S]*?)<\/tr>/gi;
   let trMatch;
 
   while ((trMatch = trRegex.exec(html)) !== null) {
-    const rowHtml = trMatch[1];
+    const rowAttrs = trMatch[1] || '';
+    const rowHtml = trMatch[2];
+
+    // İptal kontrolü: background-color: pink veya line-through
+    const isIptal = rowAttrs.includes('pink') || rowAttrs.includes('line-through');
 
     // Extract all <td> contents (raw HTML preserved for select parsing)
     const tdRegex = /<td[^>]*>([\s\S]*?)<\/td>/gi;
@@ -1302,8 +1306,12 @@ function parseBolgeHareketHtml(html: string): ProAgentTicket[] {
 
     // Col1 has <select> with status — find selected option
     let durum = '-';
-    const selectedMatch = cellsRaw[1]?.match(/selected[^>]*>(.*?)<\/option/i);
-    if (selectedMatch) durum = selectedMatch[1].trim();
+    if (isIptal) {
+      durum = 'İptal';
+    } else {
+      const selectedMatch = cellsRaw[1]?.match(/selected[^>]*>(.*?)<\/option/i);
+      if (selectedMatch) durum = selectedMatch[1].trim();
+    }
 
     tickets.push({
       no,
@@ -1357,6 +1365,9 @@ router.get('/operations/proagent', authenticate, requireRole('ADMIN', 'SUPER_ADM
   const ucusta = tickets.filter(t => t.durum === 'Uçusta').reduce((s, t) => s + t.yolcu + t.cocuk, 0);
   const bekleyen = tickets.filter(t => t.durum === '-' || t.durum === '').reduce((s, t) => s + t.yolcu + t.cocuk, 0);
   const ulasilamadi = tickets.filter(t => t.durum === 'Ulaşılamadı').reduce((s, t) => s + t.yolcu + t.cocuk, 0);
+  const iptal = tickets.filter(t => t.durum === 'İptal').reduce((s, t) => s + t.yolcu + t.cocuk, 0);
+  const totalKisi = tickets.reduce((s, t) => s + t.yolcu, 0);
+  const totalCocuk = tickets.reduce((s, t) => s + t.cocuk, 0);
 
   // Group by time slot
   const byTime: Record<string, { saat: string; kisi: number; tickets: ProAgentTicket[] }> = {};
@@ -1374,7 +1385,7 @@ router.get('/operations/proagent', authenticate, requireRole('ADMIN', 'SUPER_ADM
     data: {
       date: todayStr,
       tickets,
-      summary: { totalPax, turBitti, ofiste, transferde, ucusta, bekleyen, ulasilamadi },
+      summary: { totalPax, totalKisi, totalCocuk, turBitti, ofiste, transferde, ucusta, bekleyen, ulasilamadi, iptal },
       timeSlots,
     },
   });
