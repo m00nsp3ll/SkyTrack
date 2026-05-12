@@ -396,7 +396,26 @@ router.get('/queue-history', authenticate, asyncHandler(async (req: AuthRequest,
   const history: any[] = [];
   flights.forEach(f => history.push({ id: f.id, type: 'UÇUŞ', pilotName: f.pilot.name, pilotQueuePosition: f.pilot.queuePosition, customerDisplayId: f.customer.displayId, customerName: `${f.customer.firstName} ${f.customer.lastName}`, status: f.status, time: f.createdAt, notes: f.cancellationReason === 'CUSTOMER_CANCEL' ? 'Müşteri İptal' : null }));
   forfeits.forEach(f => history.push({ id: f.id + '-f', type: 'FERAGAT', pilotName: f.pilot.name, pilotQueuePosition: f.pilot.queuePosition, customerDisplayId: f.customer?.displayId || '-', customerName: f.customer ? `${f.customer.firstName} ${f.customer.lastName}` : '-', status: 'CANCELLED', time: f.createdAt, notes: f.notes || 'Feragat' }));
-  history.sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime());
+  // Sıra pozisyonuna göre sırala (Excel sırası)
+  // Her pilotun başlangıç round'u = güncel roundCount - bugünkü aktivite sayısı
+  const activityCount: Record<number, number> = {};
+  for (const h of history) {
+    activityCount[h.pilotQueuePosition] = (activityCount[h.pilotQueuePosition] || 0) + 1;
+  }
+  const allPilotsForSort = await prisma.pilot.findMany({
+    where: { isActive: true, isInExcel: true },
+    select: { queuePosition: true, roundCount: true },
+  });
+  const startRounds: Record<number, number> = {};
+  for (const p of allPilotsForSort) {
+    startRounds[p.queuePosition] = p.roundCount - (activityCount[p.queuePosition] || 0);
+  }
+  history.sort((a, b) => {
+    const aStart = startRounds[a.pilotQueuePosition] ?? 999;
+    const bStart = startRounds[b.pilotQueuePosition] ?? 999;
+    if (aStart !== bStart) return aStart - bStart;
+    return a.pilotQueuePosition - b.pilotQueuePosition;
+  });
 
   // Excel görünümü: her pilot için bugünkü sortileri (7 kutu)
   const allPilots = await prisma.pilot.findMany({
