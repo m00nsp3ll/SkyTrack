@@ -1222,4 +1222,170 @@ router.post('/:id/notes', authenticate, asyncHandler(async (req: AuthRequest, re
   });
 }));
 
+// ─── ProAgent Operasyon Endpoint ─────────────────────────────────────
+// Cached session cookie for ProAgent
+let proagentCookie: string | null = null;
+let proagentCookieExpiry: number = 0;
+
+async function proagentLogin(): Promise<string> {
+  // Re-use cached cookie if still valid (30 min TTL)
+  if (proagentCookie && Date.now() < proagentCookieExpiry) {
+    return proagentCookie;
+  }
+
+  const res = await fetch(
+    'https://proagent.tr/ulusky/login/LoginSorgu.php?bay=GirisYapKontrol',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: 'k_adi=HarunS&sifre=3707',
+      redirect: 'manual',
+    }
+  );
+
+  const setCookie = res.headers.getSetCookie?.() || [];
+  const phpSession = setCookie
+    .map((c: string) => c.split(';')[0])
+    .find((c: string) => c.startsWith('PHPSESSID='));
+
+  if (!phpSession) {
+    // Try to extract from headers if getSetCookie is not available
+    const raw = res.headers.get('set-cookie') || '';
+    const match = raw.match(/PHPSESSID=[^;]+/);
+    if (!match) throw new Error('ProAgent login failed — no session cookie');
+    proagentCookie = match[0];
+  } else {
+    proagentCookie = phpSession;
+  }
+
+  proagentCookieExpiry = Date.now() + 30 * 60 * 1000; // 30 min
+  return proagentCookie!;
+}
+
+interface ProAgentTicket {
+  no: string;
+  biletId: string;
+  saat: string;
+  tarih: string;
+  rehber: string;
+  acente: string;
+  tedarikci: string;
+  turAdi: string;
+  biletNo: string;
+  yolcu: number;
+  cikmis: number;
+  i: string;
+  m: string;
+  otel: string;
+  irtibat: string;
+  dil: string;
+  aciklama: string;
+  rowColor: string;
+}
+
+function parseProAgentHtml(html: string, todayStr: string): ProAgentTicket[] {
+  const tickets: ProAgentTicket[] = [];
+
+  // Match each <tr ...> ... </tr> block
+  const trRegex = /<tr[^>]*(?:style="background-color:\s*([^"]*)")?[^>]*>([\s\S]*?)<\/tr>/gi;
+  let trMatch;
+
+  while ((trMatch = trRegex.exec(html)) !== null) {
+    const rowColor = trMatch[1] || '';
+    const rowHtml = trMatch[2];
+
+    // Extract all <td> contents
+    const tdRegex = /<td[^>]*>([\s\S]*?)<\/td>/gi;
+    const cells: string[] = [];
+    let tdMatch;
+    while ((tdMatch = tdRegex.exec(rowHtml)) !== null) {
+      // Strip HTML tags and trim
+      cells.push(tdMatch[1].replace(/<[^>]*>/g, '').trim());
+    }
+
+    // Need at least 19 columns (No through Rest)
+    if (cells.length < 15) continue;
+    // Skip header row
+    if (cells[0] === 'No' || cells[0] === '') continue;
+
+    const tarih = cells[3] || '';
+    // Filter for today only
+    if (tarih !== todayStr) continue;
+
+    tickets.push({
+      no: cells[0],
+      biletId: cells[1],
+      saat: cells[2],
+      tarih,
+      rehber: cells[4],
+      acente: cells[5],
+      tedarikci: cells[6],
+      turAdi: cells[7],
+      biletNo: cells[8],
+      yolcu: parseInt(cells[9]) || 0,
+      cikmis: parseInt(cells[10]) || 0,
+      i: cells[11],
+      m: cells[12],
+      otel: cells[13],
+      irtibat: cells[14],
+      dil: cells[15] || '',
+      aciklama: cells[17] || '',
+      rowColor: rowColor.toLowerCase(),
+    });
+  }
+
+  return tickets;
+}
+
+router.get('/operations/proagent', authenticate, requireRole('ADMIN', 'SUPER_ADMIN'), asyncHandler(async (req: AuthRequest, res: any) => {
+  const cookie = await proagentLogin();
+
+  const response = await fetch('https://proagent.tr/proagentData/ada/bilet/biletList.php', {
+    method: 'POST',
+    headers: {
+      Cookie: cookie,
+      Referer: 'https://proagent.tr/ulusky/',
+    },
+  });
+
+  const html = await response.text();
+
+  // Today in DD-MM-YYYY format
+  const now = new Date();
+  const dd = String(now.getDate()).padStart(2, '0');
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const yyyy = now.getFullYear();
+  const todayStr = `${dd}-${mm}-${yyyy}`;
+
+  const tickets = parseProAgentHtml(html, todayStr);
+
+  // Summary stats
+  const totalPax = tickets.reduce((sum, t) => sum + t.yolcu, 0);
+  const turBitti = tickets.reduce((sum, t) => sum + t.cikmis, 0);
+  const kalan = totalPax - turBitti;
+
+  // Group by time slot
+  const byTime: Record<string, { saat: string; kisi: number; cikmis: number; tickets: ProAgentTicket[] }> = {};
+  for (const t of tickets) {
+    if (!byTime[t.saat]) {
+      byTime[t.saat] = { saat: t.saat, kisi: 0, cikmis: 0, tickets: [] };
+    }
+    byTime[t.saat].kisi += t.yolcu;
+    byTime[t.saat].cikmis += t.cikmis;
+    byTime[t.saat].tickets.push(t);
+  }
+
+  const timeSlots = Object.values(byTime).sort((a, b) => a.saat.localeCompare(b.saat));
+
+  res.json({
+    success: true,
+    data: {
+      date: todayStr,
+      tickets,
+      summary: { totalPax, turBitti, kalan },
+      timeSlots,
+    },
+  });
+}));
+
 export default router;

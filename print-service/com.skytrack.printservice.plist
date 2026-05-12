@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.skytrack.printservice</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/opt/homebrew/bin/node</string>
+        <string>/Users/harunsivasli/parasut/print-service/index.js</string>
+    </array>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>TOKEN</key>
+        <string>eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJlNWE1YmIwZC1iNjk3LTQ0YzAtYjdmZC04ZjI2NTc3ZGFlMDEiLCJyb2xlIjoiQURNSU4iLCJwaWxvdElkIjpudWxsLCJwdiI6IlBoTFhmcWkyIiwiaWF0IjoxNzc2OTU2OTcxLCJleHAiOjE3Nzk1NDg5NzF9.s_4GTO9qM14vrB9LYh939-NkxCMyEC9xsf4cloXVLGE</string>
+        <key>SOCKET_URL</key>
+        <string>https://api.skytrackyp.com</string>
+    </dict>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>/tmp/skytrack-print.log</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/skytrack-print.log</string>
+    <key>WorkingDirectory</key>
+    <string>/Users/harunsivasli/parasut/print-service</string>
+</dict>
+</plist>
