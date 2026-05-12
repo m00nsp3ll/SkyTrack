@@ -1336,12 +1336,15 @@ function parseBolgeHareketHtml(html: string): ProAgentTicket[] {
 router.get('/operations/proagent', authenticate, requireRole('ADMIN', 'SUPER_ADMIN'), asyncHandler(async (req: AuthRequest, res: any) => {
   const cookie = await proagentLogin();
 
-  // Today in DD-MM-YYYY format
-  const now = new Date();
-  const dd = String(now.getDate()).padStart(2, '0');
-  const mm = String(now.getMonth() + 1).padStart(2, '0');
-  const yyyy = now.getFullYear();
-  const todayStr = `${dd}-${mm}-${yyyy}`;
+  // Tarih: query param veya bugün
+  let dateStr = req.query.date as string;
+  if (!dateStr || dateStr === 'today') {
+    const now = new Date();
+    const dd = String(now.getDate()).padStart(2, '0');
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const yyyy = now.getFullYear();
+    dateStr = `${dd}-${mm}-${yyyy}`;
+  }
 
   // bolgeHareketList — contains status dropdown per ticket
   const response = await fetch('https://proagent.tr/proagentData/ada/reports/bolgesel_liste/bolgeHareketList.php', {
@@ -1351,7 +1354,7 @@ router.get('/operations/proagent', authenticate, requireRole('ADMIN', 'SUPER_ADM
       Cookie: cookie,
       Referer: 'https://proagent.tr/ulusky/',
     },
-    body: `tarih1=${todayStr}&tarih2=${todayStr}&BolgeUstBolgeFiltre=ust_Bolge&siralaFiltre=Saat`,
+    body: `tarih1=${dateStr}&tarih2=${dateStr}&BolgeUstBolgeFiltre=ust_Bolge&siralaFiltre=Saat`,
   });
 
   const html = await response.text();
@@ -1383,7 +1386,7 @@ router.get('/operations/proagent', authenticate, requireRole('ADMIN', 'SUPER_ADM
   res.json({
     success: true,
     data: {
-      date: todayStr,
+      date: dateStr,
       tickets,
       summary: { totalPax, totalKisi, totalCocuk, turBitti, ofiste, transferde, ucusta, bekleyen, ulasilamadi, iptal },
       timeSlots,

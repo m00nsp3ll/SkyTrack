@@ -35,11 +35,19 @@ export default function OperationsPage() {
   const [error, setError] = useState<string | null>(null)
   const [lastUpdate, setLastUpdate] = useState<string | null>(null)
   const [hideDone, setHideDone] = useState(false)
+  const [selectedDate, setSelectedDate] = useState<string>('today')
+
+  const getDateLabel = () => {
+    if (selectedDate === 'today') return 'Bugün'
+    if (selectedDate === 'tomorrow') return 'Yarın'
+    return selectedDate
+  }
 
   const fetchData = async () => {
     setLoading(true); setError(null)
     try {
-      const res = await api.get('/flights/operations/proagent')
+      const params = selectedDate !== 'today' ? `?date=${selectedDate}` : ''
+      const res = await api.get(`/flights/operations/proagent${params}`)
       if (res.data.success) { setData(res.data.data); setLastUpdate(new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })) }
     } catch (e: any) { setError(e.response?.data?.message || 'ProAgent verisi alınamadı') }
     finally { setLoading(false) }
@@ -61,23 +69,57 @@ export default function OperationsPage() {
   return (
     <div className="space-y-4 max-w-2xl mx-auto">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Radio className="h-5 w-5 text-emerald-600" />
-          <h1 className="text-lg font-bold">Operasyon</h1>
-          {lastUpdate && <span className="text-xs text-gray-400">({lastUpdate})</span>}
-        </div>
-        <div className="flex gap-2">
-          {data && (
-            <Button size="sm" variant={hideDone ? 'default' : 'outline'} onClick={() => setHideDone(!hideDone)} className="text-xs h-8">
-              {hideDone ? <Eye className="h-3.5 w-3.5 mr-1" /> : <EyeOff className="h-3.5 w-3.5 mr-1" />}
-              {hideDone ? 'Göster' : 'Gizle'}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Radio className="h-5 w-5 text-emerald-600" />
+            <h1 className="text-lg font-bold">Operasyon</h1>
+            {lastUpdate && <span className="text-xs text-gray-400">({lastUpdate})</span>}
+          </div>
+          <div className="flex gap-2">
+            {data && (
+              <Button size="sm" variant={hideDone ? 'default' : 'outline'} onClick={() => setHideDone(!hideDone)} className="text-xs h-8">
+                {hideDone ? <Eye className="h-3.5 w-3.5 mr-1" /> : <EyeOff className="h-3.5 w-3.5 mr-1" />}
+                {hideDone ? 'Göster' : 'Gizle'}
+              </Button>
+            )}
+            <Button onClick={fetchData} disabled={loading} size="sm" className="h-8 bg-emerald-600 hover:bg-emerald-700 text-white">
+              {loading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <RefreshCw className="h-4 w-4 mr-1" />}
+              Güncelle
             </Button>
-          )}
-          <Button onClick={fetchData} disabled={loading} size="sm" className="h-8 bg-emerald-600 hover:bg-emerald-700 text-white">
-            {loading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <RefreshCw className="h-4 w-4 mr-1" />}
-            Güncelle
-          </Button>
+          </div>
+        </div>
+        {/* Tarih seçici */}
+        <div className="flex gap-1.5 overflow-x-auto">
+          {['today', 'tomorrow', 'dayafter'].map(key => {
+            const now = new Date()
+            let label = 'Bugün'
+            let dateStr = key
+            if (key === 'tomorrow') {
+              label = 'Yarın'
+              const d = new Date(now); d.setDate(d.getDate() + 1)
+              dateStr = `${String(d.getDate()).padStart(2,'0')}-${String(d.getMonth()+1).padStart(2,'0')}-${d.getFullYear()}`
+            } else if (key === 'dayafter') {
+              label = 'Öbür Gün'
+              const d = new Date(now); d.setDate(d.getDate() + 2)
+              dateStr = `${String(d.getDate()).padStart(2,'0')}-${String(d.getMonth()+1).padStart(2,'0')}-${d.getFullYear()}`
+            }
+            return (
+              <Button key={key} size="sm" variant={selectedDate === (key === 'today' ? 'today' : dateStr) ? 'default' : 'outline'}
+                onClick={() => { setSelectedDate(key === 'today' ? 'today' : dateStr); setData(null) }}
+                className="text-xs h-7 px-3"
+              >{label}</Button>
+            )
+          })}
+          <input type="date" className="text-xs h-7 border rounded px-2 bg-white"
+            onChange={(e) => {
+              if (e.target.value) {
+                const [y, m, d] = e.target.value.split('-')
+                setSelectedDate(`${d}-${m}-${y}`)
+                setData(null)
+              }
+            }}
+          />
         </div>
       </div>
 
@@ -191,7 +233,7 @@ export default function OperationsPage() {
                                   {cfg.label}
                                 </span>
                                 {t.rest && t.rest !== '0' && (
-                                  <span className="text-[11px] font-bold text-emerald-600">{t.rest}</span>
+                                  <span className="text-[11px] font-black text-red-600 bg-red-100 px-1.5 py-0.5 rounded">{t.rest}</span>
                                 )}
                               </div>
                             </div>
