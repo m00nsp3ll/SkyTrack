@@ -1,9 +1,9 @@
 'use client'
 
 import { useState } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { RefreshCw, Radio, Users, CheckCircle, Clock, MapPin, Loader2, Eye, EyeOff } from 'lucide-react'
+import { RefreshCw, Radio, Users, CheckCircle, Clock, Loader2, Eye, EyeOff } from 'lucide-react'
 import { api } from '@/lib/api'
 
 interface Ticket {
@@ -27,16 +27,9 @@ interface TimeSlot {
 }
 
 interface Summary {
-  totalPax: number
-  totalKisi: number
-  totalCocuk: number
-  turBitti: number
-  ofiste: number
-  transferde: number
-  ucusta: number
-  bekleyen: number
-  ulasilamadi: number
-  iptal: number
+  totalPax: number; totalKisi: number; totalCocuk: number
+  turBitti: number; ofiste: number; transferde: number
+  ucusta: number; bekleyen: number; ulasilamadi: number; iptal: number
 }
 
 interface ProAgentData {
@@ -51,9 +44,9 @@ const durumStyle: Record<string, { label: string; cls: string }> = {
   'Transfer Sürecinde': { label: 'Transferde', cls: 'bg-orange-100 text-orange-700' },
   'Uçusta': { label: 'Uçusta', cls: 'bg-purple-100 text-purple-700' },
   'Ulaşılamadı': { label: 'Ulaşılamadı', cls: 'bg-red-100 text-red-700' },
-  'İptal': { label: 'İptal', cls: 'bg-red-200 text-red-800 line-through' },
-  '-': { label: 'Bekliyor', cls: 'bg-gray-100 text-gray-600' },
-  '': { label: 'Bekliyor', cls: 'bg-gray-100 text-gray-600' },
+  'İptal': { label: 'İptal', cls: 'bg-red-200 text-red-800' },
+  '-': { label: 'Bekliyor', cls: 'bg-amber-100 text-amber-700' },
+  '': { label: 'Bekliyor', cls: 'bg-amber-100 text-amber-700' },
 }
 
 export default function OperationsPage() {
@@ -85,6 +78,15 @@ export default function OperationsPage() {
       ? slot.tickets.filter(t => t.durum !== 'Tur Bitti' && t.durum !== 'İptal')
       : slot.tickets,
   })).filter(slot => slot.tickets.length > 0) || []
+
+  // Sıradaki: henüz gelmemiş (Bekliyor + Transfer) biletler saat bazlı
+  const siradakiSlots = data?.timeSlots
+    .map(slot => {
+      const pending = slot.tickets.filter(t => t.durum === '-' || t.durum === '' || t.durum === 'Transfer Sürecinde')
+      const kisi = pending.reduce((s, t) => s + t.yolcu + t.cocuk, 0)
+      return { saat: slot.saat, kisi, count: pending.length }
+    })
+    .filter(s => s.kisi > 0) || []
 
   const s = data?.summary
 
@@ -124,8 +126,8 @@ export default function OperationsPage() {
 
       {data && s && (
         <>
-          {/* Özet */}
-          <div className="grid grid-cols-3 gap-2">
+          {/* Özet Kartları */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             <Card className="border-blue-200 bg-blue-50">
               <CardContent className="p-2 text-center">
                 <Users className="h-4 w-4 mx-auto text-blue-600 mb-0.5" />
@@ -147,14 +149,35 @@ export default function OperationsPage() {
                 <div className="text-[10px] text-amber-500">Kalan</div>
               </CardContent>
             </Card>
+            {/* Sıradaki kutusu */}
+            <Card className="border-indigo-200 bg-indigo-50">
+              <CardContent className="p-2 text-center">
+                <div className="text-[10px] text-indigo-500 font-medium mb-0.5">Sıradaki</div>
+                {siradakiSlots.length > 0 ? (
+                  <div className="space-y-0.5">
+                    {siradakiSlots.slice(0, 3).map(s => (
+                      <div key={s.saat} className="text-xs">
+                        <span className="font-bold text-indigo-700">{s.saat}</span>
+                        <span className="text-indigo-500 ml-1">{s.kisi} kişi</span>
+                      </div>
+                    ))}
+                    {siradakiSlots.length > 3 && (
+                      <div className="text-[10px] text-indigo-400">+{siradakiSlots.length - 3} saat daha</div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-xs text-indigo-400">Yok</div>
+                )}
+              </CardContent>
+            </Card>
           </div>
 
-          {/* Durum detay */}
+          {/* Durum detay çipleri */}
           <div className="flex flex-wrap gap-1.5 text-[11px]">
             {s.transferde > 0 && <span className="bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full font-medium">Transferde {s.transferde}</span>}
             {s.ofiste > 0 && <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">Ofiste {s.ofiste}</span>}
             {s.ucusta > 0 && <span className="bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-medium">Uçusta {s.ucusta}</span>}
-            {s.bekleyen > 0 && <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-medium">Bekliyor {s.bekleyen}</span>}
+            {s.bekleyen > 0 && <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">Bekliyor {s.bekleyen}</span>}
             {s.ulasilamadi > 0 && <span className="bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-medium">Ulaşılamadı {s.ulasilamadi}</span>}
             {s.iptal > 0 && <span className="bg-red-200 text-red-800 px-2 py-0.5 rounded-full font-medium">İptal {s.iptal}</span>}
           </div>
@@ -164,15 +187,20 @@ export default function OperationsPage() {
             <CardContent className="p-0 divide-y">
               {filteredSlots.map((slot) => {
                 const allDone = slot.tickets.every(t => t.durum === 'Tur Bitti' || t.durum === 'İptal')
+                const slotKalan = slot.tickets.filter(t => t.durum !== 'Tur Bitti' && t.durum !== 'İptal').reduce((s, t) => s + t.yolcu + t.cocuk, 0)
                 return (
                   <div key={slot.saat}>
                     {/* Saat başlığı */}
-                    <div className={`flex items-center justify-between px-3 py-2 ${allDone ? 'bg-green-50' : 'bg-gray-50'}`}>
+                    <div className={`flex items-center justify-between px-3 py-2 ${allDone ? 'bg-gray-100' : 'bg-white border-l-4 border-l-blue-400'}`}>
                       <div className="flex items-center gap-2">
-                        <span className="text-base font-bold w-12">{slot.saat}</span>
+                        <span className={`text-base font-bold ${allDone ? 'text-gray-400' : 'text-gray-800'}`}>{slot.saat}</span>
                         <span className="text-xs text-gray-500">{slot.kisi} kişi</span>
                       </div>
-                      {allDone && <span className="text-[10px] font-bold text-green-600">TAMAM</span>}
+                      {allDone ? (
+                        <CheckCircle className="h-4 w-4 text-gray-400" />
+                      ) : slotKalan > 0 ? (
+                        <span className="text-[10px] font-bold text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded">{slotKalan} bekliyor</span>
+                      ) : null}
                     </div>
                     {/* Bilet satırları */}
                     {slot.tickets.map((t, i) => {
@@ -180,11 +208,10 @@ export default function OperationsPage() {
                       const isIptal = t.durum === 'İptal'
                       const isDone = t.durum === 'Tur Bitti'
                       return (
-                        <div key={i} className={`px-3 py-2 border-t border-gray-100 ${isDone ? 'bg-green-50/50' : isIptal ? 'bg-red-50/50' : ''}`}>
+                        <div key={i} className={`px-3 py-2 border-t border-gray-50 ${isDone ? 'opacity-50' : isIptal ? 'opacity-40' : ''}`}>
                           <div className="flex items-start gap-2">
-                            {/* Sol: bilgi */}
                             <div className="flex-1 min-w-0">
-                              <div className={`text-sm font-medium ${isIptal ? 'line-through text-gray-400' : ''}`}>
+                              <div className={`text-sm font-medium ${isIptal ? 'line-through text-gray-400' : 'text-gray-800'}`}>
                                 {t.otel}
                               </div>
                               <div className="text-[11px] text-gray-500 mt-0.5">
@@ -192,12 +219,9 @@ export default function OperationsPage() {
                                 {' · '}{t.acente}
                               </div>
                               {(t.irtibat || t.telefon) && (
-                                <div className="text-[11px] text-gray-400 mt-0.5">
-                                  {t.irtibat} {t.telefon}
-                                </div>
+                                <div className="text-[11px] text-gray-400 mt-0.5">{t.irtibat} {t.telefon}</div>
                               )}
                             </div>
-                            {/* Sağ: sayılar + durum */}
                             <div className="flex flex-col items-end gap-0.5 flex-shrink-0">
                               <div className="text-sm font-bold">
                                 {t.yolcu}
