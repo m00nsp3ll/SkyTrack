@@ -393,9 +393,20 @@ router.get('/queue-history', authenticate, asyncHandler(async (req: AuthRequest,
     orderBy: { createdAt: 'asc' },
   });
 
+  // Duplicate ID'leri önle (aynı flight hem flights hem forfeits'te çıkabilir)
+  const seenIds = new Set<string>();
   const history: any[] = [];
-  flights.forEach(f => history.push({ id: f.id, type: 'UÇUŞ', pilotName: f.pilot.name, pilotQueuePosition: f.pilot.queuePosition, customerDisplayId: f.customer.displayId, customerName: `${f.customer.firstName} ${f.customer.lastName}`, status: f.status, time: f.createdAt, notes: f.cancellationReason === 'CUSTOMER_CANCEL' ? 'Müşteri İptal' : null }));
-  forfeits.forEach(f => history.push({ id: f.id + '-f', type: 'FERAGAT', pilotName: f.pilot.name, pilotQueuePosition: f.pilot.queuePosition, customerDisplayId: f.customer?.displayId || '-', customerName: f.customer ? `${f.customer.firstName} ${f.customer.lastName}` : '-', status: 'CANCELLED', time: f.createdAt, notes: f.notes || 'Feragat' }));
+  flights.forEach(f => {
+    if (seenIds.has(f.id)) return;
+    seenIds.add(f.id);
+    const type = f.cancellationReason === 'CUSTOMER_CANCEL' ? 'İPTAL' : 'UÇUŞ';
+    history.push({ id: f.id, type, pilotName: f.pilot.name, pilotQueuePosition: f.pilot.queuePosition, customerDisplayId: f.customer.displayId, customerName: `${f.customer.firstName} ${f.customer.lastName}`, status: f.status, time: f.createdAt, notes: f.cancellationReason === 'CUSTOMER_CANCEL' ? 'Müşteri İptal' : null });
+  });
+  forfeits.forEach(f => {
+    if (seenIds.has(f.id)) return;
+    seenIds.add(f.id);
+    history.push({ id: f.id + '-f', type: 'FERAGAT', pilotName: f.pilot.name, pilotQueuePosition: f.pilot.queuePosition, customerDisplayId: f.customer?.displayId || '-', customerName: f.customer ? `${f.customer.firstName} ${f.customer.lastName}` : '-', status: 'CANCELLED', time: f.createdAt, notes: f.notes || 'Feragat' });
+  });
   // Sıra pozisyonuna göre sırala (Excel sırası)
   // Her pilotun başlangıç round'u ve tur numarası hesapla
   const allPilotsForSort = await prisma.pilot.findMany({

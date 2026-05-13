@@ -585,13 +585,14 @@ export default function LiveFlightsPage() {
           <CardContent className="p-0">
             <div className="divide-y max-h-96 overflow-y-auto">
               {queueHistory.map((item: any, i: number) => (
-                <div key={item.id} className={`flex items-center gap-3 px-4 py-2 text-sm ${item.type === 'FERAGAT' ? 'bg-red-50' : item.type === 'İPTAL' ? 'bg-gray-50' : ''}`}>
+                <div key={item.id} className={`flex items-center gap-3 px-4 py-2 text-sm`}
+                  style={{ background: item.type === 'FERAGAT' ? '#fef2f2' : item.type === 'İPTAL' ? '#fefce8' : 'transparent' }}>
                   <span className="text-xs text-gray-400 w-6 text-right">{i + 1}</span>
-                  <span className={`w-16 text-xs font-semibold px-2 py-0.5 rounded text-center ${
-                    item.type === 'UÇUŞ' ? 'bg-green-100 text-green-700' :
-                    item.type === 'FERAGAT' ? 'bg-red-100 text-red-700' :
-                    'bg-gray-100 text-gray-600'
-                  }`}>
+                  <span className="w-16 text-xs font-semibold px-2 py-0.5 rounded text-center"
+                    style={{
+                      background: item.type === 'UÇUŞ' ? '#dcfce7' : item.type === 'FERAGAT' ? '#fee2e2' : '#fef9c3',
+                      color: item.type === 'UÇUŞ' ? '#15803d' : item.type === 'FERAGAT' ? '#b91c1c' : '#a16207',
+                    }}>
                     {item.type}
                   </span>
                   <span className="font-semibold w-40 truncate">{item.pilotName}</span>
