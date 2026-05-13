@@ -18,15 +18,15 @@ interface Summary {
 }
 interface ProAgentData { date: string; summary: Summary; timeSlots: TimeSlot[] }
 
-const durumCfg: Record<string, { label: string; bg: string; text: string; rowBg: string }> = {
-  'Tur Bitti':          { label: 'Tur Bitti',    bg: 'bg-emerald-500', text: 'text-white',      rowBg: 'bg-emerald-50' },
-  'Ofiste':             { label: 'Ofiste',       bg: 'bg-blue-500',    text: 'text-white',      rowBg: 'bg-blue-50' },
-  'Transfer Sürecinde': { label: 'Transferde',   bg: 'bg-orange-500',  text: 'text-white',      rowBg: 'bg-orange-50' },
-  'Uçusta':             { label: 'Uçusta',       bg: 'bg-violet-500',  text: 'text-white',      rowBg: 'bg-violet-50' },
-  'Ulaşılamadı':        { label: 'Ulaşılamadı',  bg: 'bg-red-500',     text: 'text-white',      rowBg: 'bg-red-50' },
-  'İptal':              { label: 'İptal',        bg: 'bg-red-600',     text: 'text-white',      rowBg: 'bg-red-50' },
-  '-':                  { label: 'Bekliyor',     bg: 'bg-amber-400',   text: 'text-white',      rowBg: 'bg-amber-50' },
-  '':                   { label: 'Bekliyor',     bg: 'bg-amber-400',   text: 'text-white',      rowBg: 'bg-amber-50' },
+const durumCfg: Record<string, { label: string; badgeStyle: React.CSSProperties; rowStyle: React.CSSProperties; chipStyle: React.CSSProperties }> = {
+  'Tur Bitti':          { label: 'Tur Bitti',    badgeStyle: { background: '#10b981', color: '#fff' }, rowStyle: { background: '#ecfdf5' }, chipStyle: { background: '#10b981', color: '#fff' } },
+  'Ofiste':             { label: 'Ofiste',       badgeStyle: { background: '#3b82f6', color: '#fff' }, rowStyle: { background: '#eff6ff' }, chipStyle: { background: '#3b82f6', color: '#fff' } },
+  'Transfer Sürecinde': { label: 'Transferde',   badgeStyle: { background: '#f97316', color: '#fff' }, rowStyle: { background: '#fff7ed' }, chipStyle: { background: '#f97316', color: '#fff' } },
+  'Uçusta':             { label: 'Uçusta',       badgeStyle: { background: '#8b5cf6', color: '#fff' }, rowStyle: { background: '#f5f3ff' }, chipStyle: { background: '#8b5cf6', color: '#fff' } },
+  'Ulaşılamadı':        { label: 'Ulaşılamadı',  badgeStyle: { background: '#ef4444', color: '#fff' }, rowStyle: { background: '#fef2f2' }, chipStyle: { background: '#ef4444', color: '#fff' } },
+  'İptal':              { label: 'İptal',        badgeStyle: { background: '#dc2626', color: '#fff' }, rowStyle: { background: '#fef2f2' }, chipStyle: { background: '#dc2626', color: '#fff' } },
+  '-':                  { label: 'Bekliyor',     badgeStyle: { background: '#f59e0b', color: '#fff' }, rowStyle: { background: '#fffbeb' }, chipStyle: { background: '#f59e0b', color: '#fff' } },
+  '':                   { label: 'Bekliyor',     badgeStyle: { background: '#f59e0b', color: '#fff' }, rowStyle: { background: '#fffbeb' }, chipStyle: { background: '#f59e0b', color: '#fff' } },
 }
 
 export default function OperationsPage() {
@@ -171,12 +171,12 @@ export default function OperationsPage() {
 
           {/* Durum çipleri */}
           <div className="flex flex-wrap gap-1.5">
-            {s.transferde > 0 && <span className="bg-orange-500 text-white px-2.5 py-1 rounded-full text-xs font-bold shadow-sm">Transferde {s.transferde}</span>}
-            {s.ofiste > 0 && <span className="bg-blue-500 text-white px-2.5 py-1 rounded-full text-xs font-bold shadow-sm">Ofiste {s.ofiste}</span>}
-            {s.ucusta > 0 && <span className="bg-violet-500 text-white px-2.5 py-1 rounded-full text-xs font-bold shadow-sm">Uçusta {s.ucusta}</span>}
-            {s.bekleyen > 0 && <span className="bg-amber-400 text-white px-2.5 py-1 rounded-full text-xs font-bold shadow-sm">Bekliyor {s.bekleyen}</span>}
-            {s.ulasilamadi > 0 && <span className="bg-red-500 text-white px-2.5 py-1 rounded-full text-xs font-bold shadow-sm">Ulaşılamadı {s.ulasilamadi}</span>}
-            {s.iptal > 0 && <span className="bg-red-600 text-white px-2.5 py-1 rounded-full text-xs font-bold shadow-sm">İptal {s.iptal}</span>}
+            {s.transferde > 0 && <span style={durumCfg['Transfer Sürecinde'].chipStyle} className="px-2.5 py-1 rounded-full text-xs font-bold shadow-sm">Transferde {s.transferde}</span>}
+            {s.ofiste > 0 && <span style={durumCfg['Ofiste'].chipStyle} className="px-2.5 py-1 rounded-full text-xs font-bold shadow-sm">Ofiste {s.ofiste}</span>}
+            {s.ucusta > 0 && <span style={durumCfg['Uçusta'].chipStyle} className="px-2.5 py-1 rounded-full text-xs font-bold shadow-sm">Uçusta {s.ucusta}</span>}
+            {s.bekleyen > 0 && <span style={durumCfg['-'].chipStyle} className="px-2.5 py-1 rounded-full text-xs font-bold shadow-sm">Bekliyor {s.bekleyen}</span>}
+            {s.ulasilamadi > 0 && <span style={durumCfg['Ulaşılamadı'].chipStyle} className="px-2.5 py-1 rounded-full text-xs font-bold shadow-sm">Ulaşılamadı {s.ulasilamadi}</span>}
+            {s.iptal > 0 && <span style={durumCfg['İptal'].chipStyle} className="px-2.5 py-1 rounded-full text-xs font-bold shadow-sm">İptal {s.iptal}</span>}
           </div>
 
           {/* Saat Bazlı Liste */}
@@ -188,16 +188,20 @@ export default function OperationsPage() {
                 return (
                   <div key={slot.saat} className={slotIdx > 0 ? 'border-t-2 border-gray-200' : ''}>
                     {/* Saat başlığı */}
-                    <div className={`flex items-center justify-between px-4 py-2.5 ${allDone ? 'bg-gray-100' : 'bg-gradient-to-r from-slate-700 to-slate-800 text-white'}`}>
+                    <div className="flex items-center justify-between px-4 py-2.5"
+                      style={allDone
+                        ? { background: '#f0fdf4', borderLeft: '4px solid #86efac' }
+                        : { background: '#eef2ff', borderLeft: '4px solid #3b82f6' }
+                      }>
                       <div className="flex items-center gap-3">
-                        <Clock className={`h-4 w-4 ${allDone ? 'text-gray-400' : 'text-white opacity-60'}`} />
-                        <span className={`text-lg font-black ${allDone ? 'text-gray-400' : ''}`}>{slot.saat}</span>
-                        <span className={`text-sm ${allDone ? 'text-gray-400' : 'opacity-70'}`}>{slot.kisi} kişi</span>
+                        <Clock className="h-4 w-4" style={{ color: allDone ? '#86efac' : '#3b82f6' }} />
+                        <span className="text-lg font-black" style={{ color: allDone ? '#9ca3af' : '#1e293b' }}>{slot.saat}</span>
+                        <span className="text-sm" style={{ color: '#64748b' }}>{slot.kisi} kişi</span>
                       </div>
                       {allDone ? (
-                        <span className="text-xs font-bold text-gray-400 flex items-center gap-1"><CheckCircle className="h-3.5 w-3.5" /> Tamam</span>
+                        <span className="text-xs font-bold flex items-center gap-1" style={{ color: '#22c55e' }}><CheckCircle className="h-3.5 w-3.5" /> Tamam</span>
                       ) : slotKalan > 0 ? (
-                        <span className="bg-amber-400 text-white text-xs font-bold px-2 py-0.5 rounded-full">{slotKalan} bekliyor</span>
+                        <span className="text-xs font-bold px-2.5 py-1 rounded-full" style={{ background: '#f59e0b', color: '#fff' }}>{slotKalan} bekliyor</span>
                       ) : null}
                     </div>
                     {/* Biletler */}
@@ -206,7 +210,7 @@ export default function OperationsPage() {
                         const cfg = durumCfg[t.durum] || durumCfg['-']
                         const isIptal = t.durum === 'İptal'
                         return (
-                          <div key={i} className={`px-4 py-2.5 ${cfg.rowBg} ${isIptal ? 'opacity-50' : ''}`}>
+                          <div key={i} className={`px-4 py-2.5 ${isIptal ? 'opacity-50' : ''}`} style={cfg.rowStyle}>
                             <div className="flex items-start gap-3">
                               <div className="flex-1 min-w-0">
                                 <div className={`text-sm font-semibold ${isIptal ? 'line-through text-gray-400' : 'text-gray-800'}`}>
@@ -229,7 +233,7 @@ export default function OperationsPage() {
                                 <div className="text-base font-black text-gray-800">
                                   {t.yolcu}{t.cocuk > 0 && <span className="text-orange-500 text-sm">+{t.cocuk}ç</span>}
                                 </div>
-                                <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${cfg.bg} ${cfg.text}`}>
+                                <span className="text-[11px] font-bold px-2 py-0.5 rounded-full" style={cfg.badgeStyle}>
                                   {cfg.label}
                                 </span>
                                 {t.rest && t.rest !== '0' && (
