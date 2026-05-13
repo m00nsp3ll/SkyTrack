@@ -369,22 +369,21 @@ export default function LiveFlightsPage() {
                       <div className="flex gap-2">
                         <Button
                           size="sm"
-                          variant="outline"
-                          className="text-xs h-7 px-2 border-yellow-400 text-yellow-700 hover:bg-yellow-50"
-                          onClick={(e) => { e.stopPropagation(); adminUpdateStatus(flight.id, 'PICKED_UP') }}
-                          disabled={updatingId === flight.id}
-                        >
-                          <User className="h-3 w-3 mr-1" />
-                          Geri Al
-                        </Button>
-                        <Button
-                          size="sm"
                           className="flex-1 bg-green-600 hover:bg-green-700"
                           onClick={(e) => { e.stopPropagation(); adminUpdateStatus(flight.id, 'COMPLETED') }}
                           disabled={updatingId === flight.id}
                         >
                           <CheckCircle className="h-4 w-4 mr-1" />
                           {updatingId === flight.id ? 'İşleniyor...' : 'Güvenli İniş'}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8 px-2 border-orange-300 text-orange-600 hover:bg-orange-50"
+                          onClick={(e) => { e.stopPropagation(); adminUpdateStatus(flight.id, 'PICKED_UP') }}
+                          disabled={updatingId === flight.id}
+                        >
+                          ↩
                         </Button>
                       </div>
                     </CardContent>
