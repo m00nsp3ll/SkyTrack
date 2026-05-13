@@ -240,10 +240,11 @@ export const pilotQueueService = {
       });
 
       // ATLANAN PİLOT FERAGATİ: Sırası geçmiş ama mesai dışı/mola olan pilotlar feragat yer.
-      // Aynı roundda olup queuePosition'u daha önce olan OFF_DUTY/ON_BREAK/inQueue:false → roundCount +1
-      // Geride kalan pilotlar da +1 artırılır (her atamada 1 round ilerler, birden fazla atlamazlar)
+      // priorityOverride ile sıra başı yapılan pilotta feragat sistemi ÇALIŞMAZ —
+      // çünkü sıra atlanmadı, pilot özel olarak öne alındı.
       const oldRound = pilot.roundCount; // atama öncesi round
-      const skipped = await tx.pilot.findMany({
+      const wasPriority = pilot.priorityOverride; // atama öncesi priority durumu
+      const skipped = wasPriority ? [] : await tx.pilot.findMany({
         where: {
           isActive: true,
           isInExcel: true,
