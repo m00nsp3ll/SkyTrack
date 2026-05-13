@@ -35,6 +35,7 @@ export default function OperationsPage() {
   const [error, setError] = useState<string | null>(null)
   const [lastUpdate, setLastUpdate] = useState<string | null>(null)
   const [hideDone, setHideDone] = useState(false)
+  const [filterDurum, setFilterDurum] = useState<string | null>(null)
   const [selectedDate, setSelectedDate] = useState<string>('today')
 
   const getDateLabel = () => {
@@ -55,7 +56,11 @@ export default function OperationsPage() {
 
   const filteredSlots = data?.timeSlots.map(slot => ({
     ...slot,
-    tickets: hideDone ? slot.tickets.filter(t => t.durum !== 'Tur Bitti' && t.durum !== 'İptal') : slot.tickets,
+    tickets: slot.tickets.filter(t => {
+      if (filterDurum) return t.durum === filterDurum
+      if (hideDone) return t.durum !== 'Tur Bitti' && t.durum !== 'İptal'
+      return true
+    }),
   })).filter(slot => slot.tickets.length > 0) || []
 
   const siradakiSlots = data?.timeSlots
@@ -171,12 +176,27 @@ export default function OperationsPage() {
 
           {/* Durum çipleri */}
           <div className="flex flex-wrap gap-1.5">
-            {s.transferde > 0 && <span style={durumCfg['Transfer Sürecinde'].chipStyle} className="px-2.5 py-1 rounded-full text-xs font-bold shadow-sm">Transferde {s.transferde}</span>}
-            {s.ofiste > 0 && <span style={durumCfg['Ofiste'].chipStyle} className="px-2.5 py-1 rounded-full text-xs font-bold shadow-sm">Ofiste {s.ofiste}</span>}
-            {s.ucusta > 0 && <span style={durumCfg['Uçusta'].chipStyle} className="px-2.5 py-1 rounded-full text-xs font-bold shadow-sm">Uçusta {s.ucusta}</span>}
-            {s.bekleyen > 0 && <span style={durumCfg['-'].chipStyle} className="px-2.5 py-1 rounded-full text-xs font-bold shadow-sm">Bekliyor {s.bekleyen}</span>}
-            {s.ulasilamadi > 0 && <span style={durumCfg['Ulaşılamadı'].chipStyle} className="px-2.5 py-1 rounded-full text-xs font-bold shadow-sm">Ulaşılamadı {s.ulasilamadi}</span>}
-            {s.iptal > 0 && <span style={durumCfg['İptal'].chipStyle} className="px-2.5 py-1 rounded-full text-xs font-bold shadow-sm">İptal {s.iptal}</span>}
+            {([
+              { key: 'Transfer Sürecinde', label: 'Transferde', count: s.transferde },
+              { key: 'Ofiste', label: 'Ofiste', count: s.ofiste },
+              { key: 'Uçusta', label: 'Uçusta', count: s.ucusta },
+              { key: '-', label: 'Bekliyor', count: s.bekleyen },
+              { key: 'Ulaşılamadı', label: 'Ulaşılamadı', count: s.ulasilamadi },
+              { key: 'İptal', label: 'İptal', count: s.iptal },
+              { key: 'Tur Bitti', label: 'Tur Bitti', count: s.turBitti },
+            ] as const).filter(d => d.count > 0).map(d => {
+              const active = filterDurum === d.key
+              const cfg = durumCfg[d.key]
+              return (
+                <span key={d.key}
+                  onClick={() => setFilterDurum(active ? null : d.key)}
+                  style={active ? cfg.chipStyle : { background: '#e5e7eb', color: '#374151' }}
+                  className={`px-2.5 py-1 rounded-full text-xs font-bold shadow-sm cursor-pointer select-none transition-all ${active ? 'ring-2 ring-offset-1 ring-gray-400 scale-105' : 'hover:opacity-80'}`}
+                >
+                  {d.label} {d.count}
+                </span>
+              )
+            })}
           </div>
 
           {/* Saat Bazlı Liste */}
