@@ -407,16 +407,22 @@ router.get('/queue-history', authenticate, asyncHandler(async (req: AuthRequest,
     seenIds.add(f.id);
     history.push({ id: f.id + '-f', type: 'FERAGAT', pilotName: f.pilot.name, pilotQueuePosition: f.pilot.queuePosition, customerDisplayId: f.customer?.displayId || '-', customerName: f.customer ? `${f.customer.firstName} ${f.customer.lastName}` : '-', status: 'CANCELLED', time: f.createdAt, notes: f.notes || 'Feragat' });
   });
-  // Kronolojik sıralama: zaman sırasıyla, aynı saniyede olan kayıtlar queuePosition'a göre
-  // Bu sayede feragat (1sn önce) → uçuş sırası korunur, farklı zamanlardaki olaylar kronolojik kalır
+  // Kronolojik sıralama:
+  // 1. Saniye bazında zaman sırası
+  // 2. Aynı saniyede: FERAGAT önce, UÇUŞ sonra
+  // 3. Aynı saniye + aynı tip: queuePosition'a göre
   history.sort((a, b) => {
-    const timeA = new Date(a.time).getTime();
-    const timeB = new Date(b.time).getTime();
-    // 3 saniye içindeki kayıtlar aynı "batch" — queuePosition'a göre sırala
-    if (Math.abs(timeA - timeB) < 3000) {
-      return a.pilotQueuePosition - b.pilotQueuePosition;
-    }
-    return timeA - timeB;
+    // Saniye hassasiyetinde karşılaştır (milisaniye farkları yok say)
+    const secA = Math.floor(new Date(a.time).getTime() / 1000);
+    const secB = Math.floor(new Date(b.time).getTime() / 1000);
+    if (secA !== secB) return secA - secB;
+    // Aynı saniye: FERAGAT önce
+    const typeOrder = (t: string) => t === 'FERAGAT' ? 0 : t === 'İPTAL' ? 1 : 2;
+    const typeA = typeOrder(a.type);
+    const typeB = typeOrder(b.type);
+    if (typeA !== typeB) return typeA - typeB;
+    // Aynı saniye + aynı tip: queuePosition
+    return a.pilotQueuePosition - b.pilotQueuePosition;
   });
 
   // Excel görünümü: her pilot için bugünkü sortileri (7 kutu)
