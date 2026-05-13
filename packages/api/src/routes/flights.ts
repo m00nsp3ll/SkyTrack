@@ -407,23 +407,30 @@ router.get('/queue-history', authenticate, asyncHandler(async (req: AuthRequest,
     seenIds.add(f.id);
     history.push({ id: f.id + '-f', type: 'FERAGAT', pilotName: f.pilot.name, pilotQueuePosition: f.pilot.queuePosition, customerDisplayId: f.customer?.displayId || '-', customerName: f.customer ? `${f.customer.firstName} ${f.customer.lastName}` : '-', status: 'CANCELLED', time: f.createdAt, notes: f.notes || 'Feragat' });
   });
-  // Kronolojik sıralama:
-  // 1. Saniye bazında zaman sırası
-  // 2. Aynı saniyede: FERAGAT önce, UÇUŞ sonra
-  // 3. Aynı saniye + aynı tip: queuePosition'a göre
-  history.sort((a, b) => {
-    // Saniye hassasiyetinde karşılaştır (milisaniye farkları yok say)
-    const secA = Math.floor(new Date(a.time).getTime() / 1000);
-    const secB = Math.floor(new Date(b.time).getTime() / 1000);
-    if (secA !== secB) return secA - secB;
-    // Aynı saniye: FERAGAT önce
-    const typeOrder = (t: string) => t === 'FERAGAT' ? 0 : t === 'İPTAL' ? 1 : 2;
-    const typeA = typeOrder(a.type);
-    const typeB = typeOrder(b.type);
-    if (typeA !== typeB) return typeA - typeB;
-    // Aynı saniye + aynı tip: queuePosition
-    return a.pilotQueuePosition - b.pilotQueuePosition;
-  });
+  // Excel sıra mantığı: aynı müşteriye ait feragat+uçuş birlikte, queuePosition sırasıyla
+  // 1. Müşteri bazında grupla (aynı customerDisplayId = aynı atama batch'i)
+  // 2. Grupları kronolojik sırala (gruptaki uçuşun zamanına göre)
+  // 3. Grup içinde queuePosition sırasıyla (feragat eden pilotlar → uçan pilot)
+  const customerGroups: Record<string, { flightTime: number; items: typeof history }> = {};
+  for (const h of history) {
+    const key = h.customerDisplayId || h.id;
+    if (!customerGroups[key]) {
+      customerGroups[key] = { flightTime: new Date(h.time).getTime(), items: [] };
+    }
+    customerGroups[key].items.push(h);
+    // Grubun zamanı = uçuş kaydının zamanı (feragat değil)
+    if (h.type !== 'FERAGAT') {
+      customerGroups[key].flightTime = new Date(h.time).getTime();
+    }
+  }
+
+  // Grupları kronolojik sırala, her grup içinde queuePosition
+  const sortedGroups = Object.values(customerGroups).sort((a, b) => a.flightTime - b.flightTime);
+  history.length = 0;
+  for (const group of sortedGroups) {
+    group.items.sort((a, b) => a.pilotQueuePosition - b.pilotQueuePosition);
+    history.push(...group.items);
+  }
 
   // Excel görünümü: her pilot için bugünkü sortileri (7 kutu)
   const allPilots = await prisma.pilot.findMany({
