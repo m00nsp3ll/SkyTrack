@@ -5,7 +5,7 @@ import path from 'path';
 import { asyncHandler, AppError } from '../middleware/errorHandler.js';
 import { authenticate, requireRole, AuthRequest } from '../middleware/auth.js';
 import { pilotQueueService } from '../services/pilotQueue.js';
-import { cache } from '../services/cache.js';
+import { cache, getRedis } from '../services/cache.js';
 import { displayIdService } from '../services/displayId.js';
 import { generateWaiverPdf, getWaiverPdfPath, waiverPdfExists } from '../services/waiverPdf.js';
 import { getLocalIP } from '../utils/networkUtils.js';
@@ -343,27 +343,47 @@ router.post('/', authenticate, requireRole('ADMIN', 'OFFICE_STAFF', 'KIOSK'), as
     }
   }
 
-  // Sıradaki pilotu ÖNERİ olarak kaydet (flight oluşturma, round_count artırma)
-  // Zaten başka müşteriye önerilmiş pilotları atla (aynı pilot tekrar önerilmesin)
-  const pendingSuggestions = await prisma.customer.findMany({
-    where: {
-      status: 'REGISTERED',
-      suggestedPilotId: { not: null },
-      assignedPilotId: null,
-    },
-    select: { suggestedPilotId: true },
-  });
-  const excludePilotIds = pendingSuggestions
-    .map((c: any) => c.suggestedPilotId)
-    .filter((id: string | null): id is string => id !== null);
+  // Sıradaki pilotu ÖNERİ olarak kaydet — Redis lock ile aynı anda 2 müşteriye aynı pilot önerilmesini engelle
+  let suggestedPilot: any = null;
+  const redis = getRedis();
+  const suggLockKey = 'lock:pilot-suggestion';
+  const suggLockValue = `${customer.id}:${Date.now()}`;
+  let suggLockAcquired = false;
 
-  const suggestedPilot = await pilotQueueService.getNextPilot(excludePilotIds);
+  try {
+    if (redis) {
+      for (let attempt = 0; attempt < 5; attempt++) {
+        const result = await redis.set(suggLockKey, suggLockValue, 'EX', 10, 'NX');
+        if (result) { suggLockAcquired = true; break; }
+        await new Promise(r => setTimeout(r, 500));
+      }
+    }
 
-  if (suggestedPilot) {
-    await prisma.customer.update({
-      where: { id: customer.id },
-      data: { suggestedPilotId: suggestedPilot.id } as any,
+    const pendingSuggestions = await prisma.customer.findMany({
+      where: {
+        status: 'REGISTERED',
+        suggestedPilotId: { not: null },
+        assignedPilotId: null,
+      },
+      select: { suggestedPilotId: true },
     });
+    const excludePilotIds = pendingSuggestions
+      .map((c: any) => c.suggestedPilotId)
+      .filter((id: string | null): id is string => id !== null);
+
+    suggestedPilot = await pilotQueueService.getNextPilot(excludePilotIds);
+
+    if (suggestedPilot) {
+      await prisma.customer.update({
+        where: { id: customer.id },
+        data: { suggestedPilotId: suggestedPilot.id } as any,
+      });
+    }
+  } finally {
+    if (suggLockAcquired && redis) {
+      const currentVal = await redis.get(suggLockKey);
+      if (currentVal === suggLockValue) await redis.del(suggLockKey);
+    }
   }
 
   // Admin panele bildir (socket üzerinden bekleyen müşteri var)
