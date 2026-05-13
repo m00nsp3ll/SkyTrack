@@ -109,4 +109,22 @@ export async function forfeitPilot(pilotId: string, tx?: any): Promise<void> {
       status: 'AVAILABLE',
     },
   });
+
+  // Feragat kaydını flights tablosuna yaz — uçuş+feragat listesinde görünsün
+  const lastCustomer = await db.customer.findFirst({
+    where: { createdAt: { gte: new Date(new Date().setHours(0, 0, 0, 0)) } },
+    orderBy: { createdAt: 'desc' },
+    select: { id: true },
+  });
+  if (lastCustomer) {
+    await db.flight.create({
+      data: {
+        customerId: lastCustomer.id,
+        pilotId,
+        status: 'CANCELLED',
+        cancellationReason: 'FORFEIT',
+        notes: 'Pilot feragat',
+      },
+    });
+  }
 }

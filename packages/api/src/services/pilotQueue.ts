@@ -139,24 +139,24 @@ export const pilotQueueService = {
     specificPilotId?: string
   ): Promise<{ pilot: Pilot; flightId: string; mediaFolderPath: string } | null> {
     // Redis lock — aynı anda iki müşterinin aynı pilota atanmasını engelle
+    // Race condition'ı önlemek için: lock alınana kadar retry, force yok
     const redis = getRedis();
     const lockKey = 'lock:pilot-assignment';
     const lockValue = `${customerId}:${Date.now()}`;
     let lockAcquired = false;
 
     if (redis) {
-      // SET NX EX — 10 saniye timeout ile lock al
-      const result = await redis.set(lockKey, lockValue, 'EX', 10, 'NX');
-      if (!result) {
-        // Lock alınamadı — başka atama devam ediyor, 2 saniye bekle ve tekrar dene
-        await new Promise(r => setTimeout(r, 2000));
-        const retry = await redis.set(lockKey, lockValue, 'EX', 10, 'NX');
-        if (!retry) {
-          // Hala alınamıyorsa force — eski lock 10sn sonra zaten düşer
-          await redis.set(lockKey, lockValue, 'EX', 10);
+      for (let attempt = 0; attempt < 5; attempt++) {
+        const result = await redis.set(lockKey, lockValue, 'EX', 15, 'NX');
+        if (result) {
+          lockAcquired = true;
+          break;
         }
+        await new Promise(r => setTimeout(r, 1000));
       }
-      lockAcquired = true;
+      if (!lockAcquired) {
+        console.warn('[PILOT-ASSIGN] Lock 5 denemede alınamadı, devam ediliyor:', customerId);
+      }
     }
 
     try {
