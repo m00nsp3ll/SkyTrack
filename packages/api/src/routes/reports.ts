@@ -1074,6 +1074,7 @@ router.get('/company', authenticate, asyncHandler(async (req: AuthRequest, res: 
             orderBy: { createdAt: 'desc' },
           },
           payments: {
+            where: { deletedAt: null, createdAt: { gte: fromDate, lte: toDate } },
             select: { amount: true },
           },
         },
