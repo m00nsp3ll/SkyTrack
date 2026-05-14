@@ -599,10 +599,10 @@ export default function LiveFlightsPage() {
                 <div key={item.id} className={`flex items-center gap-3 px-4 py-2 text-sm`}
                   style={{ background: item.type === 'FERAGAT' ? '#fef2f2' : item.type === 'İPTAL' ? '#fefce8' : 'transparent' }}>
                   <span className="text-xs text-gray-400 w-6 text-right">{i + 1}</span>
-                  <span className="w-16 text-xs font-semibold px-2 py-0.5 rounded text-center"
+                  <span className="w-20 text-xs font-semibold px-2 py-0.5 rounded text-center"
                     style={{
-                      background: item.type === 'UÇUŞ' ? '#dcfce7' : item.type === 'FERAGAT' ? '#fee2e2' : '#fef9c3',
-                      color: item.type === 'UÇUŞ' ? '#15803d' : item.type === 'FERAGAT' ? '#b91c1c' : '#a16207',
+                      background: item.type === 'UÇUŞ' ? '#dcfce7' : item.type === 'FERAGAT' ? '#fee2e2' : item.type === 'HAVA İPTAL' ? '#dbeafe' : '#fef9c3',
+                      color: item.type === 'UÇUŞ' ? '#15803d' : item.type === 'FERAGAT' ? '#b91c1c' : item.type === 'HAVA İPTAL' ? '#1d4ed8' : '#a16207',
                     }}>
                     {item.type}
                   </span>

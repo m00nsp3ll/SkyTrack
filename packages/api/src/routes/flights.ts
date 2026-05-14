@@ -381,6 +381,7 @@ router.get('/queue-history', authenticate, asyncHandler(async (req: AuthRequest,
     where: { createdAt: { gte: today, lt: tomorrow }, OR: [
       { status: { in: ['COMPLETED', 'ASSIGNED', 'PICKED_UP', 'IN_FLIGHT'] } },
       { status: 'CANCELLED', cancellationReason: 'CUSTOMER_CANCEL' },
+      { status: 'CANCELLED', cancellationReason: 'WEATHER' },
     ] },
     include: { pilot: { select: { name: true, queuePosition: true } }, customer: { select: { displayId: true, firstName: true, lastName: true } } },
     orderBy: { createdAt: 'asc' },
@@ -399,8 +400,10 @@ router.get('/queue-history', authenticate, asyncHandler(async (req: AuthRequest,
   flights.forEach(f => {
     if (seenIds.has(f.id)) return;
     seenIds.add(f.id);
-    const type = f.cancellationReason === 'CUSTOMER_CANCEL' ? 'İPTAL' : 'UÇUŞ';
-    history.push({ id: f.id, type, pilotName: f.pilot.name, pilotQueuePosition: f.pilot.queuePosition, customerDisplayId: f.customer.displayId, customerName: `${f.customer.firstName} ${f.customer.lastName}`, status: f.status, time: f.createdAt, notes: f.cancellationReason === 'CUSTOMER_CANCEL' ? 'Müşteri İptal' : null });
+    const type = f.cancellationReason === 'CUSTOMER_CANCEL' ? 'İPTAL'
+      : f.cancellationReason === 'WEATHER' ? 'HAVA İPTAL'
+      : 'UÇUŞ';
+    history.push({ id: f.id, type, pilotName: f.pilot.name, pilotQueuePosition: f.pilot.queuePosition, customerDisplayId: f.customer.displayId, customerName: `${f.customer.firstName} ${f.customer.lastName}`, status: f.status, time: f.createdAt, notes: f.cancellationReason === 'CUSTOMER_CANCEL' ? 'Müşteri İptal' : f.cancellationReason === 'WEATHER' ? 'Hava Muhalefeti' : null });
   });
   forfeits.forEach(f => {
     if (seenIds.has(f.id)) return;
@@ -760,12 +763,13 @@ router.post('/bulk-cancel', authenticate, requireRole('ADMIN'), asyncHandler(asy
   const cancelledIds = waitingFlights.map(f => f.id);
 
   await prisma.$transaction(async (tx) => {
-    // Update all flights
+    // Update all flights — cancellationReason = WEATHER
     await tx.flight.updateMany({
       where: { id: { in: cancelledIds } },
       data: {
         status: 'CANCELLED',
-        notes: reason ? `Toplu iptal: ${reason}` : 'Toplu iptal (hava muhalefeti)',
+        cancellationReason: 'WEATHER',
+        notes: reason ? `Toplu iptal: ${reason}` : 'Toplu iptal: Hava muhalefeti',
       },
     });
 
@@ -775,6 +779,22 @@ router.post('/bulk-cancel', authenticate, requireRole('ADMIN'), asyncHandler(asy
       where: { id: { in: customerIds } },
       data: { status: 'CANCELLED' },
     });
+
+    // Pilotların roundCount ve dailyFlightCount geri al — sıra yerinde kalsın
+    const affectedPilotIds = [...new Set(waitingFlights.map(f => f.pilotId))];
+    for (const pilotId of affectedPilotIds) {
+      const p = await tx.pilot.findUnique({ where: { id: pilotId } });
+      if (p) {
+        await tx.pilot.update({
+          where: { id: pilotId },
+          data: {
+            status: 'AVAILABLE',
+            dailyFlightCount: p.dailyFlightCount > 0 ? { decrement: 1 } : 0,
+            roundCount: p.roundCount > 0 ? { decrement: 1 } : 0,
+          },
+        });
+      }
+    }
 
     // Set all affected pilots to available
     const pilotIds = [...new Set(waitingFlights.map(f => f.pilotId))];
