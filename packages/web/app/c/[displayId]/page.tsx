@@ -502,7 +502,8 @@ export default function CustomerDownloadPage() {
         if (json.success && json.data?.zipRelPath) {
           // LAN: NAS'taki dl.html sayfasına yönlendir — o sayfa indirmeyi başlatır
           const zipPath = encodeURIComponent(json.data.zipRelPath)
-          window.location.href = `http://192.168.1.105/media/dl.html?f=${zipPath}`
+          const dlLang = data?.language || 'en'
+          window.location.href = `http://192.168.1.105/media/dl.html?f=${zipPath}&lang=${dlLang}`
           return
         }
       } catch {}
