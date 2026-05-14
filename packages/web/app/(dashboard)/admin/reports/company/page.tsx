@@ -45,14 +45,29 @@ export default function CompanyReportPage() {
   const [loading, setLoading] = useState(true)
   const [expandedCompany, setExpandedCompany] = useState<string | null>(null)
   const [expandedPilot, setExpandedPilot] = useState<string | null>(null)
+  const [period, setPeriod] = useState<'thisMonth' | 'lastMonth' | 'custom'>('thisMonth')
   const [fromDate, setFromDate] = useState(() => {
     const d = new Date()
-    return `${d.getFullYear()}-03-01`
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
   })
   const [toDate, setToDate] = useState(() => {
     const d = new Date()
     return d.toISOString().split('T')[0]
   })
+
+  const selectPeriod = (p: 'thisMonth' | 'lastMonth' | 'custom') => {
+    setPeriod(p)
+    const now = new Date()
+    if (p === 'thisMonth') {
+      setFromDate(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`)
+      setToDate(now.toISOString().split('T')[0])
+    } else if (p === 'lastMonth') {
+      const last = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+      const lastEnd = new Date(now.getFullYear(), now.getMonth(), 0)
+      setFromDate(`${last.getFullYear()}-${String(last.getMonth() + 1).padStart(2, '0')}-01`)
+      setToDate(`${lastEnd.getFullYear()}-${String(lastEnd.getMonth() + 1).padStart(2, '0')}-${String(lastEnd.getDate()).padStart(2, '0')}`)
+    }
+  }
 
   const fetchData = async () => {
     setLoading(true)
@@ -93,13 +108,17 @@ export default function CompanyReportPage() {
           <h1 className="text-2xl font-bold text-gray-900">Firma Raporu</h1>
           <p className="text-muted-foreground">{companies.length} firma, {companies.reduce((s, c) => s + c.pilotCount, 0)} pilot</p>
         </div>
-        <div className="flex items-center gap-2">
-          <input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} className="border rounded px-2 py-1 text-sm" />
-          <span className="text-muted-foreground">-</span>
-          <input type="date" value={toDate} onChange={e => setToDate(e.target.value)} className="border rounded px-2 py-1 text-sm" />
-          <Button onClick={fetchData} variant="outline" size="sm">
-            <RefreshCw className="h-4 w-4" />
-          </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button size="sm" variant={period === 'thisMonth' ? 'default' : 'outline'} onClick={() => selectPeriod('thisMonth')}>Bu Ay</Button>
+          <Button size="sm" variant={period === 'lastMonth' ? 'default' : 'outline'} onClick={() => selectPeriod('lastMonth')}>Önceki Ay</Button>
+          <Button size="sm" variant={period === 'custom' ? 'default' : 'outline'} onClick={() => setPeriod('custom')}>Özel Aralık</Button>
+          {period === 'custom' && (
+            <>
+              <input type="date" value={fromDate} onChange={e => { setFromDate(e.target.value); setPeriod('custom') }} className="border rounded px-2 py-1 text-sm" />
+              <span className="text-muted-foreground">-</span>
+              <input type="date" value={toDate} onChange={e => { setToDate(e.target.value); setPeriod('custom') }} className="border rounded px-2 py-1 text-sm" />
+            </>
+          )}
         </div>
       </div>
 
