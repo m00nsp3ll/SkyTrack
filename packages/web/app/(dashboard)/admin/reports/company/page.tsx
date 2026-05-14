@@ -45,7 +45,7 @@ export default function CompanyReportPage() {
   const [loading, setLoading] = useState(true)
   const [expandedCompany, setExpandedCompany] = useState<string | null>(null)
   const [expandedPilot, setExpandedPilot] = useState<string | null>(null)
-  const [period, setPeriod] = useState<'thisMonth' | 'lastMonth' | 'custom'>('thisMonth')
+  const [period, setPeriod] = useState<'thisMonth' | 'lastMonth' | 'allTime' | 'custom'>('thisMonth')
   const [fromDate, setFromDate] = useState(() => {
     const d = new Date()
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
@@ -55,7 +55,7 @@ export default function CompanyReportPage() {
     return d.toISOString().split('T')[0]
   })
 
-  const selectPeriod = (p: 'thisMonth' | 'lastMonth' | 'custom') => {
+  const selectPeriod = (p: 'thisMonth' | 'lastMonth' | 'allTime' | 'custom') => {
     setPeriod(p)
     const now = new Date()
     if (p === 'thisMonth') {
@@ -66,6 +66,9 @@ export default function CompanyReportPage() {
       const lastEnd = new Date(now.getFullYear(), now.getMonth(), 0)
       setFromDate(`${last.getFullYear()}-${String(last.getMonth() + 1).padStart(2, '0')}-01`)
       setToDate(`${lastEnd.getFullYear()}-${String(lastEnd.getMonth() + 1).padStart(2, '0')}-${String(lastEnd.getDate()).padStart(2, '0')}`)
+    } else if (p === 'allTime') {
+      setFromDate('2026-01-01')
+      setToDate(now.toISOString().split('T')[0])
     }
   }
 
@@ -111,6 +114,7 @@ export default function CompanyReportPage() {
         <div className="flex flex-wrap items-center gap-2">
           <Button size="sm" variant={period === 'thisMonth' ? 'default' : 'outline'} onClick={() => selectPeriod('thisMonth')}>Bu Ay</Button>
           <Button size="sm" variant={period === 'lastMonth' ? 'default' : 'outline'} onClick={() => selectPeriod('lastMonth')}>Önceki Ay</Button>
+          <Button size="sm" variant={period === 'allTime' ? 'default' : 'outline'} onClick={() => selectPeriod('allTime')}>Tüm Zamanlar</Button>
           <Button size="sm" variant={period === 'custom' ? 'default' : 'outline'} onClick={() => setPeriod('custom')}>Özel Aralık</Button>
           {period === 'custom' && (
             <>
