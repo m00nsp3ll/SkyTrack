@@ -346,7 +346,8 @@ class QnapService {
         `rm -rf "${this.mediaPath}/${zipDir}" && mkdir -p "${this.mediaPath}/${zipDir}"`
       );
 
-      const cmd = `cd "${this.mediaPath}" && /usr/local/sbin/zip -r -0 -q "${zipRelPath}" "${relPath}" -x "*.DS_Store" "*/Thumbs.db" "*/@*" && stat -c '%s' "${zipFullPath}"`;
+      // Müşteri klasörünün İÇİNE gir, sadece içeriği zipley (tam path yapısı olmasın)
+      const cmd = `cd "${this.mediaPath}/${relPath}" && /usr/local/sbin/zip -r -0 -q "${zipFullPath}" . -x "*.DS_Store" "*/Thumbs.db" "*/@*" && stat -c '%s' "${zipFullPath}"`;
       const output = await this.execSSH(cmd);
       const size = parseInt(output.trim()) || 0;
       if (!size) return null;
