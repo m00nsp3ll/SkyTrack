@@ -1295,6 +1295,7 @@ interface ProAgentTicket {
   irtibat: string;
   telefon: string;
   rest: string;
+  sofor: string;
 }
 
 function parseBolgeHareketHtml(html: string): ProAgentTicket[] {
@@ -1347,6 +1348,7 @@ function parseBolgeHareketHtml(html: string): ProAgentTicket[] {
       irtibat: clean(cellsRaw[12]),
       telefon: clean(cellsRaw[13]),
       rest: clean(cellsRaw[17] || ''),
+      sofor: clean(cellsRaw[23] || ''),
     });
   }
 
@@ -1380,17 +1382,45 @@ router.get('/operations/proagent', authenticate, requireRole('ADMIN', 'SUPER_ADM
   const html = await response.text();
   const tickets = parseBolgeHareketHtml(html);
 
-  // Summary stats
-  const totalPax = tickets.reduce((sum, t) => sum + t.yolcu + t.cocuk, 0);
-  const turBitti = tickets.filter(t => t.durum === 'Tur Bitti').reduce((s, t) => s + t.yolcu + t.cocuk, 0);
-  const ofiste = tickets.filter(t => t.durum === 'Ofiste').reduce((s, t) => s + t.yolcu + t.cocuk, 0);
-  const transferde = tickets.filter(t => t.durum === 'Transfer Sürecinde').reduce((s, t) => s + t.yolcu + t.cocuk, 0);
-  const ucusta = tickets.filter(t => t.durum === 'Uçusta').reduce((s, t) => s + t.yolcu + t.cocuk, 0);
-  const bekleyen = tickets.filter(t => t.durum === '-' || t.durum === '').reduce((s, t) => s + t.yolcu + t.cocuk, 0);
-  const ulasilamadi = tickets.filter(t => t.durum === 'Ulaşılamadı').reduce((s, t) => s + t.yolcu + t.cocuk, 0);
-  const iptal = tickets.filter(t => t.durum === 'İptal').reduce((s, t) => s + t.yolcu + t.cocuk, 0);
+  // Summary stats — kişi sayısı sadece yetişkin (yolcu), çocuk ayrı
   const totalKisi = tickets.reduce((s, t) => s + t.yolcu, 0);
   const totalCocuk = tickets.reduce((s, t) => s + t.cocuk, 0);
+  const totalPax = totalKisi; // sadece yetişkinler
+  const turBitti = tickets.filter(t => t.durum === 'Tur Bitti').reduce((s, t) => s + t.yolcu, 0);
+  const ofiste = tickets.filter(t => t.durum === 'Ofiste').reduce((s, t) => s + t.yolcu, 0);
+  const transferde = tickets.filter(t => t.durum === 'Transfer Sürecinde').reduce((s, t) => s + t.yolcu, 0);
+  const ucusta = tickets.filter(t => t.durum === 'Uçusta').reduce((s, t) => s + t.yolcu, 0);
+  const bekleyen = tickets.filter(t => t.durum === '-' || t.durum === '').reduce((s, t) => s + t.yolcu, 0);
+  const ulasilamadi = tickets.filter(t => t.durum === 'Ulaşılamadı').reduce((s, t) => s + t.yolcu, 0);
+  const iptal = tickets.filter(t => t.durum === 'İptal').reduce((s, t) => s + t.yolcu, 0);
+
+  // Tahmini varış saatleri — bölgeye göre yol süresi (dakika)
+  const travelTimes: Record<string, number> = {
+    'ALANYA': 10, 'KONAKLI': 20, 'AVSALLAR': 30, 'OKURCALAR': 40,
+    'PAYALLAR': 35, 'MAHMUTLAR': 15, 'KARGICAK': 20, 'KESTEL': 15,
+    'OBA': 10, 'TOSMUR': 10, 'CIKCILLI': 10, 'TURKLER': 25,
+    'SIDE': 60, 'MANAVGAT': 55, 'SORGUN': 65, 'KUMKOY': 60,
+    'BELEK': 80, 'KUNDU': 90, 'KONYAALTI': 100, 'MURATPASA': 100,
+    'SIRINYALI': 95, 'BELDIBI': 120, 'KEMER': 110,
+  };
+  // Tahmini yoğunluk: her 30dk diliminde kaç kişi ofiste olacak
+  const densityMap: Record<string, number> = {};
+  for (const t of tickets) {
+    if (t.durum === 'Tur Bitti' || t.durum === 'İptal') continue;
+    const [hh, mm] = t.saat.split(':').map(Number);
+    const pickupMin = hh * 60 + mm;
+    const travel = travelTimes[t.bolge.toUpperCase()] || 30;
+    const arrivalMin = pickupMin + travel;
+    // 30dk dilimlerine yuvarla
+    const slotMin = Math.floor(arrivalMin / 30) * 30;
+    const slotH = String(Math.floor(slotMin / 60)).padStart(2, '0');
+    const slotM = String(slotMin % 60).padStart(2, '0');
+    const slotKey = `${slotH}:${slotM}`;
+    densityMap[slotKey] = (densityMap[slotKey] || 0) + t.yolcu;
+  }
+  const density = Object.entries(densityMap)
+    .map(([saat, kisi]) => ({ saat, kisi }))
+    .sort((a, b) => a.saat.localeCompare(b.saat));
 
   // Group by time slot
   const byTime: Record<string, { saat: string; kisi: number; tickets: ProAgentTicket[] }> = {};
@@ -1410,6 +1440,7 @@ router.get('/operations/proagent', authenticate, requireRole('ADMIN', 'SUPER_ADM
       tickets,
       summary: { totalPax, totalKisi, totalCocuk, turBitti, ofiste, transferde, ucusta, bekleyen, ulasilamadi, iptal },
       timeSlots,
+      density,
     },
   });
 }));
