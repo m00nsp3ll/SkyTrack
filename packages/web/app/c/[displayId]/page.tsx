@@ -500,14 +500,9 @@ export default function CustomerDownloadPage() {
         const res = await fetch(`${apiUrl}/media/${displayId}/prepare-zip`)
         const json = await res.json()
         if (json.success && json.data?.zipRelPath) {
-          const url = `http://192.168.1.105/media/${json.data.zipRelPath}`
-          const a = document.createElement('a')
-          a.href = url
-          a.download = `${displayId}.zip`
-          a.style.display = 'none'
-          document.body.appendChild(a)
-          a.click()
-          document.body.removeChild(a)
+          // Mobilde <a download> cross-origin HTTP'de çalışmıyor
+          // window.location.href ile direkt yönlendir — tarayıcı ZIP'i indirir
+          window.location.href = `http://192.168.1.105/media/${json.data.zipRelPath}`
           return
         }
       } catch {}
