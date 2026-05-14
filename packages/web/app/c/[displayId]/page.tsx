@@ -500,9 +500,9 @@ export default function CustomerDownloadPage() {
         const res = await fetch(`${apiUrl}/media/${displayId}/prepare-zip`)
         const json = await res.json()
         if (json.success && json.data?.zipRelPath) {
-          // Mobilde <a download> cross-origin HTTP'de çalışmıyor
-          // window.location.href ile direkt yönlendir — tarayıcı ZIP'i indirir
-          window.location.href = `http://192.168.1.105/media/${json.data.zipRelPath}`
+          // LAN indirme: NAS HTTPS (8081) üzerinden — mixed content engeli olmaz
+          const zipPath = json.data.zipRelPath.split('/').map(encodeURIComponent).join('/')
+          window.location.href = `https://192.168.1.105:8081/media/${zipPath}`
           return
         }
       } catch {}
