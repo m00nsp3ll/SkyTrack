@@ -652,7 +652,7 @@ router.post('/me/forfeit', authenticate, asyncHandler(async (req: AuthRequest, r
       // Pilot: forfeitCount +1, status AVAILABLE (roundCount zaten atamada artmıştı)
       await tx.pilot.update({
         where: { id: pilotId },
-        data: { forfeitCount: { increment: 1 }, status: 'AVAILABLE' },
+        data: { forfeitCount: { increment: 1 }, status: 'AVAILABLE', priorityOverride: false },
       });
 
       if (nextPilot) {
@@ -724,7 +724,7 @@ router.post('/:id/forfeit', authenticate, requireRole('ADMIN'), asyncHandler(asy
       // Eski pilot: forfeitCount +1, status AVAILABLE (roundCount değişmez — zaten artmıştı)
       await tx.pilot.update({
         where: { id },
-        data: { forfeitCount: { increment: 1 }, status: 'AVAILABLE' },
+        data: { forfeitCount: { increment: 1 }, status: 'AVAILABLE', priorityOverride: false },
       });
 
       if (nextPilot) {

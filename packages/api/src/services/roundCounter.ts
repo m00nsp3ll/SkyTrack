@@ -107,6 +107,7 @@ export async function forfeitPilot(pilotId: string, tx?: any): Promise<void> {
       forfeitCount: { increment: 1 },
       roundCount: { increment: 1 },
       status: 'AVAILABLE',
+      priorityOverride: false,
     },
   });
 
