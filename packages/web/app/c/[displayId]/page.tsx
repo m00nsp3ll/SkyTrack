@@ -500,9 +500,9 @@ export default function CustomerDownloadPage() {
         const res = await fetch(`${apiUrl}/media/${displayId}/prepare-zip`)
         const json = await res.json()
         if (json.success && json.data?.zipRelPath) {
-          // LAN: NAS HTTP port 80 — tam sayfa yönlendirme (mixed content engeli yok)
-          const zipPath = json.data.zipRelPath.split('/').map(encodeURIComponent).join('/')
-          window.location.href = `http://192.168.1.105/media/${zipPath}`
+          // LAN: NAS'taki dl.html sayfasına yönlendir — o sayfa indirmeyi başlatır
+          const zipPath = encodeURIComponent(json.data.zipRelPath)
+          window.open(`http://192.168.1.105/media/dl.html?f=${zipPath}`, '_blank')
           return
         }
       } catch {}
