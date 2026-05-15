@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
+import { useEffect, useState, useMemo, useCallback } from 'react'
 import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -250,15 +250,12 @@ export default function LiveFlightsPage() {
     return groups.filter(g => g.length > 0)
   }, [autoGroups, groupOverrides, waiting])
 
-  // Reset overrides when waiting data changes (new flights arrive, etc.)
-  const prevWaitingIdsRef = useRef<string>('')
+  // Reset overrides when waiting flights change
+  const waitingIds = waiting.map(f => f.id).join(',')
   useEffect(() => {
-    const ids = waiting.map(f => f.id).join(',')
-    if (ids !== prevWaitingIdsRef.current) {
-      prevWaitingIdsRef.current = ids
-      setGroupOverrides({})
-    }
-  }, [waiting])
+    setGroupOverrides({})
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [waitingIds])
 
   // Group colors for visual distinction
   const groupColors = [
