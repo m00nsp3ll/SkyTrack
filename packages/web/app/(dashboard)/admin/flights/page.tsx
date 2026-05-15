@@ -418,13 +418,25 @@ export default function LiveFlightsPage() {
                     return Math.abs(curr - prev) > 10 * 60 * 1000
                   })()
                   return (<>
-                  {showSeparator && (
-                    <div className="flex items-center gap-2 py-1">
-                      <div className="flex-1 h-0.5" style={{ background: 'linear-gradient(to right, transparent, #ef4444, #ef4444, transparent)' }} />
-                      <span className="text-[10px] font-bold text-red-500 whitespace-nowrap">YENİ GRUP</span>
-                      <div className="flex-1 h-0.5" style={{ background: 'linear-gradient(to left, transparent, #ef4444, #ef4444, transparent)' }} />
-                    </div>
-                  )}
+                  {showSeparator && (() => {
+                    // Bu gruptan sonraki kişi sayısını hesapla
+                    let groupCount = 0
+                    for (let j = idx; j < waiting.length; j++) {
+                      if (j > idx) {
+                        const pTime = new Date(waiting[j - 1].createdAt).getTime()
+                        const cTime = new Date(waiting[j].createdAt).getTime()
+                        if (Math.abs(cTime - pTime) > 10 * 60 * 1000) break
+                      }
+                      groupCount++
+                    }
+                    return (
+                      <div className="flex items-center gap-2 py-1">
+                        <div className="flex-1 h-0.5" style={{ background: 'linear-gradient(to right, transparent, #ef4444, #ef4444, transparent)' }} />
+                        <span className="text-[10px] font-bold text-red-500 whitespace-nowrap">YENİ GRUP ({groupCount} kişi)</span>
+                        <div className="flex-1 h-0.5" style={{ background: 'linear-gradient(to left, transparent, #ef4444, #ef4444, transparent)' }} />
+                      </div>
+                    )
+                  })()}
                   <Card key={flight.id} className="bg-yellow-50">
                     <CardContent className="p-3">
                       <Link href={`/admin/customers/${flight.customer.displayId}`}>
