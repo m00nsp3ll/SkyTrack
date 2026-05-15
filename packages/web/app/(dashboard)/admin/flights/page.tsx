@@ -209,53 +209,46 @@ export default function LiveFlightsPage() {
   const completed = data?.completed || []
   const pilots = data?.pilots || []
 
-  // Auto-group waiting flights by 10+ minute time gap
-  const autoGroups = useMemo(() => {
-    if (waiting.length === 0) return [] as Flight[][]
-    const groups: Flight[][] = [[waiting[0]]]
-    for (let i = 1; i < waiting.length; i++) {
-      const prev = new Date(waiting[i - 1].createdAt).getTime()
-      const curr = new Date(waiting[i].createdAt).getTime()
-      if (Math.abs(curr - prev) > 10 * 60 * 1000) {
-        groups.push([waiting[i]])
-      } else {
-        groups[groups.length - 1].push(waiting[i])
-      }
-    }
-    return groups
-  }, [waiting])
-
-  // Build effective groups with drag overrides applied
-  const effectiveGroups = useMemo(() => {
-    if (autoGroups.length === 0) return [] as Flight[][]
-    // Start from auto groups
-    const groups: Flight[][] = autoGroups.map(g => [...g])
-    // Apply overrides
-    for (const [flightId, targetGroup] of Object.entries(groupOverrides)) {
-      // Remove flight from its current group
-      for (const group of groups) {
-        const idx = group.findIndex(f => f.id === flightId)
-        if (idx !== -1) {
-          group.splice(idx, 1)
-          break
-        }
-      }
-      // Add to target group (if it exists)
-      if (targetGroup >= 0 && targetGroup < groups.length) {
-        const flight = waiting.find(f => f.id === flightId)
-        if (flight) groups[targetGroup].push(flight)
-      }
-    }
-    // Filter out empty groups
-    return groups.filter(g => g.length > 0)
-  }, [autoGroups, groupOverrides, waiting])
-
-  // Reset overrides when waiting flights change
+  // Auto-group waiting flights by 10+ minute time gap + drag overrides
   const waitingIds = waiting.map(f => f.id).join(',')
+
   useEffect(() => {
     setGroupOverrides({})
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [waitingIds])
+
+  const effectiveGroups: Flight[][] = useMemo(() => {
+    if (!waiting || waiting.length === 0) return []
+    try {
+      // Auto-group by time gap
+      const groups: Flight[][] = [[waiting[0]]]
+      for (let i = 1; i < waiting.length; i++) {
+        const prev = new Date(waiting[i - 1].createdAt).getTime()
+        const curr = new Date(waiting[i].createdAt).getTime()
+        if (Math.abs(curr - prev) > 10 * 60 * 1000) {
+          groups.push([waiting[i]])
+        } else {
+          groups[groups.length - 1].push(waiting[i])
+        }
+      }
+      // Apply drag overrides
+      if (Object.keys(groupOverrides).length > 0) {
+        for (const [flightId, targetIdx] of Object.entries(groupOverrides)) {
+          // Remove from current group
+          for (const g of groups) {
+            const idx = g.findIndex(f => f.id === flightId)
+            if (idx !== -1) { g.splice(idx, 1); break }
+          }
+          // Add to target
+          if (targetIdx >= 0 && targetIdx < groups.length) {
+            const flight = waiting.find(f => f.id === flightId)
+            if (flight) groups[targetIdx].push(flight)
+          }
+        }
+      }
+      return groups.filter(g => g.length > 0)
+    } catch { return [waiting] }
+  }, [waiting, groupOverrides])
 
   // Group colors for visual distinction
   const groupColors = [
