@@ -1326,12 +1326,25 @@ function parseBolgeHareketHtml(html: string): ProAgentTicket[] {
     if (!no || isNaN(parseInt(no))) continue;
 
     // Col1 has <select> with status — find selected option
+    // Bilinen durumlar: -, Transfer Sürecinde, Ulaşılamadı, Ofiste, Uçusta, Tur Bitti
+    // Bilinmeyen değer = şoför ismi = Transfer Sürecinde
+    const knownStatuses = ['-', '', 'Transfer Sürecinde', 'Ulaşılamadı', 'Ofiste', 'Uçusta', 'Tur Bitti'];
     let durum = '-';
+    let soforFromDurum = '';
     if (isIptal) {
       durum = 'İptal';
     } else {
       const selectedMatch = cellsRaw[1]?.match(/selected[^>]*>(.*?)<\/option/i);
-      if (selectedMatch) durum = selectedMatch[1].trim();
+      if (selectedMatch) {
+        const val = selectedMatch[1].trim();
+        if (knownStatuses.includes(val)) {
+          durum = val;
+        } else {
+          // Şoför ismi yazılmış = Transfer Sürecinde
+          durum = 'Transfer Sürecinde';
+          soforFromDurum = val;
+        }
+      }
     }
 
     tickets.push({
@@ -1348,7 +1361,7 @@ function parseBolgeHareketHtml(html: string): ProAgentTicket[] {
       irtibat: clean(cellsRaw[12]),
       telefon: clean(cellsRaw[13]),
       rest: clean(cellsRaw[17] || ''),
-      sofor: clean(cellsRaw[23] || ''),
+      sofor: soforFromDurum || clean(cellsRaw[23] || ''),
     });
   }
 

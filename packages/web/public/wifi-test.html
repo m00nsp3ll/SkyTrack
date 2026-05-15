@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>WiFi Test — SkyTrack</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#0f172a,#1e293b);font-family:-apple-system,BlinkMacSystemFont,sans-serif;color:#fff}
+.card{background:rgba(255,255,255,.08);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,.1);border-radius:24px;padding:32px;max-width:400px;width:90%;text-align:center}
+.logo{font-size:36px;margin-bottom:8px}
+h1{font-size:20px;font-weight:700;margin-bottom:24px;opacity:.9}
+.result{background:rgba(255,255,255,.05);border-radius:16px;padding:20px;margin-bottom:16px}
+.label{font-size:12px;text-transform:uppercase;letter-spacing:1px;opacity:.5;margin-bottom:4px}
+.value{font-size:28px;font-weight:800}
+.value.good{color:#22c55e}
+.value.ok{color:#f59e0b}
+.value.bad{color:#ef4444}
+.value.unknown{color:#94a3b8}
+.speed-bar{height:8px;background:rgba(255,255,255,.1);border-radius:4px;margin-top:8px;overflow:hidden}
+.speed-fill{height:100%;border-radius:4px;transition:width 1s ease}
+.info{font-size:13px;opacity:.6;margin-top:4px}
+.btn{display:inline-block;margin-top:20px;padding:14px 40px;background:linear-gradient(135deg,#3b82f6,#2563eb);color:#fff;border:none;border-radius:14px;font-weight:700;font-size:15px;cursor:pointer;transition:transform .1s}
+.btn:active{transform:scale(.95)}
+.results{display:none}
+.detail{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:13px}
+.detail .k{opacity:.5}
+.testing .spinner{display:inline-block;width:20px;height:20px;border:3px solid rgba(255,255,255,.2);border-top-color:#3b82f6;border-radius:50%;animation:spin .6s linear infinite;margin-right:8px;vertical-align:middle}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div class="card">
+<div class="logo">📡</div>
+<h1>WiFi Bağlantı Testi</h1>
+
+<div id="preTest">
+<p style="opacity:.6;font-size:14px;margin-bottom:20px">Bağlantı hızınızı ve WiFi bandınızı test edin</p>
+<button class="btn" onclick="runTest()">Testi Başlat</button>
+</div>
+
+<div id="testing" class="testing" style="display:none">
+<div class="spinner"></div>
+<span style="font-size:14px">Test yapılıyor...</span>
+</div>
+
+<div id="results" class="results">
+<div class="result">
+  <div class="label">İndirme Hızı</div>
+  <div class="value" id="speedValue">—</div>
+  <div class="speed-bar"><div class="speed-fill" id="speedBar"></div></div>
+  <div class="info" id="speedInfo"></div>
+</div>
+
+<div class="result">
+  <div class="label">Bağlantı Tipi</div>
+  <div class="value" id="connType">—</div>
+  <div class="info" id="connInfo"></div>
+</div>
+
+<div style="text-align:left;margin-top:16px">
+  <div class="detail"><span class="k">Gecikme (Ping)</span><span id="ping">—</span></div>
+  <div class="detail"><span class="k">NAS Erişimi</span><span id="nasAccess">—</span></div>
+  <div class="detail"><span class="k">LAN Tespiti</span><span id="lanDetect">—</span></div>
+  <div class="detail"><span class="k">IP Adresi</span><span id="ipAddr">—</span></div>
+</div>
+
+<button class="btn" onclick="runTest()" style="margin-top:16px;font-size:13px;padding:10px 24px">Tekrar Test Et</button>
+</div>
+</div>
+
+<script>
+async function runTest() {
+  document.getElementById('preTest').style.display = 'none';
+  document.getElementById('testing').style.display = 'block';
+  document.getElementById('results').style.display = 'none';
+
+  var results = { speed: 0, ping: 0, nasOk: false, isLan: false, ip: '', connType: '' };
+
+  // 1. LAN Detection
+  try {
+    var t0 = Date.now();
+    var r = await fetch('https://api.skytrackyp.com/api/network/discover', { cache: 'no-store' });
+    var j = await r.json();
+    results.ping = Date.now() - t0;
+    results.isLan = j.isLan || false;
+    results.ip = j.clientIP || '';
+  } catch(e) {}
+
+  // 2. NAS erişimi
+  try {
+    var t1 = Date.now();
+    var r2 = await fetch('http://192.168.1.105/media/skytrack-logo.png', { mode: 'no-cors', cache: 'no-store' });
+    results.nasOk = true;
+  } catch(e) {}
+
+  // 3. Hız testi — NAS'tan dosya indir
+  try {
+    var testSize = 5 * 1024 * 1024; // 5MB test
+    var t2 = Date.now();
+    var r3 = await fetch('http://192.168.1.105/media/skytrack-logo.png?bust=' + Date.now(), { cache: 'no-store' });
+    var blob = await r3.blob();
+    var elapsed = (Date.now() - t2) / 1000;
+    if (elapsed > 0 && blob.size > 0) {
+      results.speed = (blob.size / elapsed) / (1024 * 1024); // MB/s
+    }
+  } catch(e) {}
+
+  // Bağlantı tipi tahmini
+  var conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+  if (conn) {
+    var dl = conn.downlink || 0; // Mbps
+    var type = conn.effectiveType || conn.type || '';
+    if (dl >= 100 || type === 'wifi') {
+      results.connType = '5 GHz WiFi (Tahmini)';
+    } else if (dl >= 20) {
+      results.connType = '2.4 GHz WiFi (Tahmini)';
+    } else {
+      results.connType = type + ' (' + dl + ' Mbps)';
+    }
+  }
+
+  // Ping bazlı tahmin
+  if (!results.connType) {
+    if (results.ping < 50 && results.isLan) {
+      results.connType = 'LAN / WiFi';
+    } else if (results.ping < 200) {
+      results.connType = 'WiFi';
+    } else {
+      results.connType = 'Mobil Data';
+    }
+  }
+
+  // Sonuçları göster
+  document.getElementById('testing').style.display = 'none';
+  document.getElementById('results').style.display = 'block';
+
+  // Hız
+  var speedEl = document.getElementById('speedValue');
+  var speedBar = document.getElementById('speedBar');
+  var speedInfo = document.getElementById('speedInfo');
+  if (results.speed > 0) {
+    speedEl.textContent = results.speed.toFixed(1) + ' MB/s';
+    var pct = Math.min((results.speed / 100) * 100, 100);
+    speedBar.style.width = pct + '%';
+    if (results.speed > 30) {
+      speedEl.className = 'value good';
+      speedBar.style.background = '#22c55e';
+      speedInfo.textContent = '🚀 Mükemmel — Gigabit hızında';
+    } else if (results.speed > 5) {
+      speedEl.className = 'value ok';
+      speedBar.style.background = '#f59e0b';
+      speedInfo.textContent = '⚡ İyi — 5GHz önerilir';
+    } else {
+      speedEl.className = 'value bad';
+      speedBar.style.background = '#ef4444';
+      speedInfo.textContent = '🐌 Yavaş — 2.4GHz veya uzak mesafe';
+    }
+  } else {
+    speedEl.textContent = 'Ölçülemedi';
+    speedEl.className = 'value unknown';
+    speedInfo.textContent = 'NAS erişimi yok — LAN\'da değilsiniz';
+  }
+
+  // Bağlantı tipi
+  var connEl = document.getElementById('connType');
+  connEl.textContent = results.connType;
+  connEl.className = 'value ' + (results.connType.includes('5 GHz') ? 'good' : results.connType.includes('LAN') ? 'good' : 'ok');
+  document.getElementById('connInfo').textContent = results.isLan ? '✅ Ofis ağında' : '❌ Ofis ağı dışında';
+
+  // Detaylar
+  document.getElementById('ping').textContent = results.ping + ' ms';
+  document.getElementById('nasAccess').textContent = results.nasOk ? '✅ Erişilebilir' : '❌ Erişilemiyor';
+  document.getElementById('lanDetect').textContent = results.isLan ? '✅ LAN' : '❌ Dış ağ';
+  document.getElementById('ipAddr').textContent = results.ip;
+}
+</script>
+</body>
+</html>
