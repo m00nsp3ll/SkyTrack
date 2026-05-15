@@ -252,7 +252,7 @@ export default function LiveFlightsPage() {
 
   // Reset overrides when waiting data changes (new flights arrive, etc.)
   const prevWaitingIdsRef = useRef<string>('')
-  useMemo(() => {
+  useEffect(() => {
     const ids = waiting.map(f => f.id).join(',')
     if (ids !== prevWaitingIdsRef.current) {
       prevWaitingIdsRef.current = ids
