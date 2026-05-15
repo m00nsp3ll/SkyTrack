@@ -36,6 +36,7 @@ export default function OperationsPage() {
   const [error, setError] = useState<string | null>(null)
   const [lastUpdate, setLastUpdate] = useState<string | null>(null)
   const [hideDone, setHideDone] = useState(false)
+  const [showDensity, setShowDensity] = useState(false)
   const [filterDurum, setFilterDurum] = useState<string | null>(null)
   const [selectedDate, setSelectedDate] = useState<string>('today')
 
@@ -200,27 +201,34 @@ export default function OperationsPage() {
             })}
           </div>
 
-          {/* Tahmini Yoğunluk Grafiği */}
+          {/* Yoğunluk Toggle + Grafik */}
           {data.density && data.density.length > 0 && (
-            <Card className="overflow-hidden shadow-lg">
-              <CardContent className="p-4">
-                <div className="text-sm font-bold text-gray-700 mb-3">Tahmini Ofis Yoğunluğu</div>
-                <div className="flex items-end gap-1 h-24">
-                  {data.density.map(d => {
-                    const maxKisi = Math.max(...data.density.map(x => x.kisi), 1)
-                    const pct = (d.kisi / maxKisi) * 100
-                    return (
-                      <div key={d.saat} className="flex-1 flex flex-col items-center gap-0.5">
-                        <span className="text-[10px] font-bold" style={{ color: '#2563eb' }}>{d.kisi}</span>
-                        <div className="w-full rounded-t" style={{ height: `${Math.max(pct, 8)}%`, background: `linear-gradient(to top, #3b82f6, #60a5fa)` }} />
-                        <span className="text-[9px] text-gray-500">{d.saat}</span>
-                      </div>
-                    )
-                  })}
-                </div>
-                <div className="text-[10px] text-gray-400 mt-1 text-center">Alınış saati + tahmini yol süresi = ofise varış</div>
-              </CardContent>
-            </Card>
+            <>
+              <Button size="sm" variant={showDensity ? 'default' : 'outline'} onClick={() => setShowDensity(!showDensity)} className="text-xs h-8">
+                {showDensity ? '📊 Yoğunluğu Gizle' : '📊 Yoğunluk'}
+              </Button>
+              {showDensity && (
+                <Card className="overflow-hidden shadow-lg">
+                  <CardContent className="p-4">
+                    <div className="text-sm font-bold text-gray-700 mb-3">Tahmini Ofis Yoğunluğu</div>
+                    <div className="flex items-end gap-1" style={{ height: 120 }}>
+                      {data.density.map(d => {
+                        const maxKisi = Math.max(...data.density.map(x => x.kisi), 1)
+                        const pct = (d.kisi / maxKisi) * 100
+                        return (
+                          <div key={d.saat} className="flex-1 flex flex-col items-center gap-0.5">
+                            <span className="text-[10px] font-bold" style={{ color: '#2563eb' }}>{d.kisi}</span>
+                            <div className="w-full rounded-t" style={{ height: `${Math.max(pct, 8)}%`, background: pct > 70 ? 'linear-gradient(to top, #ef4444, #f87171)' : pct > 40 ? 'linear-gradient(to top, #f59e0b, #fbbf24)' : 'linear-gradient(to top, #3b82f6, #60a5fa)' }} />
+                            <span className="text-[9px] text-gray-500">{d.saat}</span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                    <div className="text-[10px] text-gray-400 mt-2 text-center">Alınış saati + bölge yol süresi = tahmini ofise varış</div>
+                  </CardContent>
+                </Card>
+              )}
+            </>
           )}
 
           {/* Saat Bazlı Liste */}

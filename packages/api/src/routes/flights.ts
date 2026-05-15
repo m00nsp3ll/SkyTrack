@@ -1383,9 +1383,9 @@ router.get('/operations/proagent', authenticate, requireRole('ADMIN', 'SUPER_ADM
   const tickets = parseBolgeHareketHtml(html);
 
   // Summary stats — kişi sayısı sadece yetişkin (yolcu), çocuk ayrı
-  const totalKisi = tickets.reduce((s, t) => s + t.yolcu, 0);
-  const totalCocuk = tickets.reduce((s, t) => s + t.cocuk, 0);
-  const totalPax = totalKisi; // sadece yetişkinler
+  const totalKisi = tickets.filter(t => t.durum !== 'İptal').reduce((s, t) => s + t.yolcu, 0);
+  const totalCocuk = tickets.filter(t => t.durum !== 'İptal').reduce((s, t) => s + t.cocuk, 0);
+  const totalPax = totalKisi; // sadece yetişkinler, iptal hariç
   const turBitti = tickets.filter(t => t.durum === 'Tur Bitti').reduce((s, t) => s + t.yolcu, 0);
   const ofiste = tickets.filter(t => t.durum === 'Ofiste').reduce((s, t) => s + t.yolcu, 0);
   const transferde = tickets.filter(t => t.durum === 'Transfer Sürecinde').reduce((s, t) => s + t.yolcu, 0);
@@ -1396,12 +1396,12 @@ router.get('/operations/proagent', authenticate, requireRole('ADMIN', 'SUPER_ADM
 
   // Tahmini varış saatleri — bölgeye göre yol süresi (dakika)
   const travelTimes: Record<string, number> = {
-    'ALANYA': 10, 'KONAKLI': 20, 'AVSALLAR': 30, 'OKURCALAR': 40,
-    'PAYALLAR': 35, 'MAHMUTLAR': 15, 'KARGICAK': 20, 'KESTEL': 15,
-    'OBA': 10, 'TOSMUR': 10, 'CIKCILLI': 10, 'TURKLER': 25,
-    'SIDE': 60, 'MANAVGAT': 55, 'SORGUN': 65, 'KUMKOY': 60,
-    'BELEK': 80, 'KUNDU': 90, 'KONYAALTI': 100, 'MURATPASA': 100,
-    'SIRINYALI': 95, 'BELDIBI': 120, 'KEMER': 110,
+    'ALANYA': 10, 'KONAKLI': 25, 'AVSALLAR': 35, 'OKURCALAR': 45,
+    'PAYALLAR': 40, 'MAHMUTLAR': 15, 'KARGICAK': 20, 'KESTEL': 15,
+    'OBA': 10, 'TOSMUR': 10, 'CIKCILLI': 10, 'TURKLER': 30,
+    'SIDE': 100, 'MANAVGAT': 90, 'SORGUN': 105, 'KUMKOY': 100,
+    'BELEK': 120, 'KUNDU': 150, 'KONYAALTI': 180, 'MURATPASA': 180,
+    'SIRINYALI': 170, 'BELDIBI': 210, 'KEMER': 210, 'ANTALYA': 180,
   };
   // Tahmini yoğunluk: her 30dk diliminde kaç kişi ofiste olacak
   const densityMap: Record<string, number> = {};
