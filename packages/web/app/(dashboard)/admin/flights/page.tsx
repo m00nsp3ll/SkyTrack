@@ -409,7 +409,22 @@ export default function LiveFlightsPage() {
               </p>
             ) : (
               <div className="space-y-3">
-                {waiting.map((flight) => (
+                {waiting.map((flight, idx) => {
+                  // Grup ayırıcı: önceki müşteriyle 10+ dk fark varsa çizgi çek
+                  const prevFlight = idx > 0 ? waiting[idx - 1] : null
+                  const showSeparator = prevFlight && (() => {
+                    const prev = new Date(prevFlight.createdAt).getTime()
+                    const curr = new Date(flight.createdAt).getTime()
+                    return Math.abs(curr - prev) > 10 * 60 * 1000
+                  })()
+                  return (<>
+                  {showSeparator && (
+                    <div className="flex items-center gap-2 py-1">
+                      <div className="flex-1 h-0.5" style={{ background: 'linear-gradient(to right, transparent, #ef4444, #ef4444, transparent)' }} />
+                      <span className="text-[10px] font-bold text-red-500 whitespace-nowrap">YENİ GRUP</span>
+                      <div className="flex-1 h-0.5" style={{ background: 'linear-gradient(to left, transparent, #ef4444, #ef4444, transparent)' }} />
+                    </div>
+                  )}
                   <Card key={flight.id} className="bg-yellow-50">
                     <CardContent className="p-3">
                       <Link href={`/admin/customers/${flight.customer.displayId}`}>
@@ -486,7 +501,7 @@ export default function LiveFlightsPage() {
                       )}
                     </CardContent>
                   </Card>
-                ))}
+                  </>)})}
               </div>
             )}
           </CardContent>
