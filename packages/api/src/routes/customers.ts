@@ -726,11 +726,29 @@ router.get('/:id/label', authenticate, asyncHandler(async (req: AuthRequest, res
   const qrSize = mm(32);
   doc.image(qrBuffer, cx - qrSize / 2, mm(11), { width: qrSize, height: qrSize });
 
-  // Display ID + name
+  // Display ID + name — otomatik font küçültme (sığmazsa küçült)
+  const labelWidth = mm(54); // kenar boşlukları çıkar
+  const labelX = mm(2);
   const name = `${customer.firstName} ${customer.lastName}`;
-  doc.fontSize(10).text(`${customer.displayId} - ${name}`, 0, mm(45), { align: 'center', width: mm(58) });
-  if (pilotName) {
-    doc.fontSize(10).text(`Pilot: ${pilotName}`, 0, mm(50), { align: 'center', width: mm(58) });
+  const line1 = `${customer.displayId} - ${name}`;
+  const line2 = pilotName ? `Pilot: ${pilotName}` : '';
+
+  // Font boyutunu hesapla — metin genişliğe sığana kadar küçült
+  const fitText = (text: string, maxSize: number, minSize: number) => {
+    for (let s = maxSize; s >= minSize; s--) {
+      doc.fontSize(s);
+      if (doc.widthOfString(text) <= labelWidth) return s;
+    }
+    return minSize;
+  };
+
+  const size1 = fitText(line1, 11, 6);
+  doc.fontSize(size1).text(line1, labelX, mm(45), { align: 'center', width: labelWidth });
+
+  if (line2) {
+    const size2 = fitText(line2, 11, 6);
+    const y2 = mm(45) + size1 + 4;
+    doc.fontSize(size2).text(line2, labelX, y2, { align: 'center', width: labelWidth });
   }
 
   doc.end();
