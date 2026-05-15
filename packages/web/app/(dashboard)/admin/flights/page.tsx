@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useMemo, useCallback } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -100,8 +100,6 @@ export default function LiveFlightsPage() {
   const [showBulkCancel, setShowBulkCancel] = useState(false)
   const [cancelling, setCancelling] = useState(false)
   const [updatingId, setUpdatingId] = useState<string | null>(null)
-  // Drag & drop group overrides: maps flight ID to group index
-  const [groupOverrides, setGroupOverrides] = useState<Record<string, number>>({})
   const [draggedFlightId, setDraggedFlightId] = useState<string | null>(null)
   const [dragOverGroup, setDragOverGroup] = useState<number | null>(null)
 
@@ -209,46 +207,22 @@ export default function LiveFlightsPage() {
   const completed = data?.completed || []
   const pilots = data?.pilots || []
 
-  // Auto-group waiting flights by 10+ minute time gap + drag overrides
-  const waitingIds = waiting.map(f => f.id).join(',')
-
-  useEffect(() => {
-    setGroupOverrides({})
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [waitingIds])
-
-  const effectiveGroups: Flight[][] = useMemo(() => {
-    if (!waiting || waiting.length === 0) return []
-    try {
-      // Auto-group by time gap
-      const groups: Flight[][] = [[waiting[0]]]
-      for (let i = 1; i < waiting.length; i++) {
-        const prev = new Date(waiting[i - 1].createdAt).getTime()
-        const curr = new Date(waiting[i].createdAt).getTime()
-        if (Math.abs(curr - prev) > 10 * 60 * 1000) {
-          groups.push([waiting[i]])
-        } else {
-          groups[groups.length - 1].push(waiting[i])
-        }
+  // Auto-group waiting flights by 10+ minute time gap
+  const getGroups = (flights: Flight[]): Flight[][] => {
+    if (!flights || flights.length === 0) return []
+    const groups: Flight[][] = [[flights[0]]]
+    for (let i = 1; i < flights.length; i++) {
+      const prev = new Date(flights[i - 1].createdAt).getTime()
+      const curr = new Date(flights[i].createdAt).getTime()
+      if (Math.abs(curr - prev) > 10 * 60 * 1000) {
+        groups.push([flights[i]])
+      } else {
+        groups[groups.length - 1].push(flights[i])
       }
-      // Apply drag overrides
-      if (Object.keys(groupOverrides).length > 0) {
-        for (const [flightId, targetIdx] of Object.entries(groupOverrides)) {
-          // Remove from current group
-          for (const g of groups) {
-            const idx = g.findIndex(f => f.id === flightId)
-            if (idx !== -1) { g.splice(idx, 1); break }
-          }
-          // Add to target
-          if (targetIdx >= 0 && targetIdx < groups.length) {
-            const flight = waiting.find(f => f.id === flightId)
-            if (flight) groups[targetIdx].push(flight)
-          }
-        }
-      }
-      return groups.filter(g => g.length > 0)
-    } catch { return [waiting] }
-  }, [waiting, groupOverrides])
+    }
+    return groups
+  }
+  const effectiveGroups = getGroups(waiting)
 
   // Group colors for visual distinction
   const groupColors = [
@@ -276,19 +250,11 @@ export default function LiveFlightsPage() {
     setDragOverGroup(null)
   }, [])
 
-  const handleDrop = useCallback((e: React.DragEvent, targetGroupIdx: number) => {
+  const handleDrop = useCallback((e: React.DragEvent, _targetGroupIdx: number) => {
     e.preventDefault()
-    const flightId = e.dataTransfer.getData('text/plain')
-    if (flightId) {
-      // Check if flight is already in this group
-      const alreadyInGroup = effectiveGroups[targetGroupIdx]?.some(f => f.id === flightId)
-      if (!alreadyInGroup) {
-        setGroupOverrides(prev => ({ ...prev, [flightId]: targetGroupIdx }))
-      }
-    }
     setDraggedFlightId(null)
     setDragOverGroup(null)
-  }, [effectiveGroups])
+  }, [])
 
   const handleDragEnd = useCallback(() => {
     setDraggedFlightId(null)
