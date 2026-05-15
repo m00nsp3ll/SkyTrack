@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -100,8 +100,6 @@ export default function LiveFlightsPage() {
   const [showBulkCancel, setShowBulkCancel] = useState(false)
   const [cancelling, setCancelling] = useState(false)
   const [updatingId, setUpdatingId] = useState<string | null>(null)
-  const [draggedFlightId, setDraggedFlightId] = useState<string | null>(null)
-  const [dragOverGroup, setDragOverGroup] = useState<number | null>(null)
 
   // Manuel admin status değiştirme — uygulaması olmayan pilotlar için
   const adminUpdateStatus = async (flightId: string, newStatus: string) => {
@@ -206,60 +204,6 @@ export default function LiveFlightsPage() {
   const waiting = data?.waiting || []
   const completed = data?.completed || []
   const pilots = data?.pilots || []
-
-  // Auto-group waiting flights by 10+ minute time gap
-  const getGroups = (flights: Flight[]): Flight[][] => {
-    if (!flights || flights.length === 0) return []
-    const groups: Flight[][] = [[flights[0]]]
-    for (let i = 1; i < flights.length; i++) {
-      const prev = new Date(flights[i - 1].createdAt).getTime()
-      const curr = new Date(flights[i].createdAt).getTime()
-      if (Math.abs(curr - prev) > 10 * 60 * 1000) {
-        groups.push([flights[i]])
-      } else {
-        groups[groups.length - 1].push(flights[i])
-      }
-    }
-    return groups
-  }
-  const effectiveGroups = getGroups(waiting)
-
-  // Group colors for visual distinction
-  const groupColors = [
-    { bg: 'bg-yellow-100', border: 'border-yellow-300', header: 'bg-yellow-200 text-yellow-800' },
-    { bg: 'bg-orange-100', border: 'border-orange-300', header: 'bg-orange-200 text-orange-800' },
-    { bg: 'bg-amber-100', border: 'border-amber-300', header: 'bg-amber-200 text-amber-800' },
-    { bg: 'bg-lime-100', border: 'border-lime-300', header: 'bg-lime-200 text-lime-800' },
-    { bg: 'bg-teal-100', border: 'border-teal-300', header: 'bg-teal-200 text-teal-800' },
-  ]
-
-  // Drag handlers
-  const handleDragStart = useCallback((e: React.DragEvent, flightId: string) => {
-    setDraggedFlightId(flightId)
-    e.dataTransfer.effectAllowed = 'move'
-    e.dataTransfer.setData('text/plain', flightId)
-  }, [])
-
-  const handleDragOver = useCallback((e: React.DragEvent, groupIdx: number) => {
-    e.preventDefault()
-    e.dataTransfer.dropEffect = 'move'
-    setDragOverGroup(groupIdx)
-  }, [])
-
-  const handleDragLeave = useCallback(() => {
-    setDragOverGroup(null)
-  }, [])
-
-  const handleDrop = useCallback((e: React.DragEvent, _targetGroupIdx: number) => {
-    e.preventDefault()
-    setDraggedFlightId(null)
-    setDragOverGroup(null)
-  }, [])
-
-  const handleDragEnd = useCallback(() => {
-    setDraggedFlightId(null)
-    setDragOverGroup(null)
-  }, [])
 
   return (
     <div className="space-y-6">
@@ -464,120 +408,112 @@ export default function LiveFlightsPage() {
                 Bekleyen müşteri yok
               </p>
             ) : (
-              <div className="space-y-4">
-                {effectiveGroups.map((group, groupIdx) => {
-                  const color = groupColors[groupIdx % groupColors.length]
-                  const sentCount = group.filter(f => f.status === 'PICKED_UP' || f.status === 'IN_FLIGHT').length
-                  const totalCount = group.length
-                  const isDragTarget = dragOverGroup === groupIdx
-
-                  return (
-                    <div
-                      key={`group-${groupIdx}`}
-                      className={`rounded-lg border-2 p-2 transition-all ${color.border} ${isDragTarget ? 'ring-2 ring-blue-400 scale-[1.01]' : ''}`}
-                      onDragOver={(e) => handleDragOver(e, groupIdx)}
-                      onDragLeave={handleDragLeave}
-                      onDrop={(e) => handleDrop(e, groupIdx)}
-                    >
-                      {/* Group header */}
-                      <div className={`flex items-center justify-between px-3 py-1.5 rounded-md mb-2 ${color.header}`}>
-                        <span className="text-xs font-bold">
-                          Grup {groupIdx + 1} ({sentCount}/{totalCount})
-                        </span>
-                        <span className="text-[10px] opacity-70">
-                          {sentCount === 0 ? 'Gönderilmedi' : sentCount === totalCount ? 'Tamamı gönderildi' : `${totalCount - sentCount} bekliyor`}
+              <div className="space-y-3">
+                {waiting.map((flight, idx) => {
+                  // Grup ayırıcı: önceki müşteriyle 10+ dk fark varsa çizgi çek
+                  const prevFlight = idx > 0 ? waiting[idx - 1] : null
+                  const showSeparator = prevFlight && (() => {
+                    const prev = new Date(prevFlight.createdAt).getTime()
+                    const curr = new Date(flight.createdAt).getTime()
+                    return Math.abs(curr - prev) > 10 * 60 * 1000
+                  })()
+                  return (<>
+                  {showSeparator && (() => {
+                    // Bu gruptan sonraki kişi sayısını hesapla
+                    let groupCount = 0
+                    for (let j = idx; j < waiting.length; j++) {
+                      if (j > idx) {
+                        const pTime = new Date(waiting[j - 1].createdAt).getTime()
+                        const cTime = new Date(waiting[j].createdAt).getTime()
+                        if (Math.abs(cTime - pTime) > 10 * 60 * 1000) break
+                      }
+                      groupCount++
+                    }
+                    return (
+                      <div className="flex items-center gap-2 py-1">
+                        <div className="flex-1 h-0.5" style={{ background: 'linear-gradient(to right, transparent, #ef4444, #ef4444, transparent)' }} />
+                        <span className="text-[10px] font-bold text-red-500 whitespace-nowrap">YENİ GRUP ({groupCount} kişi)</span>
+                        <div className="flex-1 h-0.5" style={{ background: 'linear-gradient(to left, transparent, #ef4444, #ef4444, transparent)' }} />
+                      </div>
+                    )
+                  })()}
+                  <Card key={flight.id} className="bg-yellow-50">
+                    <CardContent className="p-3">
+                      <Link href={`/admin/customers/${flight.customer.displayId}`}>
+                        <div className="flex items-start justify-between mb-2 cursor-pointer hover:opacity-80">
+                          <div>
+                            <p className="font-bold text-lg">{flight.pilot.name}</p>
+                            <p className="text-sm text-muted-foreground">
+                              {flight.customer.firstName} {flight.customer.lastName} — {flight.customer.weight} kg
+                            </p>
+                            {flight.customer.emergencyContact && (
+                              <p className="text-xs text-muted-foreground">🏨 {flight.customer.emergencyContact}</p>
+                            )}
+                            <p className="text-xs text-muted-foreground">{flight.customer.displayId}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-lg font-bold text-yellow-600">
+                              {flight.waitMinutes || 0} dk
+                            </p>
+                            <p className="text-xs text-muted-foreground">bekleme</p>
+                          </div>
+                        </div>
+                      </Link>
+                      <div className="flex items-center justify-between gap-2 mb-2">
+                        <span className={`px-1.5 py-0.5 rounded text-xs ${
+                          flight.status === 'PICKED_UP' ? 'bg-yellow-200 text-yellow-700' : 'bg-gray-200 text-gray-700'
+                        }`}>
+                          {flight.status === 'PICKED_UP' ? 'Alındı' : 'Atandı'}
                         </span>
                       </div>
-
-                      <div className="space-y-2">
-                        {group.map((flight) => (
-                          <Card
-                            key={flight.id}
-                            className={`bg-yellow-50 cursor-grab active:cursor-grabbing transition-opacity ${draggedFlightId === flight.id ? 'opacity-40' : ''}`}
-                            draggable
-                            onDragStart={(e) => handleDragStart(e, flight.id)}
-                            onDragEnd={handleDragEnd}
+                      {/* Manuel admin status butonları */}
+                      {flight.status === 'ASSIGNED' && (
+                        <div className="grid grid-cols-2 gap-2">
+                          <Button
+                            size="sm"
+                            className="bg-green-600 hover:bg-green-700"
+                            onClick={(e) => { e.stopPropagation(); adminUpdateStatus(flight.id, 'PICKED_UP') }}
+                            disabled={updatingId === flight.id}
                           >
-                            <CardContent className="p-3">
-                              <Link href={`/admin/customers/${flight.customer.displayId}`}>
-                                <div className="flex items-start justify-between mb-2 cursor-pointer hover:opacity-80">
-                                  <div>
-                                    <p className="font-bold text-lg">{flight.pilot.name}</p>
-                                    <p className="text-sm text-muted-foreground">
-                                      {flight.customer.firstName} {flight.customer.lastName} — {flight.customer.weight} kg
-                                    </p>
-                                    {flight.customer.emergencyContact && (
-                                      <p className="text-xs text-muted-foreground">🏨 {flight.customer.emergencyContact}</p>
-                                    )}
-                                    <p className="text-xs text-muted-foreground">{flight.customer.displayId}</p>
-                                  </div>
-                                  <div className="text-right">
-                                    <p className="text-lg font-bold text-yellow-600">
-                                      {flight.waitMinutes || 0} dk
-                                    </p>
-                                    <p className="text-xs text-muted-foreground">bekleme</p>
-                                  </div>
-                                </div>
-                              </Link>
-                              <div className="flex items-center justify-between gap-2 mb-2">
-                                <span className={`px-1.5 py-0.5 rounded text-xs ${
-                                  flight.status === 'PICKED_UP' ? 'bg-yellow-200 text-yellow-700' : 'bg-gray-200 text-gray-700'
-                                }`}>
-                                  {flight.status === 'PICKED_UP' ? 'Alındı' : 'Atandı'}
-                                </span>
-                              </div>
-                              {/* Manuel admin status butonları */}
-                              {flight.status === 'ASSIGNED' && (
-                                <div className="grid grid-cols-2 gap-2">
-                                  <Button
-                                    size="sm"
-                                    className="bg-green-600 hover:bg-green-700"
-                                    onClick={(e) => { e.stopPropagation(); adminUpdateStatus(flight.id, 'PICKED_UP') }}
-                                    disabled={updatingId === flight.id}
-                                  >
-                                    <User className="h-4 w-4 mr-1" />
-                                    Onayla
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="border-orange-300 text-orange-700 hover:bg-orange-50"
-                                    onClick={async (e) => {
-                                      e.stopPropagation()
-                                      if (!confirm(`${flight.pilot.name} pilotuna feragat yazılıp müşteri sıradaki pilota geçsin mi?`)) return
-                                      setUpdatingId(flight.id)
-                                      try {
-                                        await api.post(`/flights/${flight.id}/forfeit-reassign`)
-                                        await fetchData()
-                                      } catch (err: any) {
-                                        alert(err.response?.data?.error?.message || 'Feragat başarısız')
-                                      } finally { setUpdatingId(null) }
-                                    }}
-                                    disabled={updatingId === flight.id}
-                                  >
-                                    <SkipForward className="h-4 w-4 mr-1" />
-                                    Feragat
-                                  </Button>
-                                </div>
-                              )}
-                              {flight.status === 'PICKED_UP' && (
-                                <Button
-                                  size="sm"
-                                  className="w-full bg-blue-500 hover:bg-blue-600"
-                                  onClick={(e) => { e.stopPropagation(); adminUpdateStatus(flight.id, 'IN_FLIGHT') }}
-                                  disabled={updatingId === flight.id}
-                                >
-                                  <Plane className="h-4 w-4 mr-1" />
-                                  {updatingId === flight.id ? 'İşleniyor...' : 'Uçuşa Başla'}
-                                </Button>
-                              )}
-                            </CardContent>
-                          </Card>
-                        ))}
-                      </div>
-                    </div>
-                  )
-                })}
+                            <User className="h-4 w-4 mr-1" />
+                            Onayla
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="border-orange-300 text-orange-700 hover:bg-orange-50"
+                            onClick={async (e) => {
+                              e.stopPropagation()
+                              if (!confirm(`${flight.pilot.name} pilotuna feragat yazılıp müşteri sıradaki pilota geçsin mi?`)) return
+                              setUpdatingId(flight.id)
+                              try {
+                                await api.post(`/flights/${flight.id}/forfeit-reassign`)
+                                await fetchData()
+                              } catch (err: any) {
+                                alert(err.response?.data?.error?.message || 'Feragat başarısız')
+                              } finally { setUpdatingId(null) }
+                            }}
+                            disabled={updatingId === flight.id}
+                          >
+                            <SkipForward className="h-4 w-4 mr-1" />
+                            Feragat
+                          </Button>
+                        </div>
+                      )}
+                      {flight.status === 'PICKED_UP' && (
+                        <Button
+                          size="sm"
+                          className="w-full bg-blue-500 hover:bg-blue-600"
+                          onClick={(e) => { e.stopPropagation(); adminUpdateStatus(flight.id, 'IN_FLIGHT') }}
+                          disabled={updatingId === flight.id}
+                        >
+                          <Plane className="h-4 w-4 mr-1" />
+                          {updatingId === flight.id ? 'İşleniyor...' : 'Uçuşa Başla'}
+                        </Button>
+                      )}
+                    </CardContent>
+                  </Card>
+                  </>)})}
               </div>
             )}
           </CardContent>
