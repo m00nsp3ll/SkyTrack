@@ -239,49 +239,53 @@ export const pilotQueueService = {
         },
       });
 
-      // ATLANAN PİLOT FERAGATİ: Sırası geçmiş ama mesai dışı/mola olan pilotlar feragat yer.
-      // priorityOverride ile sıra başı yapılan pilotta feragat sistemi ÇALIŞMAZ —
-      // çünkü sıra atlanmadı, pilot özel olarak öne alındı.
-      const oldRound = pilot.roundCount; // atama öncesi round
-      const wasPriority = pilot.priorityOverride; // atama öncesi priority durumu
-      const skipped = wasPriority ? [] : await tx.pilot.findMany({
-        where: {
-          isActive: true,
-          isInExcel: true,
-          id: { not: pilot.id },
-          roundCount: { lte: oldRound },
-          OR: [
-            { inQueue: false },
-            { status: { in: ['OFF_DUTY', 'ON_BREAK'] } },
-          ],
-        },
-        select: { id: true, roundCount: true, queuePosition: true },
-      });
-      for (const sp of skipped) {
-        // Aynı rounddaki pilot: sadece sırası öndeyse (queuePosition < atanan pilot) feragat yer
-        // Gerideki pilot (roundCount < oldRound): her zaman feragat yer (+1)
-        if (sp.roundCount === oldRound && sp.queuePosition >= pilot.queuePosition) continue;
-        await tx.pilot.update({
-          where: { id: sp.id },
-          data: {
-            roundCount: { increment: 1 },
-            forfeitCount: { increment: 1 },
-            lastForfeitRound: oldRound,
+      // EXCEL MANTIĞI: Sıra başından başla, tek tek ilerle.
+      // OFF_DUTY/ON_BREAK → feragat yaz, sonrakine geç.
+      // AVAILABLE → müşteri ata (yukarıda yapıldı).
+      // priorityOverride ile öne alınan pilotta feragat sistemi çalışmaz.
+      if (!pilot.priorityOverride) {
+        // Atanan pilotun ÖNÜNDEKİ tüm OFF_DUTY pilotlara tek tek feragat yaz
+        const oldRound = pilot.roundCount; // atama öncesi round
+        const queueAhead = await tx.pilot.findMany({
+          where: {
+            isActive: true,
+            isInExcel: true,
+            id: { not: pilot.id },
+            status: { in: ['OFF_DUTY', 'ON_BREAK'] },
+            OR: [
+              { roundCount: { lt: oldRound } },
+              { roundCount: oldRound, queuePosition: { lt: pilot.queuePosition } },
+            ],
           },
+          select: { id: true, roundCount: true, queuePosition: true },
+          orderBy: [{ roundCount: 'asc' }, { queuePosition: 'asc' }],
         });
-        // Feragat kaydı oluştur — queue-history'de görünsün
-        // createdAt'ı flight'tan 1sn önce yap ki sıralama doğru olsun (feragat → uçuş)
-        const forfeitTime = new Date(Date.now() - 1000);
-        await tx.flight.create({
-          data: {
-            customerId,
-            pilotId: sp.id,
-            status: 'CANCELLED',
-            cancellationReason: 'FORFEIT',
-            notes: 'Mesai dışı - otomatik feragat',
-            createdAt: forfeitTime,
-          },
-        });
+
+        // Her birini tek tek feragat et — sırayla, atlamadan
+        let forfeitOffset = 0;
+        for (const sp of queueAhead) {
+          forfeitOffset++;
+          await tx.pilot.update({
+            where: { id: sp.id },
+            data: {
+              roundCount: { increment: 1 },
+              forfeitCount: { increment: 1 },
+              lastForfeitRound: oldRound,
+              priorityOverride: false,
+            },
+          });
+          // Feragat kaydı — her biri ayrı timestamp ile (kronolojik sıra korunsun)
+          await tx.flight.create({
+            data: {
+              customerId,
+              pilotId: sp.id,
+              status: 'CANCELLED',
+              cancellationReason: 'FORFEIT',
+              notes: 'Mesai dışı - otomatik feragat',
+              createdAt: new Date(Date.now() - 1000 + forfeitOffset),
+            },
+          });
+        }
       }
 
       return flight;
