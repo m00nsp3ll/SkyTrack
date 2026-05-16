@@ -4,97 +4,74 @@ const prisma = new PrismaClient();
 
 /**
  * Display ID Generator
- * Format: 1 letter + 4 digits (e.g., A0001, A0002, ... A9999, B0001, ...)
- * Total capacity: 26 x 9999 = 259,974 customers
+ * Yeni format: sadece rakam (1629, 1630, ...)
+ * Eski format (T1628, A0001 vb.) geriye uyumlu çalışır
  */
 
 export const displayIdService = {
   /**
-   * Generate the next display ID
-   * Finds the last used ID and increments it
+   * Generate the next display ID — sadece rakam
+   * Son kayıttaki en yüksek numarayı bulup +1 yapar
    */
   async generateNext(): Promise<string> {
-    // Get the last customer ordered by displayId
     const lastCustomer = await prisma.customer.findFirst({
-      orderBy: { displayId: 'desc' },
+      orderBy: { createdAt: 'desc' },
       select: { displayId: true },
+      take: 1,
     });
 
-    if (!lastCustomer) {
-      // First customer ever
-      return 'A0001';
-    }
+    if (!lastCustomer) return '1';
 
-    return this.incrementId(lastCustomer.displayId);
+    // Eski veya yeni formattan numarayı çıkar
+    const num = this.extractNumber(lastCustomer.displayId);
+    return String(num + 1);
   },
 
   /**
-   * Increment a display ID to the next value
-   * A0001 -> A0002, A9999 -> B0001, Z9999 -> error
+   * displayId'den numarayı çıkar (T1628 → 1628, A0001 → 1, 1629 → 1629)
+   */
+  extractNumber(displayId: string): number {
+    // Sadece rakam ise direkt parse et
+    if (/^\d+$/.test(displayId)) return parseInt(displayId, 10);
+    // Harf + rakam (T1628, A0001) → rakam kısmını al
+    const num = parseInt(displayId.replace(/[^0-9]/g, ''), 10);
+    return isNaN(num) ? 0 : num;
+  },
+
+  /**
+   * Increment (geriye uyumluluk için)
    */
   incrementId(currentId: string): string {
-    const letter = currentId.charAt(0);
-    const number = parseInt(currentId.slice(1), 10);
-
-    if (number < 9999) {
-      // Just increment the number
-      return `${letter}${String(number + 1).padStart(4, '0')}`;
-    }
-
-    // Number is 9999, need to go to next letter
-    const nextLetterCode = letter.charCodeAt(0) + 1;
-
-    if (nextLetterCode > 90) {
-      // 'Z' is 90, we've exceeded it
-      throw new Error('Display ID kapasitesi doldu! (Z9999 aşıldı)');
-    }
-
-    const nextLetter = String.fromCharCode(nextLetterCode);
-    return `${nextLetter}0001`;
+    const num = this.extractNumber(currentId);
+    return String(num + 1);
   },
 
   /**
-   * Parse a display ID into its components
+   * Parse
    */
   parse(displayId: string): { letter: string; number: number } {
-    const letter = displayId.charAt(0).toUpperCase();
-    const number = parseInt(displayId.slice(1), 10);
+    const letter = /^[A-Z]/i.test(displayId) ? displayId.charAt(0).toUpperCase() : '';
+    const number = this.extractNumber(displayId);
     return { letter, number };
   },
 
   /**
-   * Validate a display ID format
+   * Validate — hem eski (T1628) hem yeni (1629) format geçerli
    */
   isValid(displayId: string): boolean {
-    if (!displayId || displayId.length !== 5) return false;
-    const letter = displayId.charAt(0).toUpperCase();
-    const numberPart = displayId.slice(1);
-
-    // Letter must be A-Z
-    if (letter < 'A' || letter > 'Z') return false;
-
-    // Number part must be 4 digits, 0001-9999
-    const num = parseInt(numberPart, 10);
-    if (isNaN(num) || num < 1 || num > 9999) return false;
-    if (numberPart.length !== 4) return false;
-
-    return true;
+    if (!displayId) return false;
+    // Yeni format: sadece rakam
+    if (/^\d+$/.test(displayId)) return true;
+    // Eski format: harf + rakam
+    if (/^[A-Z]\d{1,4}$/i.test(displayId)) return true;
+    return false;
   },
 
   /**
-   * Generate display ID for a specific index (for seeding)
-   * Index is 1-based: 1 -> A0001, 9999 -> A9999, 10000 -> B0001
+   * fromIndex (seeding için)
    */
   fromIndex(index: number): string {
-    if (index < 1 || index > 259974) {
-      throw new Error('Index must be between 1 and 259974');
-    }
-
-    const letterIndex = Math.floor((index - 1) / 9999);
-    const number = ((index - 1) % 9999) + 1;
-    const letter = String.fromCharCode(65 + letterIndex); // 65 is 'A'
-
-    return `${letter}${String(number).padStart(4, '0')}`;
+    return String(index);
   },
 };
 
