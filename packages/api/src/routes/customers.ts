@@ -954,6 +954,17 @@ router.post('/:id/female-pilot', authenticate, requireRole('ADMIN', 'OFFICE_STAF
     }
   });
 
+  // Otomatik QR etiket yazdır
+  if (io) {
+    io.to('admin').emit('print:label', {
+      customerId: customer.id,
+      displayId: customer.displayId,
+      customerName: `${customer.firstName} ${customer.lastName}`,
+      pilotName: femalePilot.name,
+      createdAt: new Date().toISOString(),
+    });
+  }
+
   res.json({
     success: true,
     data: {
@@ -1104,6 +1115,17 @@ router.post('/:id/request-pilot', authenticate, requireRole('ADMIN', 'OFFICE_STA
     }
   });
 
+  // Otomatik QR etiket yazdır
+  if (io) {
+    io.to('admin').emit('print:label', {
+      customerId: customer.id,
+      displayId: customer.displayId,
+      customerName: `${customer.firstName} ${customer.lastName}`,
+      pilotName: requestedPilot.name,
+      createdAt: new Date().toISOString(),
+    });
+  }
+
   res.json({
     success: true,
     data: {
@@ -1129,6 +1151,21 @@ router.post('/:id/reassign-pilot', authenticate, requireRole('ADMIN', 'OFFICE_ST
 
   // Invalidate customer cache
   await cache.customer.invalidate(id);
+
+  // Otomatik QR etiket yazdır
+  const io2 = req.app.get('io');
+  if (io2) {
+    const cust = await prisma.customer.findUnique({ where: { id } });
+    if (cust) {
+      io2.to('admin').emit('print:label', {
+        customerId: id,
+        displayId: cust.displayId,
+        customerName: `${cust.firstName} ${cust.lastName}`,
+        pilotName: pilot.name,
+        createdAt: new Date().toISOString(),
+      });
+    }
+  }
 
   res.json({
     success: true,

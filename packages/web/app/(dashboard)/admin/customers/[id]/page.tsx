@@ -752,9 +752,7 @@ Bu belgeyi imzalayarak asagidaki hususlari kabul ve beyan ederim:
         alert(`Request: ${data.requestedPilot?.name} atandı${data.swappedPilot ? ` — ${data.swappedPilot.name} sıra başına döndü` : ''}`)
       }
       await fetchCustomer()
-      // Onay sonrası otomatik QR etiket yazdır
-      const token = localStorage.getItem('token') || ''
-      window.open(`${process.env.NEXT_PUBLIC_API_URL}/customers/${customer.id}/label?token=${token}`, '_blank')
+      // QR etiket backend'den otomatik yazdırılıyor (print:label socket event)
     } catch (error: any) {
       alert(error.response?.data?.error?.message || 'Pilot atanamadı')
     } finally {
