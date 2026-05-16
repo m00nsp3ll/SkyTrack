@@ -100,7 +100,9 @@ export default function LiveFlightsPage() {
   const [showBulkCancel, setShowBulkCancel] = useState(false)
   const [cancelling, setCancelling] = useState(false)
   const [updatingId, setUpdatingId] = useState<string | null>(null)
-  const [mergedSeparators, setMergedSeparators] = useState<Set<number>>(new Set())
+  // Gruplama: merge edilen ayırıcıları takip et (yukarı veya aşağı)
+  const [mergedUp, setMergedUp] = useState<Set<number>>(new Set())
+  const [mergedDown, setMergedDown] = useState<Set<number>>(new Set())
 
   // Manuel admin status değiştirme — uygulaması olmayan pilotlar için
   const adminUpdateStatus = async (flightId: string, newStatus: string) => {
@@ -410,34 +412,42 @@ export default function LiveFlightsPage() {
               </p>
             ) : (
               <div className="space-y-3">
-                {waiting.map((flight, idx) => {
-                  // Grup ayırıcı: önceki müşteriyle 10+ dk fark varsa çizgi çek
-                  const prevFlight = idx > 0 ? waiting[idx - 1] : null
-                  const showSeparator = prevFlight && !mergedSeparators.has(idx) && (() => {
-                    const prev = new Date(prevFlight.createdAt).getTime()
-                    const curr = new Date(flight.createdAt).getTime()
-                    return Math.abs(curr - prev) > 10 * 60 * 1000
-                  })()
-                  return (<>
-                  {showSeparator && (() => {
-                    // Bu gruptan sonraki kişi sayısını hesapla
-                    let groupCount = 0
-                    for (let j = idx; j < waiting.length; j++) {
-                      if (j > idx) {
-                        const pTime = new Date(waiting[j - 1].createdAt).getTime()
-                        const cTime = new Date(waiting[j].createdAt).getTime()
-                        if (Math.abs(cTime - pTime) > 10 * 60 * 1000) break
+                {(() => {
+                  // Grupları hesapla
+                  const groups: { start: number; flights: typeof waiting }[] = []
+                  let currentGroup: typeof waiting = []
+                  const separatorIndexes: number[] = []
+                  for (let i = 0; i < waiting.length; i++) {
+                    if (i > 0) {
+                      const prev = new Date(waiting[i-1].createdAt).getTime()
+                      const curr = new Date(waiting[i].createdAt).getTime()
+                      const isSep = Math.abs(curr - prev) > 10 * 60 * 1000
+                      const isMergedUp = mergedUp.has(separatorIndexes.length)
+                      const isMergedDown = mergedDown.has(separatorIndexes.length)
+                      if (isSep && !isMergedUp && !isMergedDown) {
+                        groups.push({ start: separatorIndexes.length, flights: currentGroup })
+                        currentGroup = []
+                        separatorIndexes.push(i)
+                      } else if (isSep) {
+                        separatorIndexes.push(i)
                       }
-                      groupCount++
                     }
-                    return (
-                      <div className="flex items-center gap-2 py-1 cursor-pointer group" onClick={() => setMergedSeparators(prev => { const n = new Set(prev); n.add(idx); return n })}>
-                        <div className="flex-1 h-0.5" style={{ background: 'linear-gradient(to right, transparent, #ef4444, #ef4444, transparent)' }} />
-                        <span className="text-[10px] font-bold text-red-500 whitespace-nowrap group-hover:text-red-300 transition-colors">YENİ GRUP ({groupCount} kişi) <span className="opacity-0 group-hover:opacity-100">✕ birleştir</span></span>
-                        <div className="flex-1 h-0.5" style={{ background: 'linear-gradient(to left, transparent, #ef4444, #ef4444, transparent)' }} />
+                    currentGroup.push(waiting[i])
+                  }
+                  if (currentGroup.length > 0) groups.push({ start: separatorIndexes.length, flights: currentGroup })
+
+                  return groups.map((group, gi) => (
+                    <div key={`grp-${gi}`}>
+                      {/* Grup başlığı */}
+                      <div className="flex items-center justify-between px-2 py-1 mb-1">
+                        <span className="text-xs font-bold" style={{ color: '#6b7280' }}>Grup {gi + 1} ({group.flights.length} kişi)</span>
+                        <div className="flex gap-1">
+                          {gi > 0 && <button onClick={() => setMergedUp(p => { const n = new Set(p); n.add(gi); return n })} className="text-[10px] px-2 py-0.5 rounded bg-blue-100 text-blue-600 hover:bg-blue-200">↑ Yukarıyla birleştir</button>}
+                          {gi < groups.length - 1 && <button onClick={() => setMergedDown(p => { const n = new Set(p); n.add(gi + 1); return n })} className="text-[10px] px-2 py-0.5 rounded bg-blue-100 text-blue-600 hover:bg-blue-200">↓ Aşağıyla birleştir</button>}
+                        </div>
                       </div>
-                    )
-                  })()}
+                      {/* Grup içeriği */}
+                      {group.flights.map((flight) => (
                   <Card key={flight.id} className="bg-yellow-50">
                     <CardContent className="p-3">
                       <Link href={`/admin/customers/${flight.customer.displayId}`}>
@@ -514,7 +524,10 @@ export default function LiveFlightsPage() {
                       )}
                     </CardContent>
                   </Card>
-                  </>)})}
+                  ))}
+                    </div>
+                  ))
+                })()}
               </div>
             )}
           </CardContent>
