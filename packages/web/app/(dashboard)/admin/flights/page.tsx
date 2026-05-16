@@ -100,7 +100,7 @@ export default function LiveFlightsPage() {
   const [showBulkCancel, setShowBulkCancel] = useState(false)
   const [cancelling, setCancelling] = useState(false)
   const [updatingId, setUpdatingId] = useState<string | null>(null)
-  const [separatorShift, setSeparatorShift] = useState<Record<number, number>>({})
+  const [splitAt, setSplitAt] = useState<number | null>(null) // hangi index'te ayırıcı var
 
   // Manuel admin status değiştirme — uygulaması olmayan pilotlar için
   const adminUpdateStatus = async (flightId: string, newStatus: string) => {
@@ -413,27 +413,10 @@ export default function LiveFlightsPage() {
                 {waiting.map((flight, idx) => {
                   // Grup ayırıcı: önceki müşteriyle 10+ dk fark varsa çizgi çek
                   const prevFlight = idx > 0 ? waiting[idx - 1] : null
-                  // Orijinal ayırıcı noktalarını bul, shift uygula
-                  const origSeparator = prevFlight && (() => {
-                    const prev = new Date(prevFlight.createdAt).getTime()
-                    const curr = new Date(flight.createdAt).getTime()
-                    return Math.abs(curr - prev) > 10 * 60 * 1000
-                  })()
-                  // Separator'ın gerçek pozisyonunu hesapla (shift uygulanmış)
-                  const sepKey = (() => {
-                    let k = 0
-                    for (let s = 1; s <= idx; s++) {
-                      if (s < waiting.length) {
-                        const p = new Date(waiting[s-1].createdAt).getTime()
-                        const c = new Date(waiting[s].createdAt).getTime()
-                        if (Math.abs(c - p) > 10 * 60 * 1000) k = s
-                      }
-                    }
-                    return k
-                  })()
-                  const shift = separatorShift[sepKey] || 0
-                  const shiftedSepPos = sepKey + shift
-                  const showSeparator = shiftedSepPos === idx && shiftedSepPos > 0 && shiftedSepPos < waiting.length
+                  // Ayırıcı: splitAt varsa onu kullan, yoksa otomatik 10dk boşluk
+                  const autoSep = prevFlight && Math.abs(new Date(flight.createdAt).getTime() - new Date(prevFlight.createdAt).getTime()) > 10 * 60 * 1000
+                  if (autoSep && splitAt === null) { setTimeout(() => setSplitAt(idx), 0) }
+                  const showSeparator = splitAt !== null ? idx === splitAt : autoSep
                   return (<>
                   {showSeparator && (() => {
                     // Bu gruptan sonraki kişi sayısını hesapla
@@ -446,13 +429,17 @@ export default function LiveFlightsPage() {
                       }
                       groupCount++
                     }
+                    const upperCount = idx
                     return (
-                      <div className="flex items-center gap-1.5 py-2">
-                        <div className="flex-1 h-0.5" style={{ background: 'linear-gradient(to right, transparent, #ef4444, #ef4444, transparent)' }} />
-                        <button onClick={() => setSeparatorShift(p => ({...p, [sepKey]: (p[sepKey]||0) + 1}))} className="text-[11px] px-2 py-1 rounded-full font-bold" style={{background:'#dcfce7',color:'#16a34a'}}>+Ekle</button>
-                        <span className="text-[10px] font-bold text-red-500 whitespace-nowrap">{groupCount} kişi</span>
-                        <button onClick={() => setSeparatorShift(p => ({...p, [sepKey]: (p[sepKey]||0) - 1}))} className="text-[11px] px-2 py-1 rounded-full font-bold" style={{background:'#fee2e2',color:'#dc2626'}}>−Çıkar</button>
-                        <div className="flex-1 h-0.5" style={{ background: 'linear-gradient(to left, transparent, #ef4444, #ef4444, transparent)' }} />
+                      <div>
+                        <div className="text-center py-0.5"><span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{background:'#fef3c7',color:'#92400e'}}>Grup 1 — {upperCount} kişi</span></div>
+                        <div className="flex items-center gap-1.5 py-1">
+                          <div className="flex-1 h-0.5" style={{ background: 'linear-gradient(to right, transparent, #ef4444, #ef4444, transparent)' }} />
+                          <button onClick={() => setSplitAt(s => s !== null && s < waiting.length ? s + 1 : s)} className="text-[11px] px-2 py-1 rounded-full font-bold" style={{background:'#dcfce7',color:'#16a34a'}}>+Ekle</button>
+                          <span className="text-[10px] font-bold text-red-500 whitespace-nowrap">Grup 2 — {groupCount} kişi</span>
+                          <button onClick={() => setSplitAt(s => s !== null && s > 1 ? s - 1 : s)} className="text-[11px] px-2 py-1 rounded-full font-bold" style={{background:'#fee2e2',color:'#dc2626'}}>−Çıkar</button>
+                          <div className="flex-1 h-0.5" style={{ background: 'linear-gradient(to left, transparent, #ef4444, #ef4444, transparent)' }} />
+                        </div>
                       </div>
                     )
                   })()}
