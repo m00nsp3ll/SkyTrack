@@ -896,18 +896,33 @@ export default function PilotPanel() {
                       <CheckCircle className="h-5 w-5 text-green-600" />
                     </div>
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full"
-                    onClick={() => {
-                      setSelectedQRCustomer(flight.customer)
-                      setSelectedQRType('media')
-                    }}
-                  >
-                    <QrCode className="h-4 w-4 mr-2" />
-                    Müşteri QR Kodu
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex-1"
+                      onClick={() => {
+                        setSelectedQRCustomer(flight.customer)
+                        setSelectedQRType('media')
+                      }}
+                    >
+                      <QrCode className="h-4 w-4 mr-2" />
+                      QR Kodu
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="px-2 border-orange-300 text-orange-600 hover:bg-orange-50"
+                      onClick={() => {
+                        if (confirm('Uçuşu geri almak istediğinize emin misiniz? Uçuşta durumuna döner.')) {
+                          handleFlightAction(flight.id, 'IN_FLIGHT')
+                        }
+                      }}
+                      disabled={updating === flight.id}
+                    >
+                      ↩
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
               )
