@@ -52,15 +52,16 @@ export default function MediaPaymentPage() {
       const res = await api.get(`/customers/public/${displayId.trim()}`)
       const data = res.data?.data || res.data
       setCustomer(data)
-      // Satışları çek
+      // Sadece Foto/Video satışlarını çek
       try {
         const salesRes = await api.get(`/sales?customerId=${data.id || ''}&displayId=${displayId.trim()}`)
-        setSales(salesRes.data?.data || [])
+        const allSales = salesRes.data?.data || []
+        setSales(allSales.filter((s: any) => s.itemType === 'Foto/Video' || s.itemType === 'MEDIA' || s.itemName?.includes('Foto') || s.itemName?.includes('Video')))
       } catch {
-        // sales endpoint farklı olabilir — müşteri detayından dene
         try {
           const custRes = await api.get(`/customers/${displayId.trim()}`)
-          setSales(custRes.data?.data?.sales || [])
+          const allSales = custRes.data?.data?.sales || []
+          setSales(allSales.filter((s: any) => s.itemType === 'Foto/Video' || s.itemType === 'MEDIA' || s.itemName?.includes('Foto') || s.itemName?.includes('Video')))
         } catch {}
       }
       await fetchRates()
