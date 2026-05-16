@@ -96,6 +96,8 @@ const menuGroups: MenuGroup[] = [
         color: 'text-purple-600', activeBg: 'bg-purple-600', activeText: 'text-white', hoverBg: 'hover:bg-purple-50' },
       { href: '/admin/media/pos', label: 'Foto/Video Satış', icon: CreditCard,
         color: 'text-purple-600', activeBg: 'bg-purple-600', activeText: 'text-white', hoverBg: 'hover:bg-purple-50' },
+      { href: '/admin/media/payment', label: 'Foto/Video Tahsilat', icon: CreditCard,
+        color: 'text-purple-600', activeBg: 'bg-purple-600', activeText: 'text-white', hoverBg: 'hover:bg-purple-50' },
     ],
   },
   {
