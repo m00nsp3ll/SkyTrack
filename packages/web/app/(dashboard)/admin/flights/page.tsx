@@ -100,6 +100,7 @@ export default function LiveFlightsPage() {
   const [showBulkCancel, setShowBulkCancel] = useState(false)
   const [cancelling, setCancelling] = useState(false)
   const [updatingId, setUpdatingId] = useState<string | null>(null)
+  const [separatorShift, setSeparatorShift] = useState<Record<number, number>>({})
 
   // Manuel admin status değiştirme — uygulaması olmayan pilotlar için
   const adminUpdateStatus = async (flightId: string, newStatus: string) => {
@@ -412,11 +413,27 @@ export default function LiveFlightsPage() {
                 {waiting.map((flight, idx) => {
                   // Grup ayırıcı: önceki müşteriyle 10+ dk fark varsa çizgi çek
                   const prevFlight = idx > 0 ? waiting[idx - 1] : null
-                  const showSeparator = prevFlight && (() => {
+                  // Orijinal ayırıcı noktalarını bul, shift uygula
+                  const origSeparator = prevFlight && (() => {
                     const prev = new Date(prevFlight.createdAt).getTime()
                     const curr = new Date(flight.createdAt).getTime()
                     return Math.abs(curr - prev) > 10 * 60 * 1000
                   })()
+                  // Separator'ın gerçek pozisyonunu hesapla (shift uygulanmış)
+                  const sepKey = (() => {
+                    let k = 0
+                    for (let s = 1; s <= idx; s++) {
+                      if (s < waiting.length) {
+                        const p = new Date(waiting[s-1].createdAt).getTime()
+                        const c = new Date(waiting[s].createdAt).getTime()
+                        if (Math.abs(c - p) > 10 * 60 * 1000) k = s
+                      }
+                    }
+                    return k
+                  })()
+                  const shift = separatorShift[sepKey] || 0
+                  const shiftedSepPos = sepKey + shift
+                  const showSeparator = shiftedSepPos === idx && shiftedSepPos > 0 && shiftedSepPos < waiting.length
                   return (<>
                   {showSeparator && (() => {
                     // Bu gruptan sonraki kişi sayısını hesapla
@@ -430,9 +447,11 @@ export default function LiveFlightsPage() {
                       groupCount++
                     }
                     return (
-                      <div className="flex items-center gap-2 py-1">
+                      <div className="flex items-center gap-2 py-1 group/sep">
                         <div className="flex-1 h-0.5" style={{ background: 'linear-gradient(to right, transparent, #ef4444, #ef4444, transparent)' }} />
                         <span className="text-[10px] font-bold text-red-500 whitespace-nowrap">YENİ GRUP ({groupCount} kişi)</span>
+                        <button onClick={() => setSeparatorShift(p => ({...p, [sepKey]: (p[sepKey]||0) + 1}))} className="text-[10px] px-1.5 py-0.5 rounded bg-green-100 text-green-700 hover:bg-green-200 opacity-0 group-hover/sep:opacity-100 transition-opacity">+Ekle</button>
+                        <button onClick={() => setSeparatorShift(p => ({...p, [sepKey]: (p[sepKey]||0) - 1}))} className="text-[10px] px-1.5 py-0.5 rounded bg-red-100 text-red-700 hover:bg-red-200 opacity-0 group-hover/sep:opacity-100 transition-opacity">−Çıkar</button>
                         <div className="flex-1 h-0.5" style={{ background: 'linear-gradient(to left, transparent, #ef4444, #ef4444, transparent)' }} />
                       </div>
                     )
