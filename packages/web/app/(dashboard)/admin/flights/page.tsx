@@ -447,11 +447,11 @@ export default function LiveFlightsPage() {
                       groupCount++
                     }
                     return (
-                      <div className="flex items-center gap-2 py-1 group/sep">
+                      <div className="flex items-center gap-1.5 py-2">
                         <div className="flex-1 h-0.5" style={{ background: 'linear-gradient(to right, transparent, #ef4444, #ef4444, transparent)' }} />
-                        <span className="text-[10px] font-bold text-red-500 whitespace-nowrap">YENİ GRUP ({groupCount} kişi)</span>
-                        <button onClick={() => setSeparatorShift(p => ({...p, [sepKey]: (p[sepKey]||0) + 1}))} className="text-[10px] px-1.5 py-0.5 rounded bg-green-100 text-green-700 hover:bg-green-200 opacity-0 group-hover/sep:opacity-100 transition-opacity">+Ekle</button>
-                        <button onClick={() => setSeparatorShift(p => ({...p, [sepKey]: (p[sepKey]||0) - 1}))} className="text-[10px] px-1.5 py-0.5 rounded bg-red-100 text-red-700 hover:bg-red-200 opacity-0 group-hover/sep:opacity-100 transition-opacity">−Çıkar</button>
+                        <button onClick={() => setSeparatorShift(p => ({...p, [sepKey]: (p[sepKey]||0) + 1}))} className="text-[11px] px-2 py-1 rounded-full font-bold" style={{background:'#dcfce7',color:'#16a34a'}}>+Ekle</button>
+                        <span className="text-[10px] font-bold text-red-500 whitespace-nowrap">{groupCount} kişi</span>
+                        <button onClick={() => setSeparatorShift(p => ({...p, [sepKey]: (p[sepKey]||0) - 1}))} className="text-[11px] px-2 py-1 rounded-full font-bold" style={{background:'#fee2e2',color:'#dc2626'}}>−Çıkar</button>
                         <div className="flex-1 h-0.5" style={{ background: 'linear-gradient(to left, transparent, #ef4444, #ef4444, transparent)' }} />
                       </div>
                     )
