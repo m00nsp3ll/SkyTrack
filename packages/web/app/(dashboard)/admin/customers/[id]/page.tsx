@@ -717,11 +717,15 @@ Bu belgeyi imzalayarak asagidaki hususlari kabul ve beyan ederim:
       const response = await api.get('/pilots/queue')
       const queueData = response.data.data
       const allPilots = (queueData?.queue || []).filter(
-        (p: any) =>
-          p.status === 'AVAILABLE' &&
-          p.dailyFlightCount < p.maxDailyFlights &&
-          p.id !== customer.assignedPilot?.id
+        (p: any) => p.isInExcel && p.id !== customer.assignedPilot?.id
       )
+      // Sıradaki müsait pilotlar önce, sonra müşteri almış pilotlar
+      allPilots.sort((a: any, b: any) => {
+        const aAvail = a.status === 'AVAILABLE' ? 0 : ['ASSIGNED','PICKED_UP','IN_FLIGHT'].includes(a.status) ? 1 : 2
+        const bAvail = b.status === 'AVAILABLE' ? 0 : ['ASSIGNED','PICKED_UP','IN_FLIGHT'].includes(b.status) ? 1 : 2
+        if (aAvail !== bAvail) return aAvail - bAvail
+        return (a.roundCount || 0) - (b.roundCount || 0) || (a.queuePosition || 0) - (b.queuePosition || 0)
+      })
       setAvailablePilots(allPilots)
     } catch (error: any) {
       alert(error.response?.data?.error?.message || 'Pilot bilgisi alınamadı')
@@ -1850,30 +1854,44 @@ Bu belgeyi imzalayarak asagidaki hususlari kabul ve beyan ederim:
                       />
                     </div>
 
-                    {/* Available pilots list */}
-                    <div className="max-h-48 overflow-y-auto space-y-1 border rounded-lg">
-                      {availablePilots
-                        .filter(p => p.id !== availablePilots[0]?.id)
-                        .filter(p => !pilotSearch || p.name.toLowerCase().includes(pilotSearch.toLowerCase()))
-                        .map((pilot) => (
-                          <button
-                            key={pilot.id}
-                            onClick={() => handleSelectPilot({ id: pilot.id, name: pilot.name })}
-                            disabled={reassigning}
-                            className="w-full flex items-center justify-between p-3 hover:bg-blue-50 transition-colors text-left border-b last:border-b-0"
-                          >
-                            <div>
-                              <p className="font-medium">{pilot.name}</p>
-                              <p className="text-xs text-muted-foreground">
-                                Sıra: {pilot.queuePosition}
-                              </p>
+                    {/* Müsait pilotlar */}
+                    {(() => {
+                      const filtered = availablePilots.filter((p: any) => !pilotSearch || p.name.toLowerCase().includes(pilotSearch.toLowerCase()))
+                      const musait = filtered.filter((p: any) => p.status === 'AVAILABLE' && p.id !== availablePilots[0]?.id)
+                      const ucusta = filtered.filter((p: any) => ['ASSIGNED','PICKED_UP','IN_FLIGHT'].includes(p.status))
+                      return (<>
+                        {musait.length > 0 && (
+                          <>
+                            <p className="text-[10px] font-bold text-green-600 uppercase tracking-wider px-1">Müsait Pilotlar</p>
+                            <div className="max-h-36 overflow-y-auto space-y-1 border rounded-lg border-green-200">
+                              {musait.map((pilot: any) => (
+                                <button key={pilot.id} onClick={() => handleSelectPilot({ id: pilot.id, name: pilot.name })} disabled={reassigning}
+                                  className="w-full flex items-center justify-between p-3 hover:bg-green-50 transition-colors text-left border-b last:border-b-0">
+                                  <div><p className="font-medium">{pilot.name}</p><p className="text-xs text-muted-foreground">Sıra: {pilot.queuePosition}</p></div>
+                                  <span className="text-sm text-green-600 font-medium">{pilot.dailyFlightCount}/{pilot.maxDailyFlights}</span>
+                                </button>
+                              ))}
                             </div>
-                            <span className="text-sm text-muted-foreground">
-                              {pilot.dailyFlightCount}/{pilot.maxDailyFlights}
-                            </span>
-                          </button>
-                        ))}
-                    </div>
+                          </>
+                        )}
+                        {ucusta.length > 0 && (
+                          <>
+                            <p className="text-[10px] font-bold text-blue-600 uppercase tracking-wider px-1 mt-3">Pilotlar Arası Değiştir</p>
+                            <div className="max-h-36 overflow-y-auto space-y-1 border rounded-lg border-blue-200">
+                              {ucusta.map((pilot: any) => (
+                                <button key={pilot.id} onClick={() => handleSelectPilot({ id: pilot.id, name: pilot.name })} disabled={reassigning}
+                                  className="w-full flex items-center justify-between p-3 hover:bg-blue-50 transition-colors text-left border-b last:border-b-0">
+                                  <div><p className="font-medium">{pilot.name}</p><p className="text-xs text-muted-foreground">
+                                    {pilot.status === 'IN_FLIGHT' ? '🛩 Uçuşta' : pilot.status === 'PICKED_UP' ? '👤 Müşteri Aldı' : '📋 Atandı'}
+                                  </p></div>
+                                  <span className="text-sm text-blue-600 font-medium">{pilot.dailyFlightCount}/{pilot.maxDailyFlights}</span>
+                                </button>
+                              ))}
+                            </div>
+                          </>
+                        )}
+                      </>)
+                    })()}
                   </>
                 )}
 
