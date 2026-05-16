@@ -432,12 +432,16 @@ export default function LiveFlightsPage() {
                     const upperCount = idx
                     return (
                       <div>
-                        <div className="text-center py-0.5"><span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{background:'#fef3c7',color:'#92400e'}}>Grup 1 — {upperCount} kişi</span></div>
-                        <div className="flex items-center gap-1.5 py-1">
+                        <div className="flex items-center justify-between px-1 py-0.5">
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{background:'#fef3c7',color:'#92400e'}}>↑ Grup 1 — {upperCount} kişi</span>
+                          <div className="flex gap-1">
+                            <button onClick={() => setSplitAt(s => s !== null && s < waiting.length ? s + 1 : s)} className="text-[11px] px-2 py-1 rounded-full font-bold" style={{background:'#dcfce7',color:'#16a34a'}}>+Ekle</button>
+                            <button onClick={() => setSplitAt(s => s !== null && s > 1 ? s - 1 : s)} className="text-[11px] px-2 py-1 rounded-full font-bold" style={{background:'#fee2e2',color:'#dc2626'}}>−Çıkar</button>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 py-0.5">
                           <div className="flex-1 h-0.5" style={{ background: 'linear-gradient(to right, transparent, #ef4444, #ef4444, transparent)' }} />
-                          <button onClick={() => setSplitAt(s => s !== null && s < waiting.length ? s + 1 : s)} className="text-[11px] px-2 py-1 rounded-full font-bold" style={{background:'#dcfce7',color:'#16a34a'}}>+Ekle</button>
-                          <span className="text-[10px] font-bold text-red-500 whitespace-nowrap">Grup 2 — {groupCount} kişi</span>
-                          <button onClick={() => setSplitAt(s => s !== null && s > 1 ? s - 1 : s)} className="text-[11px] px-2 py-1 rounded-full font-bold" style={{background:'#fee2e2',color:'#dc2626'}}>−Çıkar</button>
+                          <span className="text-[10px] font-bold text-red-500 whitespace-nowrap">↓ Grup 2 — {groupCount} kişi</span>
                           <div className="flex-1 h-0.5" style={{ background: 'linear-gradient(to left, transparent, #ef4444, #ef4444, transparent)' }} />
                         </div>
                       </div>
