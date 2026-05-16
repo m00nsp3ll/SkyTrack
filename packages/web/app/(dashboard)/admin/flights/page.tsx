@@ -100,6 +100,7 @@ export default function LiveFlightsPage() {
   const [showBulkCancel, setShowBulkCancel] = useState(false)
   const [cancelling, setCancelling] = useState(false)
   const [updatingId, setUpdatingId] = useState<string | null>(null)
+  const [mergedSeparators, setMergedSeparators] = useState<Set<number>>(new Set())
 
   // Manuel admin status değiştirme — uygulaması olmayan pilotlar için
   const adminUpdateStatus = async (flightId: string, newStatus: string) => {
@@ -412,7 +413,7 @@ export default function LiveFlightsPage() {
                 {waiting.map((flight, idx) => {
                   // Grup ayırıcı: önceki müşteriyle 10+ dk fark varsa çizgi çek
                   const prevFlight = idx > 0 ? waiting[idx - 1] : null
-                  const showSeparator = prevFlight && (() => {
+                  const showSeparator = prevFlight && !mergedSeparators.has(idx) && (() => {
                     const prev = new Date(prevFlight.createdAt).getTime()
                     const curr = new Date(flight.createdAt).getTime()
                     return Math.abs(curr - prev) > 10 * 60 * 1000
@@ -430,9 +431,9 @@ export default function LiveFlightsPage() {
                       groupCount++
                     }
                     return (
-                      <div className="flex items-center gap-2 py-1">
+                      <div className="flex items-center gap-2 py-1 cursor-pointer group" onClick={() => setMergedSeparators(prev => { const n = new Set(prev); n.add(idx); return n })}>
                         <div className="flex-1 h-0.5" style={{ background: 'linear-gradient(to right, transparent, #ef4444, #ef4444, transparent)' }} />
-                        <span className="text-[10px] font-bold text-red-500 whitespace-nowrap">YENİ GRUP ({groupCount} kişi)</span>
+                        <span className="text-[10px] font-bold text-red-500 whitespace-nowrap group-hover:text-red-300 transition-colors">YENİ GRUP ({groupCount} kişi) <span className="opacity-0 group-hover:opacity-100">✕ birleştir</span></span>
                         <div className="flex-1 h-0.5" style={{ background: 'linear-gradient(to left, transparent, #ef4444, #ef4444, transparent)' }} />
                       </div>
                     )
