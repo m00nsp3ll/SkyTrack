@@ -52,18 +52,18 @@ export default function MediaPaymentPage() {
       const res = await api.get(`/customers/public/${displayId.trim()}`)
       const data = res.data?.data || res.data
       setCustomer(data)
-      // Sadece Foto/Video satışlarını çek
+      // Müşteri detay sayfasından satışları çek (doğru müşteriye ait)
       try {
-        const salesRes = await api.get(`/sales?customerId=${data.id || ''}&displayId=${displayId.trim()}`)
-        const allSales = salesRes.data?.data || []
-        setSales(allSales.filter((s: any) => s.itemType === 'Foto/Video' || s.itemType === 'MEDIA' || s.itemName?.includes('Foto') || s.itemName?.includes('Video')))
-      } catch {
-        try {
-          const custRes = await api.get(`/customers/${displayId.trim()}`)
-          const allSales = custRes.data?.data?.sales || []
-          setSales(allSales.filter((s: any) => s.itemType === 'Foto/Video' || s.itemType === 'MEDIA' || s.itemName?.includes('Foto') || s.itemName?.includes('Video')))
-        } catch {}
-      }
+        const detailRes = await api.get(`/customers/${data.displayId || displayId.trim()}`)
+        const custDetail = detailRes.data?.data
+        const allSales = custDetail?.sales || []
+        // Sadece Foto/Video satışları
+        setSales(allSales.filter((s: any) =>
+          s.itemType === 'Foto/Video' || s.itemType === 'MEDIA' ||
+          s.itemName?.includes('Foto') || s.itemName?.includes('Video') || s.itemName?.includes('video')
+        ))
+      } catch {}
+
       await fetchRates()
     } catch {
       setError('Müşteri bulunamadı')
