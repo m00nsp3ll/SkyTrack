@@ -5,13 +5,14 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Camera, Search, X, QrCode } from 'lucide-react'
+import { Camera, Search, X, QrCode, SwitchCamera } from 'lucide-react'
 
 export default function ScanPage() {
   const router = useRouter()
   const [manualId, setManualId] = useState('')
   const [scanning, setScanning] = useState(false)
   const [error, setError] = useState('')
+  const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment')
   const scannerRef = useRef<any>(null)
   const videoRef = useRef<HTMLDivElement>(null)
 
@@ -36,7 +37,7 @@ export default function ScanPage() {
         scannerRef.current = new Html5Qrcode('qr-reader')
 
         await scannerRef.current.start(
-          { facingMode: 'environment' },
+          { facingMode },
           {
             fps: 10,
             qrbox: { width: 250, height: 250 },
@@ -66,6 +67,24 @@ export default function ScanPage() {
       scannerRef.current = null
     }
     setScanning(false)
+  }
+
+  const toggleCamera = async () => {
+    const newMode = facingMode === 'environment' ? 'user' : 'environment'
+    setFacingMode(newMode)
+    if (scanning && scannerRef.current) {
+      try { await scannerRef.current.stop() } catch {}
+      scannerRef.current = null
+      // Yeni kamerayla başlat
+      const { Html5Qrcode } = await import('html5-qrcode')
+      scannerRef.current = new Html5Qrcode('qr-reader')
+      await scannerRef.current.start(
+        { facingMode: newMode },
+        { fps: 10, qrbox: { width: 250, height: 250 } },
+        (decodedText: string) => { handleScanResult(decodedText) },
+        () => {}
+      )
+    }
   }
 
   const handleScanResult = (result: string) => {
@@ -125,14 +144,16 @@ export default function ScanPage() {
                 ref={videoRef}
                 className="w-full aspect-square bg-black rounded-lg overflow-hidden"
               />
-              <Button
-                variant="destructive"
-                className="w-full"
-                onClick={stopScanner}
-              >
-                <X className="w-4 h-4 mr-2" />
-                Taramayı Durdur
+              <div className="flex gap-2">
+              <Button variant="outline" className="flex-1" onClick={toggleCamera}>
+                <SwitchCamera className="h-4 w-4 mr-1" />
+                {facingMode === 'environment' ? 'Ön Kamera' : 'Arka Kamera'}
               </Button>
+              <Button variant="destructive" className="flex-1" onClick={stopScanner}>
+                <X className="w-4 h-4 mr-1" />
+                Durdur
+              </Button>
+              </div>
             </div>
           ) : (
             <Button

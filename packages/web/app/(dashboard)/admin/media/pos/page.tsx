@@ -10,7 +10,7 @@ import {
   Camera, Search, CreditCard, CheckCircle, Download,
   RefreshCw, QrCode, FolderOpen, User, X, Check,
   AlertTriangle, Copy, Truck, Star, ImageIcon,
-  Plane, Clock, Package, ChevronRight,
+  Plane, Clock, Package, ChevronRight, SwitchCamera,
 } from 'lucide-react'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -285,14 +285,16 @@ export default function MediaPosPage() {
 
   // ── QR Scanner ─────────────────────────────────────
 
-  const startQrScanner = async () => {
-    if (scannerRef.current) return  // already running
+  const [qrFacing, setQrFacing] = useState<'environment' | 'user'>('environment')
+
+  const startQrScanner = async (facing?: 'environment' | 'user') => {
+    if (scannerRef.current) return
     setShowQrScanner(true)
     try {
       const { Html5Qrcode } = await import('html5-qrcode')
       scannerRef.current = new Html5Qrcode('qr-reader-pos')
       await scannerRef.current.start(
-        { facingMode: 'environment' },
+        { facingMode: facing || qrFacing },
         { fps: 10, qrbox: { width: 250, height: 250 } },
         (text: string) => {
           const match = text.match(/\/c\/([A-Z]\d{4})/)
@@ -314,6 +316,16 @@ export default function MediaPosPage() {
       scannerRef.current = null
     }
     setShowQrScanner(false)
+  }
+
+  const toggleQrCamera = async () => {
+    const newMode = qrFacing === 'environment' ? 'user' : 'environment'
+    setQrFacing(newMode)
+    if (scannerRef.current) {
+      try { await scannerRef.current.stop() } catch {}
+      scannerRef.current = null
+      await startQrScanner(newMode)
+    }
   }
 
   useEffect(() => {
@@ -475,7 +487,10 @@ export default function MediaPosPage() {
         {showQrScanner && (
           <div className="mt-4 flex flex-col items-center">
             <div id="qr-reader-pos" className="w-96 rounded-lg overflow-hidden" />
-            <p className="text-center text-sm text-muted-foreground mt-2">Müşteri QR kodunu kameraya gösterin</p>
+            <Button variant="outline" size="sm" className="mt-2" onClick={toggleQrCamera}>
+              <SwitchCamera className="h-4 w-4 mr-1" />
+              {qrFacing === 'environment' ? 'Ön Kamera' : 'Arka Kamera'}
+            </Button>
           </div>
         )}
       </div>
@@ -494,7 +509,7 @@ export default function MediaPosPage() {
               <p className="text-lg text-muted-foreground">Müşteri QR kodunu okutun</p>
             </div>
             <button
-              onClick={startQrScanner}
+              onClick={() => startQrScanner()}
               className="flex items-center gap-3 mx-auto px-10 py-5 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-700 hover:from-blue-600 hover:to-blue-800 text-white font-bold text-xl shadow-lg hover:shadow-xl transition-all active:scale-95"
             >
               <QrCode className="h-8 w-8" />
