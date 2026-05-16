@@ -1115,7 +1115,7 @@ router.post('/:id/request-pilot', authenticate, requireRole('ADMIN', 'OFFICE_STA
     }
   });
 
-  // Otomatik QR etiket yazdır
+  // Otomatik QR etiket yazdır — 1. müşteri (request eden)
   if (io) {
     io.to('admin').emit('print:label', {
       customerId: customer.id,
@@ -1124,6 +1124,18 @@ router.post('/:id/request-pilot', authenticate, requireRole('ADMIN', 'OFFICE_STA
       pilotName: requestedPilot.name,
       createdAt: new Date().toISOString(),
     });
+    // 2. müşteri (swap edilen) — varsa
+    if (swappedPilot && lastAssignedFlight?.customer) {
+      setTimeout(() => {
+        io.to('admin').emit('print:label', {
+          customerId: lastAssignedFlight.customer.id,
+          displayId: lastAssignedFlight.customer.displayId,
+          customerName: `${lastAssignedFlight.customer.firstName} ${lastAssignedFlight.customer.lastName}`,
+          pilotName: currentPilot?.name || '',
+          createdAt: new Date().toISOString(),
+        });
+      }, 2000);
+    }
   }
 
   res.json({
