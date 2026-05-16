@@ -336,20 +336,13 @@ router.get('/live', authenticate, asyncHandler(async (req: AuthRequest, res: any
       : 0,
   }));
 
-  // Add wait time for waiting customers, sort by pilot queue position
+  // Add wait time for waiting customers, sort by createdAt (kronolojik)
   const waitingWithTime = waiting
     .map(f => ({
       ...f,
       waitMinutes: Math.round((now.getTime() - f.createdAt.getTime()) / 60000),
     }))
-    .sort((a, b) => {
-      const aRound = (a.pilot as any)?.roundCount ?? 999;
-      const bRound = (b.pilot as any)?.roundCount ?? 999;
-      if (aRound !== bRound) return aRound - bRound;
-      const aPos = (a.pilot as any)?.queuePosition ?? 999;
-      const bPos = (b.pilot as any)?.queuePosition ?? 999;
-      return aPos - bPos;
-    });
+    .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
 
   res.json({
     success: true,
