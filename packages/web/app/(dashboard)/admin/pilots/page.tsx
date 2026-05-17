@@ -281,24 +281,24 @@ export default function PilotsPage() {
                     }
                   >
                     <CardContent className="p-4">
-                      <div className="flex items-center gap-4">
+                      <div className="flex flex-wrap items-center gap-3">
                         {/* Queue Position */}
                         {isNext ? (
-                          <div className="hidden sm:flex items-center justify-center px-3 py-1 bg-green-500 text-white rounded-full text-xs font-bold animate-pulse">
+                          <div className="hidden sm:flex items-center justify-center px-3 py-1 bg-green-500 text-white rounded-full text-xs font-bold animate-pulse flex-shrink-0">
                             SIRADA
                           </div>
                         ) : (
-                          <div className="hidden sm:flex items-center justify-center w-8 h-8 bg-gray-100 rounded-full text-sm font-medium">
+                          <div className="hidden sm:flex items-center justify-center w-8 h-8 bg-gray-100 rounded-full text-sm font-medium flex-shrink-0">
                             {index + 1}
                           </div>
                         )}
 
                         {/* Pilot Info */}
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
+                          <div className="flex flex-wrap items-center gap-2 mb-1">
                             <h3 className="font-semibold truncate">{pilot.name}</h3>
                             <span
-                              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs text-white ${status.color}`}
+                              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs text-white flex-shrink-0 ${status.color}`}
                             >
                               <StatusIcon className="h-3 w-3" />
                               {status.label}
@@ -313,7 +313,7 @@ export default function PilotsPage() {
                         </div>
 
                         {/* Daily Stats */}
-                        <div className="text-center">
+                        <div className="text-center flex-shrink-0">
                           <p className="text-2xl font-bold text-primary">
                             {pilot.dailyFlightCount}/{pilot.maxDailyFlights}
                           </p>
@@ -321,7 +321,7 @@ export default function PilotsPage() {
                         </div>
 
                         {/* Actions */}
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
                           <Button
                             variant="outline"
                             size="sm"

@@ -18,6 +18,7 @@ import {
   Clock,
   User,
   ShoppingCart,
+  ShoppingBag,
   RefreshCw,
   X,
   Receipt,
@@ -173,6 +174,7 @@ export default function POSPage() {
   const [restProduct, setRestProduct] = useState<Product | null>(null)
   const [restPrice, setRestPrice] = useState('')
   const restPriceInputRef = useRef<HTMLInputElement>(null)
+  const [mobileTab, setMobileTab] = useState<'customer' | 'products' | 'cart'>('products')
 
   useEffect(() => {
     fetchProducts()
@@ -680,10 +682,10 @@ export default function POSPage() {
         )}
 
         {/* Divider */}
-        <div className="w-px h-6 bg-gray-200 flex-shrink-0 ml-auto" />
+        <div className="hidden md:block w-px h-6 bg-gray-200 flex-shrink-0 ml-auto" />
 
         {/* Currency converter tool */}
-        <div className="flex items-center gap-1.5 flex-shrink-0">
+        <div className="hidden md:flex items-center gap-1.5 flex-shrink-0">
           <span className="text-xs font-bold text-foreground whitespace-nowrap">Kur Hesapla:</span>
           <Input
             type="number"
@@ -721,10 +723,35 @@ export default function POSPage() {
         </div>
       </div>
 
+      {/* MOBILE TAB BAR */}
+      <div className="flex md:hidden flex-shrink-0 gap-1 bg-white border rounded-lg p-1 shadow-sm">
+        <button
+          onClick={() => setMobileTab('customer')}
+          className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-md text-sm font-medium transition-colors ${mobileTab === 'customer' ? 'bg-primary text-white' : 'text-muted-foreground hover:bg-gray-100'}`}
+        >
+          <User className="h-4 w-4" />
+          Müşteri
+        </button>
+        <button
+          onClick={() => setMobileTab('products')}
+          className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-md text-sm font-medium transition-colors ${mobileTab === 'products' ? 'bg-primary text-white' : 'text-muted-foreground hover:bg-gray-100'}`}
+        >
+          <ShoppingBag className="h-4 w-4" />
+          Ürünler
+        </button>
+        <button
+          onClick={() => setMobileTab('cart')}
+          className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-md text-sm font-medium transition-colors ${mobileTab === 'cart' ? 'bg-primary text-white' : 'text-muted-foreground hover:bg-gray-100'}`}
+        >
+          <ShoppingCart className="h-4 w-4" />
+          Sepet{cart.length > 0 ? ` (${cart.length})` : ''}
+        </button>
+      </div>
+
       {/* MAIN CONTENT */}
       <div className="flex-1 flex gap-2 min-h-0">
         {/* LEFT: Customer Section */}
-        <div className="w-72 flex-shrink-0 flex flex-col gap-2 overflow-hidden">
+        <div className={`md:w-72 md:flex-shrink-0 flex flex-col gap-2 overflow-hidden ${mobileTab === 'customer' ? 'flex w-full' : 'hidden md:flex'}`}>
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm flex items-center gap-2">
@@ -866,7 +893,7 @@ export default function POSPage() {
         </div>
 
         {/* CENTER: Products */}
-        <div className="flex-1 flex flex-col min-w-0">
+        <div className={`flex-1 flex flex-col min-w-0 ${mobileTab === 'products' ? 'flex' : 'hidden md:flex'}`}>
           {/* Category Tabs */}
           <div className="flex gap-1 mb-2 overflow-x-auto pb-1 flex-wrap">
             <Button
@@ -919,7 +946,7 @@ export default function POSPage() {
                 Bu kategoride ürün yok
               </div>
             ) : (
-              <div className="grid grid-cols-3 xl:grid-cols-4 gap-1.5">
+              <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-1.5">
                 {displayProducts.map((product) => {
                   const isOutOfStock = product.stock !== null && product.stock <= 0
                   const isRest = product.category === 'Rest'
@@ -961,7 +988,7 @@ export default function POSPage() {
         </div>
 
         {/* RIGHT: Cart + Payment (wider) */}
-        <div className="w-96 flex-shrink-0 flex flex-col">
+        <div className={`md:w-96 md:flex-shrink-0 flex flex-col ${mobileTab === 'cart' ? 'flex w-full' : 'hidden md:flex'}`}>
           <Card className="flex-1 flex flex-col">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm flex items-center justify-between">

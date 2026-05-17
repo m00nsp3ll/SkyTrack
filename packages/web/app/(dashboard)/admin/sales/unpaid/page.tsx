@@ -171,24 +171,24 @@ export default function UnpaidSalesPage() {
                   <div key={customerId} className="border rounded-lg overflow-hidden">
                     {/* Customer Header */}
                     <div
-                      className="flex items-center justify-between p-4 bg-gray-50 cursor-pointer"
+                      className="flex flex-wrap items-center gap-2 p-4 bg-gray-50 cursor-pointer"
                       onClick={() => toggleExpand(customerId)}
                     >
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
                         {isExpanded ? (
-                          <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                          <ChevronDown className="h-5 w-5 flex-shrink-0 text-muted-foreground" />
                         ) : (
-                          <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                          <ChevronRight className="h-5 w-5 flex-shrink-0 text-muted-foreground" />
                         )}
-                        <User className="h-5 w-5 text-primary" />
-                        <div>
-                          <p className="font-medium">
+                        <User className="h-5 w-5 flex-shrink-0 text-primary" />
+                        <div className="min-w-0">
+                          <p className="font-medium truncate">
                             {group.customer.firstName} {group.customer.lastName}
                           </p>
                           <p className="text-xs text-muted-foreground">{group.customer.displayId}</p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-3 flex-shrink-0">
                         <div className="text-right">
                           <p className="text-lg font-bold text-red-600">€{(group.totalEUR || group.total).toFixed(2)}</p>
                           <p className="text-xs text-muted-foreground">{group.sales.length} kalem</p>
@@ -196,7 +196,7 @@ export default function UnpaidSalesPage() {
                         {group.customer.id && (
                           <div onClick={(e) => e.stopPropagation()}>
                             <Link href={`/pos?customer=${group.customer.displayId}`}>
-                              <Button size="sm" className="bg-green-600 hover:bg-green-700">
+                              <Button size="sm" className="bg-green-600 hover:bg-green-700 whitespace-nowrap">
                                 <ShoppingCart className="h-4 w-4 mr-1" />
                                 Ödeme Al
                               </Button>
@@ -212,11 +212,11 @@ export default function UnpaidSalesPage() {
                         {group.sales.map((sale) => (
                           <div
                             key={sale.id}
-                            className="flex items-center justify-between p-3 border-b last:border-b-0"
+                            className="flex flex-wrap items-start gap-2 p-3 border-b last:border-b-0"
                           >
-                            <div className="flex-1">
-                              <p className="font-medium">{sale.itemName}</p>
-                              <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium truncate">{sale.itemName}</p>
+                              <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground mt-1">
                                 <span>
                                   {new Date(sale.createdAt).toLocaleDateString('tr-TR', {
                                     day: '2-digit',
@@ -247,7 +247,7 @@ export default function UnpaidSalesPage() {
                                 )}
                               </div>
                             </div>
-                            <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-3 flex-shrink-0">
                               <span className="font-medium text-red-600">
                                 {sale.primaryCurrency === 'USD' ? '$' : sale.primaryCurrency === 'GBP' ? '£' : sale.primaryCurrency === 'RUB' ? '₽' : sale.primaryCurrency === 'TRY' ? '₺' : '€'}
                                 {sale.totalPrice.toFixed(2)}

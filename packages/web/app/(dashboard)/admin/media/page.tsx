@@ -426,6 +426,7 @@ export default function MediaDashboardPage() {
           {staffSummary.length === 0 ? (
             <p className="text-center text-muted-foreground py-6 text-sm">Satış kaydı yok</p>
           ) : (
+            <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b bg-gray-50/80">
@@ -459,6 +460,7 @@ export default function MediaDashboardPage() {
                 )}
               </tbody>
             </table>
+            </div>
           )}
         </CardContent>
       </Card>
@@ -476,6 +478,7 @@ export default function MediaDashboardPage() {
           {pilotSummary.length === 0 ? (
             <p className="text-center text-muted-foreground py-6 text-sm">Uçuş kaydı yok</p>
           ) : (
+            <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b bg-gray-50/80">
@@ -507,6 +510,7 @@ export default function MediaDashboardPage() {
                 ))}
               </tbody>
             </table>
+            </div>
           )}
         </CardContent>
       </Card>
