@@ -5,7 +5,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { api, currencyApi } from '@/lib/api'
-import { QrCode, Search, X, Banknote, CreditCard, Building, Trash2, Check } from 'lucide-react'
+import { QrCode, Search, X, Banknote, CreditCard, Building, Check } from 'lucide-react'
 
 interface Sale {
   id: string
@@ -16,13 +16,13 @@ interface Sale {
   createdAt: string
 }
 
-interface PaymentEntry {
+interface CollectedPayment {
   id: string
-  saleId: string
   currency: Currency
   amount: number
   method: PaymentMethod
   eurEquivalent: number
+  rate: number
 }
 
 type Currency = 'EUR' | 'USD' | 'GBP' | 'RUB' | 'TRY'
@@ -51,25 +51,30 @@ export default function MediaPaymentPage() {
   const [selectedCurrency, setSelectedCurrency] = useState<Currency>('EUR')
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('CASH')
   const [payAmount, setPayAmount] = useState('')
-  const [paymentEntries, setPaymentEntries] = useState<PaymentEntry[]>([])
+  const [collectedPayments, setCollectedPayments] = useState<CollectedPayment[]>([])
   const [processing, setProcessing] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
+  const [pendingPayment, setPendingPayment] = useState<{ amount: number; currency: Currency; method: PaymentMethod; eurEquivalent: number; rate: number } | null>(null)
   const [success, setSuccess] = useState(false)
   const payInputRef = useRef<HTMLInputElement>(null)
 
   // --- Currency helpers ---
-  const convertFromEUR = (eurAmount: number, toCurrency: Currency): number => {
-    if (toCurrency === 'EUR') return eurAmount
-    const rate = rates[`EUR_${toCurrency}`]?.sellRate || rates[toCurrency]?.buyRate
-    if (!rate || rate === 0) return eurAmount
-    return eurAmount * rate
+  const getRate = (currency: Currency): number => {
+    if (currency === 'EUR') return 1
+    const rate = rates[`EUR_${currency}`]?.sellRate || rates[currency]?.buyRate
+    return rate || 1
   }
 
   const convertToEUR = (amount: number, fromCurrency: Currency): number => {
     if (fromCurrency === 'EUR') return amount
-    const rate = rates[`EUR_${fromCurrency}`]?.sellRate || rates[fromCurrency]?.buyRate
-    if (!rate || rate === 0) return amount
+    const rate = getRate(fromCurrency)
     return amount / rate
+  }
+
+  const convertFromEUR = (eurAmount: number, toCurrency: Currency): number => {
+    if (toCurrency === 'EUR') return eurAmount
+    const rate = getRate(toCurrency)
+    return eurAmount * rate
   }
 
   const getCurrencySymbol = (c: Currency): string => {
@@ -94,8 +99,9 @@ export default function MediaPaymentPage() {
     setError('')
     setCustomer(null)
     setSales([])
-    setPaymentEntries([])
+    setCollectedPayments([])
     setSuccess(false)
+    setPendingPayment(null)
     if (!displayId.trim()) return
     try {
       setLoading(true)
@@ -151,101 +157,71 @@ export default function MediaPaymentPage() {
   // --- Payment calculations ---
   const unpaid = sales.filter(s => s.paymentStatus === 'UNPAID')
   const totalDebtEUR = unpaid.reduce((s, x) => s + (x.totalAmountEUR || x.totalPrice), 0)
+  const paidTotalEUR = collectedPayments.reduce((sum, e) => sum + e.eurEquivalent, 0)
+  const remainingEUR = Math.max(0, totalDebtEUR - paidTotalEUR)
 
-  // Already paid portion from payment entries
-  const paidTotalEUR = paymentEntries.reduce((sum, e) => sum + e.eurEquivalent, 0)
-  const remainingEUR = totalDebtEUR - paidTotalEUR
+  // Handle "Tahsil Et" button — show confirmation modal
+  const handleCollect = () => {
+    const amount = parseFloat(payAmount)
+    if (!amount || amount <= 0) return
+    const rate = getRate(selectedCurrency)
+    const eurEquivalent = convertToEUR(amount, selectedCurrency)
+    setPendingPayment({ amount, currency: selectedCurrency, method: paymentMethod, eurEquivalent, rate })
+    setShowConfirm(true)
+  }
 
-  // When currency changes or remaining changes, update input with converted remaining
-  const updatePayAmountForCurrency = (currency: Currency) => {
-    if (remainingEUR > 0.01) {
-      const converted = convertFromEUR(remainingEUR, currency)
-      setPayAmount(formatAmount(Math.ceil(converted * 100) / 100, currency))
+  // Confirm payment in modal
+  const handleConfirmPayment = async () => {
+    if (!pendingPayment) return
+    setShowConfirm(false)
+
+    const newPayment: CollectedPayment = {
+      id: String(Date.now()),
+      ...pendingPayment,
+    }
+    const updatedPayments = [...collectedPayments, newPayment]
+    setCollectedPayments(updatedPayments)
+    setPendingPayment(null)
+
+    const newPaidTotal = updatedPayments.reduce((sum, e) => sum + e.eurEquivalent, 0)
+    const newRemaining = Math.max(0, totalDebtEUR - newPaidTotal)
+
+    // If fully paid, execute API call
+    if (newRemaining < 0.01) {
+      setProcessing(true)
+      try {
+        for (const sale of unpaid) {
+          await api.post(`/sales/${sale.id}/pay`, {
+            paymentMethod: updatedPayments[0].method,
+            currency: updatedPayments[0].currency,
+            amount: updatedPayments[0].amount,
+          })
+        }
+        setSales(prev => prev.map(s =>
+          unpaid.find(u => u.id === s.id) ? { ...s, paymentStatus: 'PAID' } : s
+        ))
+        setSuccess(true)
+        setPayAmount('')
+      } catch (e: any) {
+        alert(e.response?.data?.message || 'Ödeme başarısız')
+      } finally {
+        setProcessing(false)
+      }
     } else {
-      setPayAmount('')
+      // Show remaining in selected currency
+      const converted = convertFromEUR(newRemaining, selectedCurrency)
+      setPayAmount(formatAmount(Math.ceil(converted * 100) / 100, selectedCurrency))
     }
   }
 
   const handleCurrencySelect = (currency: Currency) => {
     setSelectedCurrency(currency)
-    updatePayAmountForCurrency(currency)
+    if (remainingEUR > 0.01) {
+      const converted = convertFromEUR(remainingEUR, currency)
+      setPayAmount(formatAmount(Math.ceil(converted * 100) / 100, currency))
+    }
     setTimeout(() => payInputRef.current?.focus(), 50)
   }
-
-  // Add a partial payment entry
-  const addPaymentEntry = () => {
-    const amount = parseFloat(payAmount)
-    if (!amount || amount <= 0) return
-
-    const eurEquivalent = convertToEUR(amount, selectedCurrency)
-    // Distribute across unpaid sales proportionally
-    const entry: PaymentEntry = {
-      id: String(Date.now()),
-      saleId: '', // will be resolved at payment time
-      currency: selectedCurrency,
-      amount,
-      method: paymentMethod,
-      eurEquivalent,
-    }
-    setPaymentEntries(prev => [...prev, entry])
-    // Update pay amount to show new remaining
-    const newRemaining = remainingEUR - eurEquivalent
-    if (newRemaining > 0.01) {
-      const converted = convertFromEUR(newRemaining, selectedCurrency)
-      setPayAmount(formatAmount(Math.ceil(converted * 100) / 100, selectedCurrency))
-    } else {
-      setPayAmount('')
-    }
-  }
-
-  const removePaymentEntry = (id: string) => {
-    setPaymentEntries(prev => prev.filter(e => e.id !== id))
-  }
-
-  // Full pay shortcut
-  const handleFullPay = () => {
-    if (remainingEUR <= 0.01) return
-    const amount = parseFloat(payAmount)
-    if (!amount || amount <= 0) return
-    const eurEquivalent = convertToEUR(amount, selectedCurrency)
-    const entry: PaymentEntry = {
-      id: String(Date.now()),
-      saleId: '',
-      currency: selectedCurrency,
-      amount,
-      method: paymentMethod,
-      eurEquivalent,
-    }
-    setPaymentEntries(prev => [...prev, entry])
-    setPayAmount('')
-  }
-
-  // Execute payment
-  const handleConfirmPayment = async () => {
-    setShowConfirm(false)
-    setProcessing(true)
-    try {
-      for (const sale of unpaid) {
-        const firstEntry = paymentEntries[0]
-        await api.post(`/sales/${sale.id}/pay`, {
-          paymentMethod: firstEntry.method,
-          currency: firstEntry.currency,
-          amount: firstEntry.amount,
-        })
-      }
-      setSales(prev => prev.map(s =>
-        unpaid.find(u => u.id === s.id) ? { ...s, paymentStatus: 'PAID' } : s
-      ))
-      setPaymentEntries([])
-      setSuccess(true)
-    } catch (e: any) {
-      alert(e.response?.data?.message || 'Ödeme başarısız')
-    } finally {
-      setProcessing(false)
-    }
-  }
-
-  const isFullyPaid = paidTotalEUR >= totalDebtEUR - 0.01 && paymentEntries.length > 0
 
   return (
     <div style={{ padding: '0.75rem', maxWidth: 480, margin: '0 auto' }}>
@@ -288,12 +264,12 @@ export default function MediaPaymentPage() {
                     Pilot: {customer.pilot?.name || customer.assignedPilot?.name || '-'} · {customer.media?.fileCount || 0} dosya
                   </p>
                 </div>
-                <button onClick={() => { setCustomer(null); setSales([]); setManualId(''); setPaymentEntries([]); setSuccess(false) }}
+                <button onClick={() => { setCustomer(null); setSales([]); setManualId(''); setCollectedPayments([]); setSuccess(false) }}
                   style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}>
                   <X style={{ width: 18, height: 18, color: '#9ca3af' }} />
                 </button>
               </div>
-              {success && <p style={{ color: '#16a34a', fontWeight: 600, fontSize: '0.8rem', marginTop: 4 }}>✅ Ödeme tamamlandı</p>}
+              {success && <p style={{ color: '#16a34a', fontWeight: 600, fontSize: '0.8rem', marginTop: 4 }}>✅ Ödeme tamamlandı — müşteri dosyalarını indirebilir</p>}
               {!success && totalDebtEUR === 0 && sales.length > 0 && <p style={{ color: '#16a34a', fontWeight: 600, fontSize: '0.8rem', marginTop: 4 }}>✅ Tüm ödemeler alındı</p>}
               {sales.length === 0 && <p style={{ color: '#9ca3af', fontSize: '0.8rem', marginTop: 4 }}>Müşterinin foto/video satışı yok</p>}
             </CardContent>
@@ -338,25 +314,25 @@ export default function MediaPaymentPage() {
           {unpaid.length > 0 && !success && (
             <Card>
               <CardContent style={{ padding: '0.75rem' }}>
-                {/* Total debt / Remaining */}
+                {/* Debt / Remaining display */}
                 <div style={{ textAlign: 'center', marginBottom: '0.6rem' }}>
-                  {paymentEntries.length === 0 ? (
+                  {collectedPayments.length === 0 ? (
                     <>
                       <p style={{ color: '#6b7280', fontSize: '0.7rem' }}>Toplam Borç</p>
                       <p style={{ fontSize: '2rem', fontWeight: 800 }}>{totalDebtEUR.toFixed(2)} €</p>
                     </>
                   ) : (
                     <>
-                      <p style={{ color: '#6b7280', fontSize: '0.7rem' }}>Kalan</p>
+                      <p style={{ color: '#6b7280', fontSize: '0.7rem' }}>Kalan Borç</p>
                       <p style={{ fontSize: '2rem', fontWeight: 800, color: remainingEUR <= 0.01 ? '#16a34a' : '#dc2626' }}>
-                        {remainingEUR > 0 ? remainingEUR.toFixed(2) : '0.00'} €
+                        {remainingEUR.toFixed(2)} €
                       </p>
                     </>
                   )}
-                  {/* Converted amounts */}
+                  {/* Other currencies */}
                   <div style={{ display: 'flex', justifyContent: 'center', gap: '0.6rem', fontSize: '0.7rem', color: '#6b7280', marginTop: 2 }}>
                     {CURRENCIES.filter(c => c.value !== 'EUR').map(c => {
-                      const base = paymentEntries.length === 0 ? totalDebtEUR : Math.max(0, remainingEUR)
+                      const base = collectedPayments.length === 0 ? totalDebtEUR : remainingEUR
                       return (
                         <span key={c.value}>{c.symbol}{formatAmount(convertFromEUR(base, c.value), c.value)}</span>
                       )
@@ -364,10 +340,10 @@ export default function MediaPaymentPage() {
                   </div>
                 </div>
 
-                {/* Payment entries list */}
-                {paymentEntries.length > 0 && (
+                {/* Collected payments list */}
+                {collectedPayments.length > 0 && (
                   <div style={{ marginBottom: '0.6rem', borderTop: '1px solid #e5e7eb', paddingTop: '0.4rem' }}>
-                    {paymentEntries.map(entry => (
+                    {collectedPayments.map(entry => (
                       <div key={entry.id} style={{
                         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                         padding: '0.3rem 0.4rem', marginBottom: 3, borderRadius: 6,
@@ -380,22 +356,22 @@ export default function MediaPaymentPage() {
                           <span style={{ color: '#6b7280', marginLeft: 6, fontSize: '0.7rem' }}>
                             {entry.method === 'CASH' ? 'Nakit' : entry.method === 'CREDIT_CARD' ? 'Kart' : 'Havale'}
                           </span>
-                          <span style={{ color: '#9ca3af', marginLeft: 4, fontSize: '0.65rem' }}>
-                            (€{entry.eurEquivalent.toFixed(2)})
-                          </span>
+                          {entry.currency !== 'EUR' && (
+                            <span style={{ color: '#9ca3af', marginLeft: 4, fontSize: '0.65rem' }}>
+                              (kur: {entry.rate.toFixed(2)} → €{entry.eurEquivalent.toFixed(2)})
+                            </span>
+                          )}
                         </div>
-                        <button onClick={() => removePaymentEntry(entry.id)}
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2 }}>
-                          <Trash2 style={{ width: 14, height: 14, color: '#ef4444' }} />
-                        </button>
+                        <Check style={{ width: 14, height: 14, color: '#16a34a' }} />
                       </div>
                     ))}
                   </div>
                 )}
 
-                {/* Editable amount input */}
+                {/* Amount input + currency + method */}
                 {remainingEUR > 0.01 && (
                   <>
+                    {/* Editable amount */}
                     <div style={{ marginBottom: '0.5rem' }}>
                       <div style={{ position: 'relative' }}>
                         <input
@@ -426,8 +402,7 @@ export default function MediaPaymentPage() {
                     {/* Currency buttons */}
                     <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginBottom: '0.5rem' }}>
                       {CURRENCIES.map(({ value, symbol, color }) => {
-                        const base = Math.max(0, remainingEUR)
-                        const converted = convertFromEUR(base, value)
+                        const converted = convertFromEUR(remainingEUR, value)
                         return (
                           <button key={value} onClick={() => handleCurrencySelect(value)} style={{
                             width: 56, height: 56, borderRadius: 10, display: 'flex', flexDirection: 'column',
@@ -464,41 +439,16 @@ export default function MediaPaymentPage() {
                       ))}
                     </div>
 
-                    {/* Action buttons: Add partial or Full pay */}
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      {paymentEntries.length > 0 && (
-                        <button onClick={addPaymentEntry} style={{
-                          flex: 1, padding: '0.7rem', borderRadius: 10, border: '2px solid #2563eb',
-                          background: '#eff6ff', color: '#2563eb', fontWeight: 700, fontSize: '0.85rem',
-                          cursor: 'pointer',
-                        }}>
-                          + Kısmi Ekle
-                        </button>
-                      )}
-                      <button onClick={handleFullPay} style={{
-                        flex: 2, padding: '0.8rem', borderRadius: 12, border: 'none', cursor: 'pointer',
-                        background: 'linear-gradient(135deg, #16a34a, #15803d)', color: '#fff',
-                        fontWeight: 800, fontSize: '1rem',
-                      }}>
-                        {paymentEntries.length === 0
-                          ? `Ödeme Al — ${payAmount || '0'} ${getCurrencySymbol(selectedCurrency)}`
-                          : `Ekle & Tamamla — ${payAmount || '0'} ${getCurrencySymbol(selectedCurrency)}`}
-                      </button>
-                    </div>
+                    {/* Tahsil Et button */}
+                    <button onClick={handleCollect} disabled={!payAmount || parseFloat(payAmount) <= 0} style={{
+                      width: '100%', padding: '0.9rem', borderRadius: 12, border: 'none', cursor: 'pointer',
+                      background: 'linear-gradient(135deg, #16a34a, #15803d)', color: '#fff',
+                      fontWeight: 800, fontSize: '1.1rem',
+                      opacity: (!payAmount || parseFloat(payAmount) <= 0) ? 0.5 : 1,
+                    }}>
+                      Tahsil Et — {payAmount || '0'} {getCurrencySymbol(selectedCurrency)}
+                    </button>
                   </>
-                )}
-
-                {/* Confirm button when fully paid */}
-                {isFullyPaid && (
-                  <button onClick={() => setShowConfirm(true)} disabled={processing} style={{
-                    width: '100%', padding: '1rem', borderRadius: 12, border: 'none', cursor: 'pointer',
-                    background: 'linear-gradient(135deg, #16a34a, #15803d)', color: '#fff',
-                    fontWeight: 800, fontSize: '1.1rem', marginTop: '0.5rem',
-                    opacity: processing ? 0.5 : 1,
-                  }}>
-                    <Check style={{ width: 20, height: 20, display: 'inline', marginRight: 6, verticalAlign: 'middle' }} />
-                    {processing ? 'İşleniyor...' : 'Ödemeyi Onayla'}
-                  </button>
                 )}
               </CardContent>
             </Card>
@@ -507,7 +457,7 @@ export default function MediaPaymentPage() {
       )}
 
       {/* Confirmation modal */}
-      {showConfirm && (
+      {showConfirm && pendingPayment && (
         <div style={{
           position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -517,31 +467,42 @@ export default function MediaPaymentPage() {
             background: '#fff', borderRadius: 16, padding: '1.5rem',
             maxWidth: 360, width: '100%', textAlign: 'center'
           }}>
-            <p style={{ fontWeight: 700, marginBottom: '0.5rem', fontSize: '1.1rem' }}>Ödeme Onayı</p>
-            <p style={{ color: '#6b7280', fontSize: '0.85rem' }}>{customer?.firstName} {customer?.lastName}</p>
+            <p style={{ fontWeight: 700, marginBottom: '0.75rem', fontSize: '1.1rem' }}>Tahsilat Onayı</p>
 
-            <div style={{ margin: '0.75rem 0', padding: '0.5rem', background: '#f9fafb', borderRadius: 8 }}>
-              {paymentEntries.map((entry, i) => (
-                <div key={entry.id} style={{ fontSize: '0.85rem', padding: '0.2rem 0' }}>
-                  <span style={{ fontWeight: 700 }}>
-                    {formatAmount(entry.amount, entry.currency)} {getCurrencySymbol(entry.currency)}
-                  </span>
-                  <span style={{ color: '#6b7280', marginLeft: 6 }}>
-                    {entry.method === 'CASH' ? 'Nakit' : entry.method === 'CREDIT_CARD' ? 'Kart' : 'Havale'}
-                  </span>
+            <div style={{ margin: '0.75rem 0', padding: '0.75rem', background: '#f9fafb', borderRadius: 10 }}>
+              {/* Amount in original currency */}
+              <p style={{ fontSize: '1.5rem', fontWeight: 800 }}>
+                {formatAmount(pendingPayment.amount, pendingPayment.currency)} {getCurrencySymbol(pendingPayment.currency)}
+              </p>
+
+              {/* Exchange rate calculation */}
+              {pendingPayment.currency !== 'EUR' && (
+                <div style={{ marginTop: '0.5rem', color: '#6b7280', fontSize: '0.85rem' }}>
+                  <p>Döviz Kuru: 1€ = {pendingPayment.rate.toFixed(4)} {getCurrencySymbol(pendingPayment.currency)}</p>
+                  <p style={{ marginTop: 4 }}>
+                    {formatAmount(pendingPayment.amount, pendingPayment.currency)} {getCurrencySymbol(pendingPayment.currency)} ÷ {pendingPayment.rate.toFixed(4)} = <strong style={{ color: '#16a34a' }}>€{pendingPayment.eurEquivalent.toFixed(2)}</strong>
+                  </p>
                 </div>
-              ))}
-              <div style={{ borderTop: '1px solid #e5e7eb', marginTop: '0.3rem', paddingTop: '0.3rem' }}>
-                <span style={{ fontWeight: 800, fontSize: '1.1rem', color: '#16a34a' }}>
-                  Toplam: €{paidTotalEUR.toFixed(2)}
-                </span>
-              </div>
+              )}
+
+              {/* Method */}
+              <p style={{ marginTop: '0.5rem', fontSize: '0.8rem', color: '#6b7280' }}>
+                Yöntem: {pendingPayment.method === 'CASH' ? 'Nakit' : pendingPayment.method === 'CREDIT_CARD' ? 'Kredi Kartı' : 'Havale'}
+              </p>
             </div>
 
+            <p style={{ fontSize: '0.85rem', color: '#374151', marginBottom: '0.75rem' }}>
+              <strong>€{pendingPayment.eurEquivalent.toFixed(2)}</strong> tahsil edilecek. Onaylıyor musunuz?
+            </p>
+
             <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <Button variant="outline" className="flex-1" onClick={() => setShowConfirm(false)}>Vazgeç</Button>
-              <Button className="flex-1" onClick={handleConfirmPayment}
-                style={{ background: '#16a34a', color: '#fff' }}>Onayla</Button>
+              <Button variant="outline" className="flex-1" onClick={() => { setShowConfirm(false); setPendingPayment(null) }}>
+                Vazgeç
+              </Button>
+              <Button className="flex-1" onClick={handleConfirmPayment} disabled={processing}
+                style={{ background: '#16a34a', color: '#fff' }}>
+                {processing ? 'İşleniyor...' : 'Onayla'}
+              </Button>
             </div>
           </div>
         </div>
