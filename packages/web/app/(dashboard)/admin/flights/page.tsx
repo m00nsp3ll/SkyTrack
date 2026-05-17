@@ -23,6 +23,7 @@ import {
   Wifi,
   WifiOff,
   SkipForward,
+  Undo2,
 } from 'lucide-react'
 
 interface Customer {
@@ -516,15 +517,26 @@ export default function LiveFlightsPage() {
                         </div>
                       )}
                       {flight.status === 'PICKED_UP' && (
-                        <Button
-                          size="sm"
-                          className="w-full bg-blue-500 hover:bg-blue-600"
-                          onClick={(e) => { e.stopPropagation(); adminUpdateStatus(flight.id, 'IN_FLIGHT') }}
-                          disabled={updatingId === flight.id}
-                        >
-                          <Plane className="h-4 w-4 mr-1" />
-                          {updatingId === flight.id ? 'İşleniyor...' : 'Uçuşa Başla'}
-                        </Button>
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="border-gray-300 text-gray-600 hover:bg-gray-100"
+                            onClick={(e) => { e.stopPropagation(); adminUpdateStatus(flight.id, 'ASSIGNED') }}
+                            disabled={updatingId === flight.id}
+                          >
+                            <Undo2 className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            className="flex-1 bg-blue-500 hover:bg-blue-600"
+                            onClick={(e) => { e.stopPropagation(); adminUpdateStatus(flight.id, 'IN_FLIGHT') }}
+                            disabled={updatingId === flight.id}
+                          >
+                            <Plane className="h-4 w-4 mr-1" />
+                            {updatingId === flight.id ? 'İşleniyor...' : 'Uçuşa Başla'}
+                          </Button>
+                        </div>
                       )}
                     </CardContent>
                   </Card>
