@@ -451,41 +451,106 @@ export const pilotQueueService = {
 
       await prisma.$transaction(async (tx) => {
         if (oldPilotId !== pilot!.id) {
-          // Eski pilotun mevcut değerlerini oku
-          const oldPilot = await tx.pilot.findUnique({ where: { id: oldPilotId } });
-
-          // Eski pilot: uçmadı → geri al (0'ın altına düşürme)
-          await tx.pilot.update({
-            where: { id: oldPilotId },
-            data: {
-              dailyFlightCount: oldPilot && oldPilot.dailyFlightCount > 0 ? { decrement: 1 } : 0,
-              roundCount: oldPilot && oldPilot.roundCount > 0 ? { decrement: 1 } : 0,
-              status: 'AVAILABLE',
+          // Hedef pilotun aktif müşterisi var mı? (swap senaryosu)
+          const targetPilotFlight = await tx.flight.findFirst({
+            where: {
+              pilotId: pilot!.id,
+              status: { in: ['ASSIGNED', 'PICKED_UP'] },
             },
+            orderBy: { createdAt: 'desc' },
+            include: { customer: true },
           });
 
-          // Yeni pilot: uçacak → artır
-          await tx.pilot.update({
-            where: { id: pilot!.id },
-            data: {
-              dailyFlightCount: { increment: 1 },
-              roundCount: { increment: 1 },
-              status: 'ASSIGNED',
-            },
-          });
+          if (targetPilotFlight) {
+            // ─── SWAP: iki pilotun müşterilerini değiş tokuş et ───
+            // Hedef pilotun müşterisini → eski pilota taşı
+            await tx.flight.update({
+              where: { id: targetPilotFlight.id },
+              data: { pilotId: oldPilotId },
+            });
+            await tx.customer.update({
+              where: { id: targetPilotFlight.customerId },
+              data: { assignedPilotId: oldPilotId },
+            });
+
+            // Kaynak müşteriyi → hedef pilota taşı
+            await tx.flight.update({
+              where: { id: customer.flights[0].id },
+              data: { pilotId: pilot!.id },
+            });
+            await tx.customer.update({
+              where: { id: customerId },
+              data: { assignedPilotId: pilot!.id },
+            });
+
+            // Pilotların status'ları değişmez (ikisi de ASSIGNED kalır)
+            // dailyFlightCount/roundCount değişmez (müşteri sayısı aynı)
+
+            // MediaFolder path'lerini güncelle
+            const dateStr = new Date().toISOString().split('T')[0];
+            const sanitize = (name: string) => name.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_-]/g, '');
+
+            // Kaynak müşterinin klasörünü hedef pilota taşı
+            const srcFolder = await tx.mediaFolder.findFirst({ where: { flightId: customer.flights[0].id } });
+            if (srcFolder) {
+              await tx.mediaFolder.update({
+                where: { id: srcFolder.id },
+                data: {
+                  pilotId: pilot!.id,
+                  folderPath: `media/${dateStr}/${sanitize(pilot!.name)}/${customer.displayId}`,
+                },
+              });
+            }
+
+            // Hedef müşterinin klasörünü eski pilota taşı
+            const tgtFolder = await tx.mediaFolder.findFirst({ where: { flightId: targetPilotFlight.id } });
+            if (tgtFolder) {
+              const oldPilotData = await tx.pilot.findUnique({ where: { id: oldPilotId } });
+              await tx.mediaFolder.update({
+                where: { id: tgtFolder.id },
+                data: {
+                  pilotId: oldPilotId,
+                  folderPath: `media/${dateStr}/${sanitize(oldPilotData?.name || 'Unknown')}/${targetPilotFlight.customer.displayId}`,
+                },
+              });
+            }
+          } else {
+            // ─── Tek yönlü atama: hedef pilotun müşterisi yok ───
+            const oldPilot = await tx.pilot.findUnique({ where: { id: oldPilotId } });
+
+            // Eski pilot: uçmadı → geri al (0'ın altına düşürme)
+            await tx.pilot.update({
+              where: { id: oldPilotId },
+              data: {
+                dailyFlightCount: oldPilot && oldPilot.dailyFlightCount > 0 ? { decrement: 1 } : 0,
+                roundCount: oldPilot && oldPilot.roundCount > 0 ? { decrement: 1 } : 0,
+                status: 'AVAILABLE',
+              },
+            });
+
+            // Yeni pilot: uçacak → artır
+            await tx.pilot.update({
+              where: { id: pilot!.id },
+              data: {
+                dailyFlightCount: { increment: 1 },
+                roundCount: { increment: 1 },
+                status: 'ASSIGNED',
+              },
+            });
+
+            // Update flight
+            await tx.flight.update({
+              where: { id: customer.flights[0].id },
+              data: { pilotId: pilot!.id },
+            });
+
+            // Update customer
+            await tx.customer.update({
+              where: { id: customerId },
+              data: { assignedPilotId: pilot!.id },
+            });
+          }
         }
-
-        // Update flight
-        await tx.flight.update({
-          where: { id: customer.flights[0].id },
-          data: { pilotId: pilot!.id },
-        });
-
-        // Update customer
-        await tx.customer.update({
-          where: { id: customerId },
-          data: { assignedPilotId: pilot!.id },
-        });
       });
 
       // Invalidate caches (both old and new pilot)
