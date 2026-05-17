@@ -431,8 +431,10 @@ export const pilotQueueService = {
         throw new Error('Bu pilot günlük uçuş limitine ulaşmış');
       }
 
-      if (pilot.status !== 'AVAILABLE') {
-        throw new Error('Bu pilot şu an müsait değil');
+      // AVAILABLE, ASSIGNED veya PICKED_UP kabul — pilotlar arası swap için
+      const allowedStatuses = ['AVAILABLE', 'ASSIGNED', 'PICKED_UP'];
+      if (!allowedStatuses.includes(pilot.status)) {
+        throw new Error('Bu pilot şu an müsait değil (uçuşta veya devre dışı)');
       }
     } else {
       // Get next available pilot
