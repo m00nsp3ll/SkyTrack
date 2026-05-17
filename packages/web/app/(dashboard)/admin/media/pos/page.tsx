@@ -606,12 +606,13 @@ export default function MediaPosPage() {
                     <input type="file" multiple accept="image/*,video/*" className="hidden" onChange={handleFileUpload} />
                   </label>
                 </div>
-                {!isFlightCompleted ? (
+                {!isFlightCompleted && (
                   <div className="flex items-center gap-3 p-3 bg-orange-50 rounded-lg text-orange-700 text-sm">
-                    <Clock className="h-5 w-5 flex-shrink-0" />
-                    <span>Uçuş tamamlandığında medya yüklenebilir</span>
+                    <AlertTriangle className="h-5 w-5 flex-shrink-0" />
+                    <span>⚠️ Pilot uçuşu henüz kapatmamış — pilota bilgi verin</span>
                   </div>
-                ) : !hasMedia ? (
+                )}
+                {!hasMedia ? (
                   <div className="flex items-center gap-3 p-3 bg-red-50 rounded-lg text-red-700 text-sm">
                     <AlertTriangle className="h-5 w-5 flex-shrink-0" />
                     <div>
@@ -857,49 +858,48 @@ export default function MediaPosPage() {
                 </div>
 
                 {/* Kasaya Yönlendir bölümü */}
-                {isFlightCompleted ? (
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm flex items-center gap-2">
-                        <CreditCard className="h-4 w-4" />Kasaya Yönlendir
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      {/* Tutar özeti */}
-                      {totalEUR > 0 && (
-                        <div className="p-3 rounded-lg bg-blue-50 border border-blue-200 text-sm">
-                          <div className="flex justify-between font-semibold text-blue-800">
-                            <span>Toplam Tutar</span>
-                            <span>€{totalEUR.toFixed(2)}{convertedEurToUsd(totalEUR) > 0 ? ` / $${convertedEurToUsd(totalEUR).toFixed(0)}` : ''}</span>
-                          </div>
-                          <div className="flex gap-3 mt-1.5 text-xs flex-wrap">
-                            {CURRENCIES.filter(c => c.value !== 'EUR').map(c => {
-                              const eq = convertFromEUR(totalEUR, c.value)
-                              return eq > 0 ? <span key={c.value} className={c.color}>{getCurrencySymbol(c.value)}{eq.toFixed(2)}</span> : null
-                            })}
-                          </div>
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <CreditCard className="h-4 w-4" />Kasaya Yönlendir
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {!isFlightCompleted && (
+                      <div className="flex items-center gap-2 p-2 bg-orange-50 rounded-lg text-orange-700 text-xs">
+                        <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+                        <span>Pilot uçuşu henüz kapatmamış — pilota bilgi verin</span>
+                      </div>
+                    )}
+                    {/* Tutar özeti */}
+                    {totalEUR > 0 && (
+                      <div className="p-3 rounded-lg bg-blue-50 border border-blue-200 text-sm">
+                        <div className="flex justify-between font-semibold text-blue-800">
+                          <span>Toplam Tutar</span>
+                          <span>€{totalEUR.toFixed(2)}{convertedEurToUsd(totalEUR) > 0 ? ` / $${convertedEurToUsd(totalEUR).toFixed(0)}` : ''}</span>
                         </div>
-                      )}
+                        <div className="flex gap-3 mt-1.5 text-xs flex-wrap">
+                          {CURRENCIES.filter(c => c.value !== 'EUR').map(c => {
+                            const eq = convertFromEUR(totalEUR, c.value)
+                            return eq > 0 ? <span key={c.value} className={c.color}>{getCurrencySymbol(c.value)}{eq.toFixed(2)}</span> : null
+                          })}
+                        </div>
+                      </div>
+                    )}
 
-                      <Button
-                        className="w-full h-12 text-base font-bold bg-green-600 hover:bg-green-700"
-                        onClick={handleSendToCashier}
-                        disabled={processingPayment || !totalEUR}
-                      >
-                        {processingPayment
-                          ? <RefreshCw className="h-5 w-5 animate-spin mr-2" />
-                          : <CreditCard className="h-5 w-5 mr-2" />}
-                        Kasaya Yönlendir — €{totalEUR.toFixed(2)}
-                        {convertedEurToUsd(totalEUR) > 0 && totalEUR > 0 && ` / $${convertedEurToUsd(totalEUR).toFixed(0)}`}
-                      </Button>
-                    </CardContent>
-                  </Card>
-                ) : (
-                  <div className="flex items-center gap-2.5 p-4 rounded-xl border text-sm bg-orange-50 border-orange-200 text-orange-700">
-                    <AlertTriangle className="h-5 w-5 flex-shrink-0" />
-                    <p>Uçuş tamamlandıktan sonra kasaya yönlendirilebilir</p>
-                  </div>
-                )}
+                    <Button
+                      className="w-full h-12 text-base font-bold bg-green-600 hover:bg-green-700"
+                      onClick={handleSendToCashier}
+                      disabled={processingPayment || !totalEUR}
+                    >
+                      {processingPayment
+                        ? <RefreshCw className="h-5 w-5 animate-spin mr-2" />
+                        : <CreditCard className="h-5 w-5 mr-2" />}
+                      Kasaya Yönlendir — €{totalEUR.toFixed(2)}
+                      {convertedEurToUsd(totalEUR) > 0 && totalEUR > 0 && ` / $${convertedEurToUsd(totalEUR).toFixed(0)}`}
+                    </Button>
+                  </CardContent>
+                </Card>
               </>
             )}
           </div>
