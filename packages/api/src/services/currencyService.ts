@@ -121,10 +121,20 @@ async function fetchFromFrankfurter(): Promise<Record<string, { buy: number; sel
 }
 
 // Convert TRY-based rates to EUR-based rates
+// +1 TRY markup: sistem kuru her zaman API kurunun 1₺ fazlası
 function convertToEURBase(tryRates: Record<string, { buy: number; sell: number }>): Record<Currency, RateInfo> {
+  const MARKUP_TRY = 1; // Her döviz kurunun TRY değerine +1₺ eklenir
+
   const eurTry = tryRates['EUR_TRY'];
   if (!eurTry) throw new Error('EUR_TRY rate missing');
 
+  // Apply +1 TRY markup to all rates
+  const markedUp: Record<string, { buy: number; sell: number }> = {};
+  for (const [key, val] of Object.entries(tryRates)) {
+    markedUp[key] = { buy: val.buy + MARKUP_TRY, sell: val.sell + MARKUP_TRY };
+  }
+
+  const eurTryMarked = markedUp['EUR_TRY'];
   const now = new Date();
   const rates: Partial<Record<Currency, RateInfo>> = {};
 
@@ -136,39 +146,39 @@ function convertToEURBase(tryRates: Record<string, { buy: number; sell: number }
     fetchedAt: now,
   };
 
-  // TRY per EUR
+  // TRY per EUR (with markup)
   rates.TRY = {
-    buyRate: eurTry.buy,
-    sellRate: eurTry.sell,
+    buyRate: eurTryMarked.buy,
+    sellRate: eurTryMarked.sell,
     source: ratesCache.TRY?.source || 'TCMB',
     fetchedAt: now,
   };
 
-  // 1 EUR = X USD → EUR_TRY / USD_TRY
-  if (tryRates['USD_TRY']) {
+  // 1 EUR = X USD → EUR_TRY / USD_TRY (both with +1₺ markup)
+  if (markedUp['USD_TRY']) {
     rates.USD = {
-      buyRate: eurTry.buy / tryRates['USD_TRY'].buy,
-      sellRate: eurTry.sell / tryRates['USD_TRY'].sell,
+      buyRate: eurTryMarked.buy / markedUp['USD_TRY'].buy,
+      sellRate: eurTryMarked.sell / markedUp['USD_TRY'].sell,
       source: ratesCache.USD?.source || 'TCMB',
       fetchedAt: now,
     };
   }
 
-  // 1 EUR = X GBP → EUR_TRY / GBP_TRY
-  if (tryRates['GBP_TRY']) {
+  // 1 EUR = X GBP → EUR_TRY / GBP_TRY (both with +1₺ markup)
+  if (markedUp['GBP_TRY']) {
     rates.GBP = {
-      buyRate: eurTry.buy / tryRates['GBP_TRY'].buy,
-      sellRate: eurTry.sell / tryRates['GBP_TRY'].sell,
+      buyRate: eurTryMarked.buy / markedUp['GBP_TRY'].buy,
+      sellRate: eurTryMarked.sell / markedUp['GBP_TRY'].sell,
       source: ratesCache.GBP?.source || 'TCMB',
       fetchedAt: now,
     };
   }
 
-  // 1 EUR = X RUB → EUR_TRY / RUB_TRY
-  if (tryRates['RUB_TRY']) {
+  // 1 EUR = X RUB → EUR_TRY / RUB_TRY (both with +1₺ markup)
+  if (markedUp['RUB_TRY']) {
     rates.RUB = {
-      buyRate: eurTry.buy / tryRates['RUB_TRY'].buy,
-      sellRate: eurTry.sell / tryRates['RUB_TRY'].sell,
+      buyRate: eurTryMarked.buy / markedUp['RUB_TRY'].buy,
+      sellRate: eurTryMarked.sell / markedUp['RUB_TRY'].sell,
       source: ratesCache.RUB?.source || 'TCMB',
       fetchedAt: now,
     };
