@@ -410,43 +410,48 @@ export default function LiveFlightsPage() {
               </p>
             ) : (
               <div className="space-y-3">
+                {/* Grup 1 header — her zaman görünür */}
+                <div className="flex items-center justify-between px-1">
+                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-full" style={{background:'#fef3c7',color:'#92400e'}}>
+                    Grup 1 — {splitAt !== null ? splitAt : waiting.length} kişi
+                  </span>
+                  {splitAt !== null && (
+                    <button onClick={() => setSplitAt(null)} className="text-[10px] px-2 py-0.5 rounded-full font-bold" style={{background:'#fee2e2',color:'#dc2626'}}>
+                      Grubu Kaldır
+                    </button>
+                  )}
+                </div>
                 {waiting.map((flight, idx) => {
-                  // Grup ayırıcı: önceki müşteriyle 10+ dk fark varsa çizgi çek
+                  // Otomatik 10dk boşluk algılama
                   const prevFlight = idx > 0 ? waiting[idx - 1] : null
-                  // Ayırıcı: splitAt varsa onu kullan, yoksa otomatik 10dk boşluk
                   const autoSep = prevFlight && Math.abs(new Date(flight.createdAt).getTime() - new Date(prevFlight.createdAt).getTime()) > 10 * 60 * 1000
                   if (autoSep && splitAt === null) { setTimeout(() => setSplitAt(idx), 0) }
-                  const showSeparator = splitAt !== null ? idx === splitAt : autoSep
+                  const isSplitHere = splitAt === idx
                   return (<>
-                  {showSeparator && (() => {
-                    // Bu gruptan sonraki kişi sayısını hesapla
-                    let groupCount = 0
-                    for (let j = idx; j < waiting.length; j++) {
-                      if (j > idx) {
-                        const pTime = new Date(waiting[j - 1].createdAt).getTime()
-                        const cTime = new Date(waiting[j].createdAt).getTime()
-                        if (Math.abs(cTime - pTime) > 10 * 60 * 1000) break
-                      }
-                      groupCount++
-                    }
-                    const upperCount = idx
-                    return (
-                      <div>
-                        <div className="flex items-center justify-between px-1 py-0.5">
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{background:'#fef3c7',color:'#92400e'}}>↑ Grup 1 — {upperCount} kişi</span>
-                          <div className="flex gap-1">
-                            <button onClick={() => setSplitAt(s => s !== null && s < waiting.length ? s + 1 : s)} className="text-[11px] px-2 py-1 rounded-full font-bold" style={{background:'#dcfce7',color:'#16a34a'}}>+Ekle</button>
-                            <button onClick={() => setSplitAt(s => s !== null && s > 1 ? s - 1 : s)} className="text-[11px] px-2 py-1 rounded-full font-bold" style={{background:'#fee2e2',color:'#dc2626'}}>−Çıkar</button>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2 py-0.5">
-                          <div className="flex-1 h-0.5" style={{ background: 'linear-gradient(to right, transparent, #ef4444, #ef4444, transparent)' }} />
-                          <span className="text-[10px] font-bold text-red-500 whitespace-nowrap">↓ Grup 2 — {groupCount} kişi</span>
-                          <div className="flex-1 h-0.5" style={{ background: 'linear-gradient(to left, transparent, #ef4444, #ef4444, transparent)' }} />
+                  {/* Separator — otomatik veya manuel */}
+                  {isSplitHere && (
+                    <div>
+                      <div className="flex items-center justify-between px-1 py-0.5">
+                        <div className="flex gap-1">
+                          <button onClick={() => setSplitAt(s => s !== null && s > 1 ? s - 1 : s)} className="text-[11px] px-2 py-1 rounded-full font-bold" style={{background:'#dcfce7',color:'#16a34a'}}>+Ekle</button>
+                          <button onClick={() => setSplitAt(s => s !== null && s < waiting.length ? s + 1 : s)} className="text-[11px] px-2 py-1 rounded-full font-bold" style={{background:'#fee2e2',color:'#dc2626'}}>-Çıkar</button>
                         </div>
                       </div>
-                    )
-                  })()}
+                      <div className="flex items-center gap-2 py-0.5">
+                        <div className="flex-1 h-0.5" style={{ background: 'linear-gradient(to right, transparent, #ef4444, #ef4444, transparent)' }} />
+                        <span className="text-[10px] font-bold text-red-500 whitespace-nowrap">Grup 2 — {waiting.length - idx} kişi</span>
+                        <div className="flex-1 h-0.5" style={{ background: 'linear-gradient(to left, transparent, #ef4444, #ef4444, transparent)' }} />
+                      </div>
+                    </div>
+                  )}
+                  {/* Manuel gruplama butonu — separator yoksa kartlar arası tıklanabilir çizgi */}
+                  {idx > 0 && !isSplitHere && splitAt === null && (
+                    <button onClick={() => setSplitAt(idx)} className="w-full flex items-center gap-2 py-0 group opacity-30 hover:opacity-100 transition-opacity">
+                      <div className="flex-1 h-px bg-gray-300 group-hover:bg-orange-400" />
+                      <span className="text-[9px] text-gray-400 group-hover:text-orange-500 font-bold whitespace-nowrap">buradan böl</span>
+                      <div className="flex-1 h-px bg-gray-300 group-hover:bg-orange-400" />
+                    </button>
+                  )}
                   <Card key={flight.id} className="bg-yellow-50">
                     <CardContent className="p-3">
                       <Link href={`/admin/customers/${flight.customer.displayId}`}>
