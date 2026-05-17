@@ -996,6 +996,7 @@ router.get(
       },
       include: {
         flights: {
+          where: { status: { not: 'CANCELLED' } },
           orderBy: { createdAt: 'desc' },
           take: 1,
           include: {
