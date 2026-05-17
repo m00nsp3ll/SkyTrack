@@ -456,18 +456,13 @@ router.put('/:id', authenticate, asyncHandler(async (req: AuthRequest, res: any)
         for (const flight of existing.flights) {
           await tx.flight.update({ where: { id: flight.id }, data: { status: 'CANCELLED', notes: 'Müşteri iptal edildi' } });
 
-          // Pilotun sırasını koru — roundCount ve dailyFlightCount geri al
-          const pilot = await tx.pilot.findUnique({ where: { id: flight.pilotId } });
-          if (pilot) {
-            await tx.pilot.update({
-              where: { id: flight.pilotId },
-              data: {
-                status: 'AVAILABLE',
-                dailyFlightCount: pilot.dailyFlightCount > 0 ? { decrement: 1 } : 0,
-                roundCount: pilot.roundCount > 0 ? { decrement: 1 } : 0,
-              },
-            });
-          }
+          // Müşteri iptal = pilot pilotajını almış sayılır
+          // dailyFlightCount ve roundCount düşürülMEZ — pilot uçmuş gibi devam eder
+          // Sadece status AVAILABLE yapılır (sıradaki müşteriyi alabilsin)
+          await tx.pilot.update({
+            where: { id: flight.pilotId },
+            data: { status: 'AVAILABLE' },
+          });
         }
 
         // Müşteriyi iptal et ve pilot atamasını kaldır
