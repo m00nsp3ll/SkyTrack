@@ -179,6 +179,7 @@ router.get('/:id', authenticate, asyncHandler(async (req: AuthRequest, res: any)
     include: {
       assignedPilot: true,
       flights: {
+        where: { status: { not: 'CANCELLED' } },
         include: {
           pilot: { select: { id: true, name: true } },
           mediaFolder: true,
