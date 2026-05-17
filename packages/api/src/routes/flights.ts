@@ -984,7 +984,7 @@ router.patch('/:id/status', authenticate, asyncHandler(async (req: AuthRequest, 
   // Validate status transitions (no going back)
   const validTransitions: Record<string, string[]> = {
     ASSIGNED: ['PICKED_UP', 'CANCELLED'],
-    PICKED_UP: ['IN_FLIGHT', 'CANCELLED'],
+    PICKED_UP: ['IN_FLIGHT', 'CANCELLED', 'ASSIGNED'],
     IN_FLIGHT: ['COMPLETED', 'CANCELLED', 'PICKED_UP'],
     COMPLETED: [],
     CANCELLED: [],
@@ -1003,6 +1003,10 @@ router.patch('/:id/status', authenticate, asyncHandler(async (req: AuthRequest, 
   }
 
   switch (status) {
+    case 'ASSIGNED':
+      // PICKED_UP'tan geri alma — pickupAt temizle
+      updateData.pickupAt = null;
+      break;
     case 'PICKED_UP':
       // IN_FLIGHT'tan geri alma durumunda takeoffAt temizle
       if (flight.status === 'IN_FLIGHT') {

@@ -106,6 +106,7 @@ export default function LiveFlightsPage() {
   // Manuel admin status değiştirme — uygulaması olmayan pilotlar için
   const adminUpdateStatus = async (flightId: string, newStatus: string) => {
     const labels: Record<string, string> = {
+      ASSIGNED: 'Müşteri "Atandı" durumuna geri alınsın mı?',
       PICKED_UP: 'Müşteri alındı olarak işaretlensin mi?',
       IN_FLIGHT: 'Uçuş başlatılsın mı?',
       COMPLETED: 'Uçuş tamamlandı (güvenli iniş) olarak işaretlensin mi?',
@@ -520,21 +521,21 @@ export default function LiveFlightsPage() {
                         <div className="flex gap-2">
                           <Button
                             size="sm"
-                            variant="outline"
-                            className="border-gray-300 text-gray-600 hover:bg-gray-100"
-                            onClick={(e) => { e.stopPropagation(); adminUpdateStatus(flight.id, 'ASSIGNED') }}
-                            disabled={updatingId === flight.id}
-                          >
-                            <Undo2 className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            size="sm"
                             className="flex-1 bg-blue-500 hover:bg-blue-600"
                             onClick={(e) => { e.stopPropagation(); adminUpdateStatus(flight.id, 'IN_FLIGHT') }}
                             disabled={updatingId === flight.id}
                           >
                             <Plane className="h-4 w-4 mr-1" />
                             {updatingId === flight.id ? 'İşleniyor...' : 'Uçuşa Başla'}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="border-gray-300 text-gray-600 hover:bg-gray-100"
+                            onClick={(e) => { e.stopPropagation(); adminUpdateStatus(flight.id, 'ASSIGNED') }}
+                            disabled={updatingId === flight.id}
+                          >
+                            <Undo2 className="h-4 w-4" />
                           </Button>
                         </div>
                       )}
