@@ -644,7 +644,7 @@ export default function POSPage() {
   const displayProducts = getDisplayProducts()
 
   return (
-    <div className="h-[calc(100vh-80px)] flex flex-col gap-3">
+    <div className="h-[calc(100vh-80px)] flex flex-col gap-3" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
       {/* TOP: Exchange Rates Bar */}
       <div className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border shadow-sm flex-shrink-0">
         {/* Rates section - All in TRY */}

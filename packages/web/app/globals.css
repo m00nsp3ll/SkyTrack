@@ -104,4 +104,9 @@
   .sidebar-scrollbar::-webkit-scrollbar-thumb:hover {
     background-color: rgba(71, 85, 105, 0.75);
   }
+
+  /* Safe area — tüm sayfaların altına padding */
+  .safe-bottom {
+    padding-bottom: max(1rem, env(safe-area-inset-bottom, 0px));
+  }
 }

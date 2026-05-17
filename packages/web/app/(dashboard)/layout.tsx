@@ -115,7 +115,7 @@ export default function DashboardLayout({
 
       <div className="flex-1 flex flex-col min-w-0">
         <Header onMenuClick={() => setSidebarOpen(true)} />
-        <main className="flex-1 p-6">{children}</main>
+        <main className="flex-1 p-6" style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))' }}>{children}</main>
       </div>
     </div>
   )
