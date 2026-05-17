@@ -776,6 +776,7 @@ router.post(
       where: { id: customerId },
       include: {
         flights: {
+          where: { status: { not: 'CANCELLED' } },
           orderBy: { createdAt: 'desc' },
           take: 1,
           include: { pilot: true, mediaFolder: true },
@@ -876,6 +877,7 @@ router.post(
       where: { id: customerId },
       include: {
         flights: {
+          where: { status: { not: 'CANCELLED' } },
           orderBy: { createdAt: 'desc' },
           take: 1,
           include: { pilot: true, mediaFolder: true },
@@ -1082,6 +1084,7 @@ router.get(
       },
       include: {
         flights: {
+          where: { status: { not: 'CANCELLED' } },
           orderBy: { createdAt: 'desc' },
           take: 1,
           include: { mediaFolder: true, pilot: true },
@@ -1226,6 +1229,7 @@ router.get(
       },
       include: {
         flights: {
+          where: { status: { not: 'CANCELLED' } },
           orderBy: { createdAt: 'desc' },
           take: 1,
           include: { mediaFolder: true },
@@ -1278,6 +1282,7 @@ router.get(
       where: { OR: [{ id: customerId }, { displayId: customerId }] },
       include: {
         flights: {
+          where: { status: { not: 'CANCELLED' } },
           orderBy: { createdAt: 'desc' },
           take: 1,
           include: { mediaFolder: true },
@@ -1325,7 +1330,7 @@ router.get(
     const { customerId } = req.params;
     const customer = await prisma.customer.findFirst({
       where: { OR: [{ id: customerId }, { displayId: customerId }] },
-      include: { flights: { orderBy: { createdAt: 'desc' }, take: 1, include: { mediaFolder: true } } },
+      include: { flights: { where: { status: { not: 'CANCELLED' } }, orderBy: { createdAt: 'desc' }, take: 1, include: { mediaFolder: true } } },
     });
     if (!customer) throw new AppError('Müşteri bulunamadı', 404, 'CUSTOMER_NOT_FOUND');
     const mediaFolder = customer.flights[0]?.mediaFolder;
@@ -1357,6 +1362,7 @@ router.get(
       },
       include: {
         flights: {
+          where: { status: { not: 'CANCELLED' } },
           orderBy: { createdAt: 'desc' },
           take: 1,
           include: { mediaFolder: true },
@@ -1401,6 +1407,7 @@ router.get(
       where: { OR: [{ id: customerId }, { displayId: customerId }] },
       include: {
         flights: {
+          where: { status: { not: 'CANCELLED' } },
           orderBy: { createdAt: 'desc' },
           take: 1,
           include: { mediaFolder: true },
@@ -1465,6 +1472,7 @@ router.get(
       where: { OR: [{ id: customerId }, { displayId: customerId }] },
       include: {
         flights: {
+          where: { status: { not: 'CANCELLED' } },
           orderBy: { createdAt: 'desc' },
           take: 1,
           include: { mediaFolder: true },
@@ -1542,6 +1550,7 @@ router.patch(
       },
       include: {
         flights: {
+          where: { status: { not: 'CANCELLED' } },
           orderBy: { createdAt: 'desc' },
           take: 1,
           include: { mediaFolder: true },
@@ -1604,6 +1613,7 @@ router.patch(
       where: { id: customerId },
       include: {
         flights: {
+          where: { status: { not: 'CANCELLED' } },
           orderBy: { createdAt: 'desc' },
           take: 1,
           include: { mediaFolder: true },
@@ -1645,6 +1655,7 @@ router.post(
       where: { id: customerId },
       include: {
         flights: {
+          where: { status: { not: 'CANCELLED' } },
           orderBy: { createdAt: 'desc' },
           take: 1,
           include: { mediaFolder: true },
@@ -1758,6 +1769,7 @@ router.delete(
       where: { id: customerId },
       include: {
         flights: {
+          where: { status: { not: 'CANCELLED' } },
           orderBy: { createdAt: 'desc' },
           take: 1,
           include: { mediaFolder: true },
@@ -1813,6 +1825,7 @@ router.post(
       where: { OR: [{ id: customerId }, { displayId: customerId }] },
       include: {
         flights: {
+          where: { status: { not: 'CANCELLED' } },
           orderBy: { createdAt: 'desc' },
           take: 1,
           include: { mediaFolder: true, pilot: true },
