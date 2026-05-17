@@ -428,6 +428,26 @@ router.get('/:id/panel', authenticate, asyncHandler(async (req: AuthRequest, res
   // Calculate ACTUAL completed flight count for today
   const actualDailyFlightCount = completedFlights.length;
 
+  // Bugün iptal olan uçuşlar (müşteri iptal — pilotun panelinde gösterilecek)
+  const cancelledFlightsToday = await prisma.flight.findMany({
+    where: {
+      pilotId: id,
+      status: 'CANCELLED',
+      cancellationReason: { not: 'FORFEIT' },
+      createdAt: { gte: today },
+    },
+    include: {
+      customer: {
+        select: {
+          id: true, displayId: true, firstName: true, lastName: true,
+          phone: true, weight: true, createdAt: true,
+        },
+      },
+    },
+    orderBy: { updatedAt: 'desc' },
+    take: 5,
+  });
+
   // Calculate DYNAMIC queue position: all inQueue=true pilots, status independent
   // ON_BREAK / OFF_DUTY pilots keep their spot but won't receive customers until AVAILABLE
   const allQueuedPilots = await prisma.pilot.findMany({
@@ -483,6 +503,7 @@ router.get('/:id/panel', authenticate, asyncHandler(async (req: AuthRequest, res
       },
       activeFlights,
       completedFlights,
+      cancelledFlightsToday,
       stats: {
         completed: completedFlights.length,
         remaining: pilot.maxDailyFlights - actualDailyFlightCount,

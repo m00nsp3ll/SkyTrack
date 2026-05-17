@@ -75,6 +75,7 @@ interface PanelData {
   pilot: PilotData
   activeFlights: Flight[]
   completedFlights: Flight[]
+  cancelledFlightsToday?: Flight[]
   stats: {
     completed: number
     remaining: number
@@ -532,6 +533,7 @@ export default function PilotPanel() {
   const pilot = panelData?.pilot
   const activeFlights = panelData?.activeFlights || []
   const completedFlights = panelData?.completedFlights || []
+  const cancelledFlightsToday = panelData?.cancelledFlightsToday || []
   const stats = panelData?.stats
   const isAtLimit = pilot && pilot.dailyFlightCount >= pilot.maxDailyFlights
   const currentStatus = pilot ? statusConfig[pilot.status] : null
@@ -701,6 +703,28 @@ export default function PilotPanel() {
             {lastUpdate.toLocaleTimeString('tr-TR')}
           </span>
         </div>
+
+        {/* Bugün iptal olan müşteriler */}
+        {cancelledFlightsToday.length > 0 && (
+          <div className="space-y-2 mb-3">
+            {cancelledFlightsToday.map((flight: any) => (
+              <Card key={flight.id} className="border-red-200 bg-red-50/50">
+                <CardContent className="p-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-semibold text-sm text-red-700">
+                        {flight.customer.firstName} {flight.customer.lastName}
+                        <span className="ml-2 text-xs text-muted-foreground">{flight.customer.displayId}</span>
+                      </p>
+                      <p className="text-xs text-red-500 font-medium mt-0.5">Müşteri İptal</p>
+                    </div>
+                    <span className="text-xs font-bold px-2 py-1 rounded bg-red-100 text-red-600">İPTAL</span>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
 
         {activeFlights.length === 0 ? (
           <Card className="mb-4">
